@@ -1,0 +1,252 @@
+/* ════════════════════════════════════════════════════
+   Stickman Mystery — Admin Dashboard styles
+   ════════════════════════════════════════════════════ */
+
+.sma-dashboard {
+  background: #0d1117;
+  border-radius: 10px;
+  border: 1px solid #21262d;
+  overflow: hidden;
+  margin-top: 1rem;
+}
+
+/* ── Header ─────────────────────────────────────── */
+.sma-header {
+  background: linear-gradient(135deg, #1a1a2e 0%, #162447 100%);
+  color: white;
+  padding: 1.2rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.sma-title {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.sma-icon {
+  font-size: 2rem;
+}
+
+.sma-title h3 {
+  margin: 0 0 0.15rem;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.sma-title p {
+  margin: 0;
+  font-size: 0.8rem;
+  opacity: 0.65;
+}
+
+.sma-pills {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.sma-pill {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  padding: 0.4rem 0.9rem;
+  text-align: center;
+  min-width: 64px;
+  color: #fff;
+}
+
+.sma-pill.solved-pill {
+  background: rgba(34, 197, 94, 0.2);
+  border-color: rgba(34, 197, 94, 0.4);
+}
+
+.sma-pill.playing-pill {
+  background: rgba(251, 191, 36, 0.15);
+  border-color: rgba(251, 191, 36, 0.4);
+}
+
+.sma-answer-pill {
+  background: rgba(250, 204, 21, 0.15);
+  border: 1.5px solid rgba(250, 204, 21, 0.5);
+  border-radius: 10px;
+  padding: 0.4rem 0.9rem;
+  text-align: center;
+  min-width: 80px;
+  cursor: pointer;
+  transition: background 0.2s;
+  user-select: none;
+  color: #fff;
+}
+
+.sma-answer-pill:hover {
+  background: rgba(250, 204, 21, 0.28);
+}
+
+.sma-answer-val {
+  color: #fef08a;
+  letter-spacing: 3px;
+}
+
+.sma-pill-val {
+  display: block;
+  font-size: 1.2rem;
+  font-weight: 700;
+  font-family: "Courier New", monospace;
+  line-height: 1;
+}
+
+.sma-pill-label {
+  font-size: 0.7rem;
+  opacity: 0.8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ── Info panel ─────────────────────────────────── */
+.sma-info {
+  padding: 0.85rem 1.25rem;
+  background: #161b22;
+  border-bottom: 1px solid #21262d;
+}
+
+.sma-info h4 {
+  margin: 0 0 0.6rem;
+  font-size: 0.8rem;
+  color: #00c9a7;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.sma-info-grid {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.sma-info-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.83rem;
+  color: #c9d1d9;
+}
+
+.sma-info-label {
+  font-weight: 700;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.sma-info-val {
+  color: #e6edf3;
+}
+
+/* ── Leaderboard ────────────────────────────────── */
+.sma-leaderboard {
+  overflow: hidden;
+}
+
+.sma-empty {
+  padding: 2rem;
+  text-align: center;
+  color: #8b949e;
+  font-size: 0.88rem;
+}
+
+.sma-lb-header {
+  display: grid;
+  grid-template-columns: 48px 1fr 80px 100px 90px 70px;
+  background: #161b22;
+  padding: 0.5rem 1rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #8b949e;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid #21262d;
+}
+
+.sma-lb-row {
+  display: grid;
+  grid-template-columns: 48px 1fr 80px 100px 90px 70px;
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid #161b22;
+  align-items: center;
+  font-size: 0.88rem;
+  color: #c9d1d9;
+  transition: background 0.12s;
+}
+
+.sma-lb-row:last-child {
+  border-bottom: none;
+}
+
+.sma-lb-row:hover {
+  background: rgba(0, 200, 167, 0.06);
+}
+
+.sma-row-solved {
+  background: rgba(22, 163, 74, 0.06);
+}
+
+.sma-row-solved:hover {
+  background: rgba(22, 163, 74, 0.1);
+}
+
+.sma-lb-rank {
+  font-size: 1rem;
+  text-align: center;
+}
+
+.sma-lb-name {
+  font-weight: 600;
+  color: #e6edf3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sma-lb-guesses {
+  text-align: center;
+  font-family: "Courier New", monospace;
+}
+
+.sma-lb-status {
+  font-size: 0.82rem;
+}
+
+.sma-lb-time {
+  font-size: 0.8rem;
+  color: #8b949e;
+}
+
+.sma-lb-score {
+  font-weight: 700;
+  color: #00c9a7;
+  text-align: right;
+}
+
+/* ── Responsive ─────────────────────────────────── */
+@media (max-width: 700px) {
+  .sma-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .sma-lb-header,
+  .sma-lb-row {
+    grid-template-columns: 36px 1fr 60px 80px 70px 55px;
+    font-size: 0.78rem;
+  }
+  .sma-info-grid {
+    flex-direction: column;
+  }
+}

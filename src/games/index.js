@@ -8,29 +8,30 @@
  * 4. Add an entry below following the same shape
  */
 
-import NumberMysteryGame from '../components/NumberMysteryGame';
-import NumberMysteryAdminDashboard from './NumberMystery/AdminDashboard';
+import NumberMysteryGame from "../components/NumberMysteryGame";
+import NumberMysteryAdminDashboard from "./NumberMystery/AdminDashboard";
+import StickmanMysteryGame from "./StickmanMystery/StickmanMysteryGame";
+import StickmanMysteryAdminDashboard from "./StickmanMystery/AdminDashboard";
 
 export const GAMES = [
   {
-    id: 'number-mystery',
-    name: 'Number Mystery',
-    icon: '🔍',
+    id: "number-mystery",
+    name: "Number Mystery",
+    icon: "🔍",
     description:
-      'Players guess a secret 4-digit code using Bulls & Cows clues. Score is based on speed and fewest guesses.',
+      "Players guess a secret 4-digit code using Bulls & Cows clues. Score is based on speed and fewest guesses.",
     PlayerComponent: NumberMysteryGame,
     AdminDashboard: NumberMysteryAdminDashboard,
   },
-
-  // ── Add more games here ──────────────────────────────────────────────────
-  // {
-  //   id: '3d-puzzle',
-  //   name: '3D Puzzle',
-  //   icon: '🧊',
-  //   description: 'Rotate and solve a 3-dimensional puzzle.',
-  //   PlayerComponent: ThreeDPuzzleGame,
-  //   AdminDashboard: ThreeDPuzzleAdminDashboard,
-  // },
+  {
+    id: "stickman-mystery",
+    name: "Stickman Mystery",
+    icon: "🏃",
+    description:
+      "Explore a 3D world as a stickman, collect 5 clues from mysterious objects, and solve the riddle before time runs out.",
+    PlayerComponent: StickmanMysteryGame,
+    AdminDashboard: StickmanMysteryAdminDashboard,
+  },
 ];
 
 /** Look up a game config by its id. Returns undefined if not found. */

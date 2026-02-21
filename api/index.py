@@ -43,7 +43,7 @@ def get_database():
 # -------------------------------------------------------------------------
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=False)
 
 def generate_passkey():
     """Generate a 6-character passkey"""
@@ -132,7 +132,7 @@ def get_room_by_id(db, room_id):
         return None
 
 # Rooms Routes
-@app.route('/api/rooms', methods=['POST', 'OPTIONS'])
+@app.route('/api/rooms', methods=['POST'])
 def create_room():
     db = get_database()
     if db is None:
@@ -178,7 +178,7 @@ def create_room():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/api/rooms/join', methods=['POST', 'OPTIONS'])
+@app.route('/api/rooms/join', methods=['POST'])
 def join_room():
     db = get_database()
     if db is None:
@@ -234,7 +234,7 @@ def join_room():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/api/rooms/<room_id>/players', methods=['GET', 'POST', 'OPTIONS'])
+@app.route('/api/rooms/<room_id>/players', methods=['GET', 'POST'])
 def room_players(room_id):
     db = get_database()
     if db is None:
@@ -292,7 +292,7 @@ def room_players(room_id):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/api/rooms/<room_id>/players/<player_id>', methods=['DELETE', 'OPTIONS'])
+@app.route('/api/rooms/<room_id>/players/<player_id>', methods=['DELETE'])
 def remove_room_player(room_id, player_id):
     db = get_database()
     if db is None:
@@ -323,7 +323,7 @@ def remove_room_player(room_id, player_id):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/api/rooms/<room_id>/admin', methods=['POST', 'OPTIONS'])
+@app.route('/api/rooms/<room_id>/admin', methods=['POST'])
 def room_admin_action(room_id):
     db = get_database()
     if db is None:
@@ -369,6 +369,9 @@ def room_admin_action(room_id):
                     clues = generate_clues(target)
                     additional_updates['targetNumber'] = target  # stored server-side
                     additional_updates['clues'] = clues           # safe to expose
+                elif game_type == 'stickman-mystery':
+                    additional_updates['mysteryAnswer'] = 'LIGHT'
+                    additional_updates['mysteryQuestion'] = 'All five clues describe the same thing. What am I?'
         elif action == 'pause':
             new_status = 'paused'
             additional_updates['pausedAt'] = datetime.utcnow()
@@ -413,6 +416,9 @@ def room_admin_action(room_id):
                 clues = generate_clues(target)
                 additional_updates['targetNumber'] = target
                 additional_updates['clues'] = clues
+            elif gt == 'stickman-mystery':
+                additional_updates['mysteryAnswer'] = 'LIGHT'
+                additional_updates['mysteryQuestion'] = 'All five clues describe the same thing. What am I?'
         elif action == 'clear-sessions':
             game_states.update_one(
                 {'roomId': room_oid},
@@ -454,6 +460,8 @@ def room_admin_action(room_id):
             additional_updates['gameType'] = None
             additional_updates['targetNumber'] = None
             additional_updates['clues'] = None
+            additional_updates['mysteryAnswer'] = None
+            additional_updates['mysteryQuestion'] = None
         
         update_data = {
             'status': new_status,
@@ -473,8 +481,9 @@ def room_admin_action(room_id):
         if result:
             result['_id'] = str(result['_id'])
             result['roomId'] = str(result['roomId'])
-            # Never send targetNumber to clients
+            # Never send secret answers to clients via admin action responses
             result.pop('targetNumber', None)
+            result.pop('mysteryAnswer', None)
         
         return jsonify({
             'success': True,
@@ -485,7 +494,7 @@ def room_admin_action(room_id):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/api/rooms/<room_id>/game-state', methods=['GET', 'OPTIONS'])
+@app.route('/api/rooms/<room_id>/game-state', methods=['GET'])
 def room_game_state(room_id):
     db = get_database()
     if db is None:
@@ -520,7 +529,7 @@ def room_game_state(room_id):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/api/rooms/<room_id>/guess', methods=['POST', 'OPTIONS'])
+@app.route('/api/rooms/<room_id>/guess', methods=['POST'])
 def submit_guess(room_id):
     db = get_database()
     if db is None:
@@ -586,8 +595,62 @@ def submit_guess(room_id):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+# Submit a text answer (Stickman Mystery and future text-answer games)
+@app.route('/api/rooms/<room_id>/answer', methods=['POST'])
+def submit_answer(room_id):
+    db = get_database()
+    if db is None:
+        return jsonify({'success': False, 'error': 'Database not configured'}), 503
+
+    try:
+        room_oid = ObjectId(room_id)
+        data = request.get_json() or {}
+        player_id = data.get('playerId')
+        answer = str(data.get('answer', '')).strip()
+        time_left = int(data.get('timeLeft', 0))
+        wrong_attempts = int(data.get('wrongAttempts', 0))
+
+        if not player_id or not answer:
+            return jsonify({'success': False, 'error': 'playerId and answer are required'}), 400
+
+        game_states = db['gamestate']
+        game_state = game_states.find_one({'roomId': room_oid})
+
+        if not game_state or game_state.get('status') != 'playing':
+            return jsonify({'success': False, 'error': 'Game is not active'}), 400
+
+        correct_answer = str(game_state.get('mysteryAnswer', '')).strip()
+        is_correct = answer.upper() == correct_answer.upper()
+        score = 0
+
+        if is_correct:
+            # Score = 1000 − elapsed*2 − wrongAttempts*100  (elapsed = 300 − timeLeft)
+            elapsed = 300 - max(0, time_left)
+            score = max(0, int(1000 - elapsed * 2 - wrong_attempts * 100))
+
+            players_collection = db['players']
+            players_collection.update_one(
+                {'_id': ObjectId(player_id)},
+                {'$set': {
+                    'score': score,
+                    'solved': True,
+                    'solvedAt': datetime.utcnow(),
+                    'guessCount': wrong_attempts + 1
+                }}
+            )
+            game_states.update_one({'roomId': room_oid}, {'$inc': {'version': 1}})
+
+        return jsonify({
+            'success': True,
+            'isCorrect': is_correct,
+            'score': score,
+        }), 200
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 # Events Route (Long Polling) - Updated for rooms
-@app.route('/api/events', methods=['GET', 'OPTIONS'])
+@app.route('/api/events', methods=['GET'])
 def events():
     db = get_database()
     if db is None:
@@ -629,6 +692,7 @@ def events():
                 game_state['roomId'] = str(game_state['roomId'])
                 if not is_admin:
                     game_state.pop('targetNumber', None)  # only strip for non-admins
+                    game_state.pop('mysteryAnswer', None)
             
             for player in players:
                 player['_id'] = str(player['_id'])
