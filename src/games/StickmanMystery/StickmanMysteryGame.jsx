@@ -7,8 +7,12 @@ const API_URL = import.meta.env.VITE_API_URL || "";
 
 /* ── Constants ──────────────────────────────────────── */
 const GAME_DURATION = 300; // 5 min countdown
-const TIME_PENALTY = 30; // seconds lost per clue
-const DECOY_PENALTY = 20; // seconds lost per decoy trap
+const CLUE_PENALTY = 15; // seconds lost per clue opened
+const TRASH_PENALTY = 30; // seconds lost per trash opened
+const TRASH_SLOW_DURATION = 4; // seconds of slowed movement after trash
+const TRASH_SHAKE_DURATION = 1; // seconds of camera shake after trash
+const SLOW_FACTOR = 0.4; // movement multiplier during slow
+const WRONG_ANSWER_PENALTY = 10; // seconds lost per wrong answer
 const INTERACT_DIST = 3.5;
 const MOVE_SPEED = 8;
 const TURN_SPEED = 3;
@@ -21,59 +25,211 @@ const DASH_COOLDOWN = 2; // seconds
 const PUSH_DIST = 2;
 const PUSH_FORCE = 18;
 const POSITION_SYNC_MS = 150;
+const TOTAL_STAGES = 5;
+const STAGE_MAX_SCORE = 200;
+const CLUES_PER_STAGE = 5;
 
 const PLAYER_COLORS = [
   0xff6b6b, 0x48dbfb, 0xfeca57, 0xff9ff3, 0x54a0ff, 0x5f27cd, 0x01a3a4,
   0xf368e0,
 ];
 
-/* ── Mystery puzzle data ────────────────────────────── */
-const MYSTERY = {
-  answer: "LIGHT",
-  question: "All five clues describe the same thing. What am I?",
-  objects: [
-    {
-      name: "Ancient Chest",
-      pos: [10, 0, 10],
-      color: 0x8b4513,
-      emissive: 0x5c2d0a,
-      beaconColor: 0xffd700,
-      clue: "I travel at exactly 299,792,458 m/s — the fastest speed possible in the universe.",
+/* ── 5 Stages — each with 5 clue objects + 3 trash ─── */
+const STAGES = [
+  {
+    name: "The Awakening",
+    answer: "WATER",
+    question: "All five clues describe the same thing. What am I?",
+    theme: {
+      color: 0x00e5ff,
+      emissive: 0x006b80,
+      beacon: 0x00e5ff,
+      label: "#00e5ff",
     },
-    {
-      name: "Crystal Orb",
-      pos: [-10, 0, -10],
-      color: 0x9b59b6,
-      emissive: 0x6c3483,
-      beaconColor: 0xbb8fce,
-      clue: "Without me, there is only complete and total darkness.",
+    clues: [
+      {
+        name: "Ancient Vessel",
+        clue: "I fall from the sky but never get hurt.",
+      },
+      { name: "Crystal Flask", clue: "I can be solid, liquid, or gas." },
+      { name: "Stone Basin", clue: "Fish live inside me." },
+      {
+        name: "Sealed Amphora",
+        clue: "I make up about 60% of the human body.",
+      },
+      {
+        name: "Jade Fountain",
+        clue: "I always run downhill but I have no legs.",
+      },
+    ],
+    trash: [
+      {
+        name: "Cracked Urn",
+        msg: "The urn crumbles to dust… worthless trash!",
+      },
+      {
+        name: "Rusted Helm",
+        msg: "The helm falls apart in your hands… it was junk!",
+      },
+      { name: "Broken Tablet", msg: "The writing fades away… just garbage!" },
+    ],
+  },
+  {
+    name: "The Shadows",
+    answer: "FIRE",
+    question: "All five clues describe the same thing. What am I?",
+    theme: {
+      color: 0xbb86fc,
+      emissive: 0x5d4380,
+      beacon: 0xbb86fc,
+      label: "#bb86fc",
     },
-    {
-      name: "Arcane Tome",
-      pos: [12, 0, -8],
-      color: 0xc0392b,
-      emissive: 0x922b21,
-      beaconColor: 0xe74c3c,
-      clue: "I am composed of tiny massless packets of energy called photons.",
+    clues: [
+      {
+        name: "Obsidian Cube",
+        clue: "I dance on a wick but I'm not a dancer.",
+      },
+      {
+        name: "Shadow Prism",
+        clue: "I need oxygen to stay alive, but I'm not an animal.",
+      },
+      {
+        name: "Dark Chalice",
+        clue: "Campers gather around me for warmth at night.",
+      },
+      {
+        name: "Void Crystal",
+        clue: "I can spread through forests faster than any animal can run.",
+      },
+      {
+        name: "Night Lantern",
+        clue: "I am the reason early humans could cook their food.",
+      },
+    ],
+    trash: [
+      {
+        name: "Empty Coffer",
+        msg: "The coffer is empty… nothing but a waste of time!",
+      },
+      { name: "Dead Compass", msg: "The needle spins wildly… it was cursed!" },
+      { name: "Cursed Coin", msg: "The coin burns your hand… it was a trap!" },
+    ],
+  },
+  {
+    name: "The Inferno",
+    answer: "TIME",
+    question: "All five clues describe the same thing. What am I?",
+    theme: {
+      color: 0xff5252,
+      emissive: 0x802929,
+      beacon: 0xff5252,
+      label: "#ff5252",
     },
-    {
-      name: "Golden Lantern",
-      pos: [-8, 0, 12],
-      color: 0xf39c12,
-      emissive: 0xd4ac0d,
-      beaconColor: 0xf9e79f,
-      clue: "I can behave as both a wave and a particle — a famous duality in physics.",
+    clues: [
+      {
+        name: "Molten Orb",
+        clue: "I never stop moving forward, yet I have no legs.",
+      },
+      {
+        name: "Flame Codex",
+        clue: "Everyone wants more of me, but no one can save me.",
+      },
+      { name: "Ember Crown", clue: "Doctors say I heal all wounds." },
+      {
+        name: "Blazing Mirror",
+        clue: "Clocks and watches exist only to track me.",
+      },
+      {
+        name: "Scorched Relic",
+        clue: "I fly when you're having fun but crawl when you're bored.",
+      },
+    ],
+    trash: [
+      { name: "Ash Pile", msg: "Just a pile of ash… nothing useful here!" },
+      {
+        name: "Burnt Scroll",
+        msg: "The scroll is too burnt to read… total waste!",
+      },
+      { name: "Cinder Stone", msg: "The stone is just a worthless cinder!" },
+    ],
+  },
+  {
+    name: "The Radiance",
+    answer: "SHADOW",
+    question: "All five clues describe the same thing. What am I?",
+    theme: {
+      color: 0xffab00,
+      emissive: 0x805500,
+      beacon: 0xffab00,
+      label: "#ffab00",
     },
-    {
-      name: "Enchanted Mirror",
-      pos: [-13, 0, 0],
-      color: 0xbdc3c7,
-      emissive: 0x85929e,
-      beaconColor: 0xd5f5e3,
-      clue: "Flip a switch and I instantly fill an entire room.",
+    clues: [
+      {
+        name: "Sun Stone",
+        clue: "I follow you everywhere during the day, but vanish at night.",
+      },
+      { name: "Light Shard", clue: "I can only exist when there is light." },
+      {
+        name: "Golden Eye",
+        clue: "The brighter the light, the darker I become.",
+      },
+      {
+        name: "Radiant Key",
+        clue: "I copy your every move perfectly, but I am flat.",
+      },
+      {
+        name: "Prism Heart",
+        clue: "Peter Pan once lost me and needed help getting me back.",
+      },
+    ],
+    trash: [
+      {
+        name: "Fool's Gold",
+        msg: "It's just fool's gold… completely worthless!",
+      },
+      { name: "Tarnished Ring", msg: "The ring turns to rust… it was cursed!" },
+      { name: "Hollow Gem", msg: "The gem is hollow inside… just a trick!" },
+    ],
+  },
+  {
+    name: "The Revelation",
+    answer: "ECHO",
+    question: "All five clues describe the same thing. What am I?",
+    theme: {
+      color: 0x00e676,
+      emissive: 0x00733b,
+      beacon: 0x00e676,
+      label: "#00e676",
     },
-  ],
-};
+    clues: [
+      {
+        name: "Verdant Tome",
+        clue: "I repeat everything you say, but I have no voice of my own.",
+      },
+      {
+        name: "Life Seed",
+        clue: "I am born in mountains, caves, and large empty halls.",
+      },
+      { name: "Emerald Scale", clue: "I get weaker every time I speak." },
+      {
+        name: "Nature's Core",
+        clue: "Shout into a canyon and I will answer you.",
+      },
+      {
+        name: "Genesis Orb",
+        clue: "I am not a parrot, but I copy every sound you make.",
+      },
+    ],
+    trash: [
+      {
+        name: "Dead Root",
+        msg: "The root withers in your hands… cursed garbage!",
+      },
+      { name: "Withered Leaf", msg: "The leaf crumbles to nothing… a trap!" },
+      { name: "Hollow Bark", msg: "The bark is hollow and rotten… just junk!" },
+    ],
+  },
+];
 
 /* ── Wall layout — maze style ───────────────────────── */
 const WALL_SEGMENTS = [
@@ -112,124 +268,6 @@ const WALL_SEGMENTS = [
   { x: 8, z: -24, w: 0.6, d: 6, h: 2.6 },
   { x: -8, z: -24, w: 0.6, d: 6, h: 2.6 },
   { x: 24, z: 10, w: 6, d: 0.6, h: 2.6 },
-];
-
-/* ── Decoy objects — look like real clues but are traps ── */
-const DECOY_OBJECTS = [
-  {
-    name: "Forgotten Scroll",
-    color: 0xd4a574,
-    emissive: 0x6a5238,
-    beaconColor: 0xffd700,
-    shape: 0,
-    msg: "This scroll crumbles into dust… it was a decoy!",
-  },
-  {
-    name: "Glowing Gem",
-    color: 0xe056a0,
-    emissive: 0x702850,
-    beaconColor: 0xff69b4,
-    shape: 1,
-    msg: "The gem flickers and goes dark… it was a trap!",
-  },
-  {
-    name: "Dusty Relic",
-    color: 0xb07d4b,
-    emissive: 0x583e25,
-    beaconColor: 0xdaa520,
-    shape: 2,
-    msg: "The relic shatters on touch… just a fake!",
-  },
-  {
-    name: "Shadow Orb",
-    color: 0x7b68ee,
-    emissive: 0x3d3477,
-    beaconColor: 0x9370db,
-    shape: 1,
-    msg: "Dark energy drains your time… it was cursed!",
-  },
-  {
-    name: "Mystic Chalice",
-    color: 0xc0c0c0,
-    emissive: 0x606060,
-    beaconColor: 0xe0e0e0,
-    shape: 3,
-    msg: "The chalice was empty — a worthless decoy!",
-  },
-  {
-    name: "Rune Stone",
-    color: 0x8fbc8f,
-    emissive: 0x475e47,
-    beaconColor: 0x90ee90,
-    shape: 2,
-    msg: "The runes fade away… this was a trap!",
-  },
-  {
-    name: "Enchanted Skull",
-    color: 0xdcdcdc,
-    emissive: 0x6e6e6e,
-    beaconColor: 0xf0f0f0,
-    shape: 0,
-    msg: "The skull laughs at you… time wasted on a fake!",
-  },
-  {
-    name: "Phoenix Feather",
-    color: 0xff4500,
-    emissive: 0x802200,
-    beaconColor: 0xff6347,
-    shape: 3,
-    msg: "The feather burns up — it was just a trick!",
-  },
-];
-const DECOY_INTERACT_DIST = 3.5;
-
-/* ── Stage system ────────────────────────────────────── */
-const TOTAL_STAGES = 5;
-const STAGE_MAX_SCORE = 200;
-const STAGE_THEMES = [
-  {
-    name: "The Awakening",
-    color: 0x00e5ff,
-    emissive: 0x006b80,
-    beacon: 0x00e5ff,
-    label: "#00e5ff",
-  },
-  {
-    name: "The Shadows",
-    color: 0xbb86fc,
-    emissive: 0x5d4380,
-    beacon: 0xbb86fc,
-    label: "#bb86fc",
-  },
-  {
-    name: "The Inferno",
-    color: 0xff5252,
-    emissive: 0x802929,
-    beacon: 0xff5252,
-    label: "#ff5252",
-  },
-  {
-    name: "The Radiance",
-    color: 0xffab00,
-    emissive: 0x805500,
-    beacon: 0xffab00,
-    label: "#ffab00",
-  },
-  {
-    name: "The Revelation",
-    color: 0x00e676,
-    emissive: 0x00733b,
-    beacon: 0x00e676,
-    label: "#00e676",
-  },
-];
-// Which DECOY_OBJECTS indices belong to each stage (0-based)
-const STAGE_DECOY_MAP = [
-  [0, 1], // Stage 1
-  [2, 3], // Stage 2
-  [4, 5], // Stage 3
-  [6], // Stage 4
-  [7], // Stage 5
 ];
 
 /* ── Helpers ─────────────────────────────────────────── */
@@ -560,9 +598,9 @@ function buildWallMesh(w) {
   const group = new THREE.Group();
   const isPerimeter = w.w >= 50 || w.d >= 50;
   const mat = new THREE.MeshStandardMaterial({
-    color: isPerimeter ? 0x4a4a6e : 0x6a6a90,
+    color: isPerimeter ? 0xb0b0b8 : 0xd0d0d8,
     roughness: 0.82,
-    metalness: 0.12,
+    metalness: 0.08,
   });
   // Subtle stone-brick look via a top cap
   const wall = new THREE.Mesh(new THREE.BoxGeometry(w.w, w.h, w.d), mat);
@@ -573,9 +611,9 @@ function buildWallMesh(w) {
 
   // Lighter cap on top of wall
   const capMat = new THREE.MeshStandardMaterial({
-    color: isPerimeter ? 0x5a5a80 : 0x8484a8,
+    color: isPerimeter ? 0xc8c8d0 : 0xe8e8f0,
     roughness: 0.75,
-    metalness: 0.15,
+    metalness: 0.1,
   });
   const cap = new THREE.Mesh(
     new THREE.BoxGeometry(w.w + 0.1, 0.12, w.d + 0.1),
@@ -626,8 +664,8 @@ function buildTorch(x, y, z) {
   return { group, flame, light: torchLight };
 }
 
-/** Build a decoy object — looks exactly like a real clue with beacon + label */
-function buildDecoyMesh(decoyData) {
+/** Build a trash object — looks similar to clues but with subtle warning hints */
+function buildTrashMesh(trashData, shapeIdx) {
   const group = new THREE.Group();
 
   // Pedestal (same as real clues)
@@ -645,16 +683,16 @@ function buildDecoyMesh(decoyData) {
   pedestal.receiveShadow = true;
   group.add(pedestal);
 
-  // Main shape (same shapes as real clues to deceive)
+  // Main shape (similar to clue shapes to blend in)
   const mainMat = new THREE.MeshStandardMaterial({
-    color: decoyData.color,
-    emissive: decoyData.emissive,
+    color: trashData.color,
+    emissive: trashData.emissive,
     emissiveIntensity: 0.5,
     roughness: 0.35,
     metalness: 0.3,
   });
   let mainMesh;
-  switch (decoyData.shape) {
+  switch (shapeIdx % 4) {
     case 0:
       mainMesh = new THREE.Mesh(
         new THREE.BoxGeometry(0.9, 0.55, 0.65),
@@ -689,10 +727,10 @@ function buildDecoyMesh(decoyData) {
   mainMesh.castShadow = true;
   group.add(mainMesh);
 
-  // Beacon (identical to real clues)
+  // Beacon (similar to clues — but animated differently in the loop)
   const beaconMat = new THREE.MeshStandardMaterial({
-    color: decoyData.beaconColor,
-    emissive: decoyData.beaconColor,
+    color: trashData.beaconColor,
+    emissive: trashData.beaconColor,
     emissiveIntensity: 1.5,
     transparent: true,
     opacity: 0.9,
@@ -704,13 +742,17 @@ function buildDecoyMesh(decoyData) {
   beacon.position.y = 2.5;
   group.add(beacon);
 
-  // Proximity ring (identical to real clues)
+  // Proximity ring — slightly reddish tint as a subtle warning
+  const ringColor = new THREE.Color(trashData.beaconColor).lerp(
+    new THREE.Color(0xff4444),
+    0.25,
+  );
   const ringMat = new THREE.MeshStandardMaterial({
-    color: decoyData.beaconColor,
-    emissive: decoyData.beaconColor,
+    color: ringColor,
+    emissive: ringColor,
     emissiveIntensity: 0.6,
     transparent: true,
-    opacity: 0.25,
+    opacity: 0.2,
     side: THREE.DoubleSide,
   });
   const ring = new THREE.Mesh(
@@ -721,23 +763,35 @@ function buildDecoyMesh(decoyData) {
   ring.position.y = 0.02;
   group.add(ring);
 
-  // Point light (same as real clues)
-  const light = new THREE.PointLight(decoyData.beaconColor, 2, 12);
+  // Point light
+  const light = new THREE.PointLight(trashData.beaconColor, 2, 12);
   light.position.y = 2.0;
   group.add(light);
 
-  // Name label (looks exactly like real clues)
+  // Name label
   const label = createTextSprite(
-    decoyData.name,
-    decoyData.labelColor || "#ffffff",
+    trashData.name,
+    trashData.labelColor || "#ffffff",
   );
   label.position.y = 3.2;
   group.add(label);
 
-  return { group, mesh: mainMesh, beacon, ring, light, label };
+  // ★ Warning indicator — small orbiting red dot (subtle hint)
+  const warnMat = new THREE.MeshStandardMaterial({
+    color: 0xff3333,
+    emissive: 0xff0000,
+    emissiveIntensity: 2.0,
+    transparent: true,
+    opacity: 0.7,
+  });
+  const warnDot = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), warnMat);
+  warnDot.position.set(0.8, 1.5, 0);
+  group.add(warnDot);
+
+  return { group, mesh: mainMesh, beacon, ring, light, label, warnDot };
 }
 
-// (decorative builder removed — replaced by decoy system)
+// (decorative builder removed — replaced by trash system)
 
 /** Check if a point is inside any wall (with padding radius) */
 function isInsideWall(x, z, radius, walls) {
@@ -805,7 +859,8 @@ const StickmanMysteryGame = () => {
   const clockRef = useRef(new THREE.Clock());
   const animFrameRef = useRef(null);
   const stickmanRef = useRef(null);
-  const objMeshesRef = useRef([]);
+  const clueMeshesRef = useRef([]);
+  const trashMeshesRef = useRef([]);
 
   /* ── Input refs ────────────────────────────────────── */
   const keysRef = useRef({});
@@ -814,22 +869,23 @@ const StickmanMysteryGame = () => {
   const interactCoolRef = useRef(false);
 
   /* ── State↔ref bridges (read from animation loop) ─── */
-  const cluesFoundRef = useRef([]);
-  const nearObjRef = useRef(null);
+  const stageCluesFoundRef = useRef([]);
+  const stageTrashTriggeredRef = useRef([]);
+  const nearClueRef = useRef(null);
+  const nearTrashRef = useRef(null);
   const showingModalRef = useRef(false);
-  const solvedRef = useRef(false);
+  const gameCompleteRef = useRef(false);
   const gameOverRef = useRef(false);
   const isPausedRef = useRef(false);
   const nearCartRef = useRef(false);
   const cartMeshRef = useRef(null);
   const wallBoxesRef = useRef([]);
-  const decoyMeshesRef = useRef([]);
-  const decoysTriggeredRef = useRef([]);
-  const nearDecoyRef = useRef(null);
   const torchFlamesRef = useRef([]);
   const currentStageRef = useRef(0);
   const stageStartTimeRef = useRef(GAME_DURATION);
-  const stageDecoysRef = useRef([0, 0, 0, 0, 0]);
+  const slowTimeRef = useRef(0);
+  const shakeTimeRef = useRef(0);
+  const isSlowedRef = useRef(false);
 
   /* ── Multiplayer refs ──────────────────────────────── */
   const otherPlayersRef = useRef(new Map());
@@ -842,25 +898,26 @@ const StickmanMysteryGame = () => {
 
   /* ── React state ───────────────────────────────────── */
   const [timeLeft, setTimeLeft] = useState(GAME_DURATION);
-  const [cluesFound, setCluesFound] = useState([]);
-  const [nearObject, setNearObject] = useState(null);
+  const [currentStage, setCurrentStage] = useState(0);
+  const [stageCluesFound, setStageCluesFound] = useState([]);
+  const [stageTrashTriggered, setStageTrashTriggered] = useState([]);
+  const [nearClue, setNearClue] = useState(null);
+  const [nearTrash, setNearTrash] = useState(null);
   const [showClue, setShowClue] = useState(null);
-  const [showQuestion, setShowQuestion] = useState(false);
-  const [answer, setAnswer] = useState("");
+  const [showTrash, setShowTrash] = useState(null);
+  const [showStageQuestion, setShowStageQuestion] = useState(false);
+  const [stageAnswer, setStageAnswer] = useState("");
+  const [stageWrongAttempts, setStageWrongAttempts] = useState(0);
   const [error, setError] = useState("");
-  const [solved, setSolved] = useState(false);
+  const [gameComplete, setGameComplete] = useState(false);
   const [finalScore, setFinalScore] = useState(0);
-  const [wrongAttempts, setWrongAttempts] = useState(0);
   const [gameOver, setGameOver] = useState(false);
   const [nearCart, setNearCart] = useState(false);
   const [isDashing, setIsDashing] = useState(false);
   const [dashReady, setDashReady] = useState(true);
-  const [nearDecoy, setNearDecoy] = useState(null);
-  const [showDecoyTrap, setShowDecoyTrap] = useState(null);
-  const [decoysTriggered, setDecoysTriggered] = useState([]);
-  const [currentStage, setCurrentStage] = useState(0);
-  const [stageScores, setStageScores] = useState([]);
+  const [isSlowed, setIsSlowed] = useState(false);
   const [showStageSummary, setShowStageSummary] = useState(null);
+  const [stageScores, setStageScores] = useState([]);
   const [showFinalSummary, setShowFinalSummary] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
 
@@ -873,11 +930,14 @@ const StickmanMysteryGame = () => {
 
   /* ── Keep refs in sync ─────────────────────────────── */
   useEffect(() => {
-    cluesFoundRef.current = cluesFound;
-  }, [cluesFound]);
+    stageCluesFoundRef.current = stageCluesFound;
+  }, [stageCluesFound]);
   useEffect(() => {
-    solvedRef.current = solved;
-  }, [solved]);
+    stageTrashTriggeredRef.current = stageTrashTriggered;
+  }, [stageTrashTriggered]);
+  useEffect(() => {
+    gameCompleteRef.current = gameComplete;
+  }, [gameComplete]);
   useEffect(() => {
     gameOverRef.current = gameOver;
   }, [gameOver]);
@@ -890,18 +950,20 @@ const StickmanMysteryGame = () => {
   useEffect(() => {
     showingModalRef.current =
       showClue !== null ||
-      showQuestion ||
-      showDecoyTrap !== null ||
+      showTrash !== null ||
+      showStageQuestion ||
       showStageSummary !== null ||
       showFinalSummary ||
-      showDashboard;
+      showDashboard ||
+      (gameComplete && !showFinalSummary && !showDashboard);
   }, [
     showClue,
-    showQuestion,
-    showDecoyTrap,
+    showTrash,
+    showStageQuestion,
     showStageSummary,
     showFinalSummary,
     showDashboard,
+    gameComplete,
   ]);
 
   /* ── Detect admin restart ──────────────────────────── */
@@ -909,54 +971,61 @@ const StickmanMysteryGame = () => {
     const newStarted = gameState?.startedAt;
     if (newStarted && newStarted !== prevStartedAtRef.current) {
       setTimeLeft(GAME_DURATION);
-      setCluesFound([]);
+      setCurrentStage(0);
+      setStageCluesFound([]);
+      setStageTrashTriggered([]);
       setShowClue(null);
-      setShowQuestion(false);
-      setAnswer("");
+      setShowTrash(null);
+      setShowStageQuestion(false);
+      setStageAnswer("");
+      setStageWrongAttempts(0);
       setError("");
-      setSolved(false);
+      setGameComplete(false);
       setFinalScore(0);
-      setWrongAttempts(0);
       setGameOver(false);
-      cluesFoundRef.current = [];
-      solvedRef.current = false;
+      setIsDashing(false);
+      setDashReady(true);
+      setIsSlowed(false);
+      setShowStageSummary(null);
+      setStageScores([]);
+      setShowFinalSummary(false);
+      setShowDashboard(false);
+      // Reset refs
+      stageCluesFoundRef.current = [];
+      stageTrashTriggeredRef.current = [];
+      currentStageRef.current = 0;
+      gameCompleteRef.current = false;
       gameOverRef.current = false;
+      slowTimeRef.current = 0;
+      shakeTimeRef.current = 0;
+      stageStartTimeRef.current = GAME_DURATION;
       isDashingRef.current = false;
       dashCoolRef.current = false;
       dashTimerRef.current = 0;
       pushVelocityRef.current = { x: 0, z: 0 };
-      setIsDashing(false);
-      setDashReady(true);
       // reset stickman position
       if (stickmanRef.current) {
         stickmanRef.current.group.position.set(0, 0, 0);
         stickmanAngleRef.current = 0;
       }
-      // restore beacons
-      objMeshesRef.current.forEach((o) => {
+      // restore all clue object beacons
+      clueMeshesRef.current.forEach((o) => {
         if (o.beacon) o.beacon.visible = true;
-        if (o.ring) o.ring.visible = true;
+        if (o.ring) {
+          o.ring.visible = true;
+          o.ring.material.opacity = 0.25;
+        }
         if (o.light) o.light.intensity = 2;
       });
-      // restore decoys
-      decoyMeshesRef.current.forEach((d) => {
-        if (d.beacon) d.beacon.visible = true;
-        if (d.ring) d.ring.material.opacity = 0.25;
-        if (d.light) d.light.intensity = 2;
+      // restore all trash object beacons
+      trashMeshesRef.current.forEach((t) => {
+        if (t.beacon) t.beacon.visible = true;
+        if (t.ring) {
+          t.ring.material.opacity = 0.2;
+        }
+        if (t.light) t.light.intensity = 2;
+        if (t.warnDot) t.warnDot.visible = true;
       });
-      setDecoysTriggered([]);
-      decoysTriggeredRef.current = [];
-      setShowDecoyTrap(null);
-      setNearDecoy(null);
-      // Reset stage system
-      setCurrentStage(0);
-      setStageScores([]);
-      setShowStageSummary(null);
-      setShowFinalSummary(false);
-      setShowDashboard(false);
-      currentStageRef.current = 0;
-      stageStartTimeRef.current = GAME_DURATION;
-      stageDecoysRef.current = [0, 0, 0, 0, 0];
       prevStartedAtRef.current = newStarted;
     }
   }, [gameState?.startedAt]);
@@ -965,7 +1034,7 @@ const StickmanMysteryGame = () => {
   const timerRef = useRef(null);
   useEffect(() => {
     clearInterval(timerRef.current);
-    if (solved || gameOver || isPaused || gameState?.status !== "playing")
+    if (gameComplete || gameOver || isPaused || gameState?.status !== "playing")
       return;
     timerRef.current = setInterval(() => {
       setTimeLeft((prev) => {
@@ -977,7 +1046,7 @@ const StickmanMysteryGame = () => {
       });
     }, 1000);
     return () => clearInterval(timerRef.current);
-  }, [solved, gameOver, isPaused, gameState?.status]);
+  }, [gameComplete, gameOver, isPaused, gameState?.status]);
 
   /* ════════════════════════════════════════════════════
      Three.js scene — runs once on mount
@@ -1106,69 +1175,68 @@ const StickmanMysteryGame = () => {
       [0, 0],
       [CART_POS[0], CART_POS[2]],
     ];
-    const randomPositions = MYSTERY.objects.map((obj) => {
-      const pos = generateRandomPos(occupied, wallBoxes, 5, BOUNDARY - 2, 6);
-      if (pos) {
-        occupied.push(pos);
-        return pos;
-      }
-      occupied.push([obj.pos[0], obj.pos[2]]);
-      return [obj.pos[0], obj.pos[2]];
-    });
 
     // ── Stickman ──────────────────────────────────────
     const stickman = buildStickman();
     scene.add(stickman.group);
     stickmanRef.current = stickman;
 
-    // ── 5 Mystery objects (one per stage, stage-colored) ──────
-    const objMeshes = MYSTERY.objects.map((data, i) => {
-      const theme = STAGE_THEMES[i];
-      const themedData = {
-        ...data,
-        color: theme.color,
-        emissive: theme.emissive,
-        beaconColor: theme.beacon,
-        labelColor: theme.label,
-      };
-      const obj = buildObjectMesh(themedData, i);
-      const rp = randomPositions[i];
-      obj.group.position.set(rp[0], 0, rp[1]);
-      obj.stage = i;
-      obj.group.visible = i === 0; // Only stage 0 visible initially
-      scene.add(obj.group);
-      return obj;
+    // ── Clue objects (5 per stage × 5 stages = 25) ────
+    const clueMeshes = [];
+    STAGES.forEach((stage, stageIdx) => {
+      stage.clues.forEach((clueData, clueIdx) => {
+        const themedData = {
+          ...clueData,
+          pos: [0, 0, 0],
+          color: stage.theme.color,
+          emissive: stage.theme.emissive,
+          beaconColor: stage.theme.beacon,
+          labelColor: stage.theme.label,
+        };
+        const pos = generateRandomPos(occupied, wallBoxes, 4, BOUNDARY - 2, 5);
+        if (!pos) return;
+        occupied.push(pos);
+        const obj = buildObjectMesh(themedData, clueIdx);
+        obj.group.position.set(pos[0], 0, pos[1]);
+        obj.group.visible = stageIdx === 0;
+        scene.add(obj.group);
+        clueMeshes.push({ ...obj, stage: stageIdx, clueIdx, data: clueData });
+      });
     });
-    objMeshesRef.current = objMeshes;
+    clueMeshesRef.current = clueMeshes;
 
     // ── Answer Cart ───────────────────────────────────
     const cart = buildCartMesh();
     scene.add(cart.group);
     cartMeshRef.current = cart;
 
-    // ── Decoy objects (stage-assigned, same color as their stage clue) ──
-    const decoyMeshes = [];
-    STAGE_DECOY_MAP.forEach((decoyIndices, stageIdx) => {
-      const theme = STAGE_THEMES[stageIdx];
-      decoyIndices.forEach((dIdx) => {
-        const decoyData = {
-          ...DECOY_OBJECTS[dIdx],
-          color: theme.color,
-          emissive: theme.emissive,
-          beaconColor: theme.beacon,
-          labelColor: theme.label,
+    // ── Trash objects (3 per stage × 5 stages = 15) ───
+    const trashMeshes = [];
+    STAGES.forEach((stage, stageIdx) => {
+      stage.trash.forEach((trashData, trashIdx) => {
+        const themedData = {
+          ...trashData,
+          color: stage.theme.color,
+          emissive: stage.theme.emissive,
+          beaconColor: stage.theme.beacon,
+          labelColor: stage.theme.label,
         };
         const pos = generateRandomPos(occupied, wallBoxes, 4, BOUNDARY - 2, 5);
         if (!pos) return;
         occupied.push(pos);
-        const decoy = buildDecoyMesh(decoyData);
-        decoy.group.position.set(pos[0], 0, pos[1]);
-        decoy.group.visible = stageIdx === 0;
-        scene.add(decoy.group);
-        decoyMeshes.push({ ...decoy, data: decoyData, pos, stage: stageIdx });
+        const mesh = buildTrashMesh(themedData, trashIdx);
+        mesh.group.position.set(pos[0], 0, pos[1]);
+        mesh.group.visible = stageIdx === 0;
+        scene.add(mesh.group);
+        trashMeshes.push({
+          ...mesh,
+          stage: stageIdx,
+          trashIdx,
+          data: trashData,
+        });
       });
     });
-    decoyMeshesRef.current = decoyMeshes;
+    trashMeshesRef.current = trashMeshes;
 
     // ── Animation loop ────────────────────────────────
     const clock = clockRef.current;
@@ -1182,17 +1250,27 @@ const StickmanMysteryGame = () => {
       const keys = keysRef.current;
       const paused = isPausedRef.current;
       const modal = showingModalRef.current;
-      const done = solvedRef.current;
+      const done = gameCompleteRef.current;
       const over = gameOverRef.current;
       const canMove = !paused && !modal && !done && !over;
       const curStage = currentStageRef.current;
 
+      /* —— Slow / shake effect timers (only tick when canMove for slow) —— */
+      if (canMove && slowTimeRef.current > 0) slowTimeRef.current -= delta;
+      if (shakeTimeRef.current > 0) shakeTimeRef.current -= delta;
+      const nowSlowed = slowTimeRef.current > 0;
+      if (nowSlowed !== isSlowedRef.current) {
+        isSlowedRef.current = nowSlowed;
+        setIsSlowed(nowSlowed);
+      }
+      const effectiveSpeed = nowSlowed ? MOVE_SPEED * SLOW_FACTOR : MOVE_SPEED;
+
       /* —— Stage visibility —— */
-      objMeshes.forEach((o, i) => {
-        o.group.visible = i === curStage && curStage < TOTAL_STAGES;
+      clueMeshes.forEach((o) => {
+        o.group.visible = o.stage === curStage && curStage < TOTAL_STAGES;
       });
-      decoyMeshes.forEach((d) => {
-        d.group.visible = d.stage === curStage && curStage < TOTAL_STAGES;
+      trashMeshes.forEach((t) => {
+        t.group.visible = t.stage === curStage && curStage < TOTAL_STAGES;
       });
 
       /* —— Movement —— */
@@ -1220,7 +1298,7 @@ const StickmanMysteryGame = () => {
               new THREE.Vector3(0, 1, 0),
               stickmanAngleRef.current,
             );
-          stickman.group.position.addScaledVector(dir, MOVE_SPEED * delta);
+          stickman.group.position.addScaledVector(dir, effectiveSpeed * delta);
           stickman.group.position.x = THREE.MathUtils.clamp(
             stickman.group.position.x,
             -BOUNDARY,
@@ -1362,43 +1440,55 @@ const StickmanMysteryGame = () => {
         stickman.group.position.z,
       );
 
-      /* —— Proximity detection —— */
-      let nearest = null;
-      let nearestDist = Infinity;
-      const px = stickman.group.position.x;
-      const pz = stickman.group.position.z;
-      for (let i = 0; i < objMeshes.length; i++) {
-        if (i !== curStage || curStage >= TOTAL_STAGES) continue;
-        const ox = objMeshes[i].group.position.x;
-        const oz = objMeshes[i].group.position.z;
-        const d = Math.sqrt((px - ox) ** 2 + (pz - oz) ** 2);
-        if (d < INTERACT_DIST && d < nearestDist) {
-          nearest = i;
-          nearestDist = d;
-        }
-      }
-      if (nearest !== nearObjRef.current) {
-        nearObjRef.current = nearest;
-        setNearObject(nearest);
+      /* —— Camera shake from trash interaction —— */
+      if (shakeTimeRef.current > 0) {
+        const intensity = 0.15 * (shakeTimeRef.current / TRASH_SHAKE_DURATION);
+        camera.position.x += (Math.random() - 0.5) * intensity;
+        camera.position.y += (Math.random() - 0.5) * intensity * 0.5;
       }
 
-      /* —— Decoy proximity detection —— */
-      let nearestDecoy = null;
-      let nearestDecoyDist = Infinity;
-      for (let i = 0; i < decoyMeshes.length; i++) {
-        if (decoyMeshes[i].stage !== curStage || curStage >= TOTAL_STAGES)
+      /* —— Proximity detection — clue objects —— */
+      let nearestClue = null;
+      let nearestClueDist = Infinity;
+      const px = stickman.group.position.x;
+      const pz = stickman.group.position.z;
+      for (let i = 0; i < clueMeshes.length; i++) {
+        if (clueMeshes[i].stage !== curStage || curStage >= TOTAL_STAGES)
           continue;
-        const dx = px - decoyMeshes[i].group.position.x;
-        const dz = pz - decoyMeshes[i].group.position.z;
-        const d = Math.sqrt(dx * dx + dz * dz);
-        if (d < DECOY_INTERACT_DIST && d < nearestDecoyDist) {
-          nearestDecoy = i;
-          nearestDecoyDist = d;
+        if (stageCluesFoundRef.current.includes(clueMeshes[i].clueIdx))
+          continue;
+        const ox = clueMeshes[i].group.position.x;
+        const oz = clueMeshes[i].group.position.z;
+        const d = Math.sqrt((px - ox) ** 2 + (pz - oz) ** 2);
+        if (d < INTERACT_DIST && d < nearestClueDist) {
+          nearestClue = i;
+          nearestClueDist = d;
         }
       }
-      if (nearestDecoy !== nearDecoyRef.current) {
-        nearDecoyRef.current = nearestDecoy;
-        setNearDecoy(nearestDecoy);
+      if (nearestClue !== nearClueRef.current) {
+        nearClueRef.current = nearestClue;
+        setNearClue(nearestClue);
+      }
+
+      /* —— Proximity detection — trash objects —— */
+      let nearestTrash = null;
+      let nearestTrashDist = Infinity;
+      for (let i = 0; i < trashMeshes.length; i++) {
+        if (trashMeshes[i].stage !== curStage || curStage >= TOTAL_STAGES)
+          continue;
+        if (stageTrashTriggeredRef.current.includes(trashMeshes[i].trashIdx))
+          continue;
+        const dx = px - trashMeshes[i].group.position.x;
+        const dz = pz - trashMeshes[i].group.position.z;
+        const d = Math.sqrt(dx * dx + dz * dz);
+        if (d < INTERACT_DIST && d < nearestTrashDist) {
+          nearestTrash = i;
+          nearestTrashDist = d;
+        }
+      }
+      if (nearestTrash !== nearTrashRef.current) {
+        nearTrashRef.current = nearestTrash;
+        setNearTrash(nearestTrash);
       }
 
       /* —— Cart proximity —— */
@@ -1417,65 +1507,95 @@ const StickmanMysteryGame = () => {
         setTimeout(() => {
           interactCoolRef.current = false;
         }, 400);
-        // Answer cart takes priority
-        if (nearCartRef.current && currentStageRef.current >= TOTAL_STAGES) {
-          setShowQuestion(true);
-        } else if (
-          nearObjRef.current !== null &&
-          !cluesFoundRef.current.includes(nearObjRef.current)
+        const stgClues = stageCluesFoundRef.current;
+        const stgTrash = stageTrashTriggeredRef.current;
+        // Answer cart: available when at least 1 clue in current stage found
+        if (
+          nearCartRef.current &&
+          stgClues.length >= 1 &&
+          currentStageRef.current < TOTAL_STAGES
         ) {
-          // Real clue
-          const idx = nearObjRef.current;
-          setShowClue(idx);
-          setCluesFound((prev) => [...prev, idx]);
-          setTimeLeft((prev) => Math.max(0, prev - TIME_PENALTY));
-          const o = objMeshes[idx];
-          if (o.beacon) o.beacon.visible = false;
-          if (o.ring) o.ring.material.opacity = 0.08;
-          if (o.light) o.light.intensity = 0.35;
-        } else if (
-          nearDecoyRef.current !== null &&
-          !decoysTriggeredRef.current.includes(nearDecoyRef.current)
-        ) {
-          // Decoy trap!
-          const dIdx = nearDecoyRef.current;
-          setShowDecoyTrap(dIdx);
-          setDecoysTriggered((prev) => {
-            const next = [...prev, dIdx];
-            decoysTriggeredRef.current = next;
-            return next;
-          });
-          setTimeLeft((prev) => Math.max(0, prev - DECOY_PENALTY));
-          const d = decoyMeshes[dIdx];
-          if (d.beacon) d.beacon.visible = false;
-          if (d.ring) d.ring.material.opacity = 0.08;
-          if (d.light) d.light.intensity = 0.35;
-          // Track per-stage decoy count
-          if (d.stage !== undefined) stageDecoysRef.current[d.stage]++;
+          setShowStageQuestion(true);
+        }
+        // Clue object interaction
+        else if (nearClueRef.current !== null) {
+          const entry = clueMeshes[nearClueRef.current];
+          if (
+            entry &&
+            entry.stage === curStage &&
+            !stgClues.includes(entry.clueIdx)
+          ) {
+            setShowClue(entry.clueIdx);
+            setStageCluesFound((prev) => {
+              const next = [...prev, entry.clueIdx];
+              stageCluesFoundRef.current = next;
+              return next;
+            });
+            setTimeLeft((prev) => Math.max(0, prev - CLUE_PENALTY));
+            if (entry.beacon) entry.beacon.visible = false;
+            if (entry.ring) entry.ring.material.opacity = 0.08;
+            if (entry.light) entry.light.intensity = 0.35;
+          }
+        }
+        // Trash object interaction — heavier consequences
+        else if (nearTrashRef.current !== null) {
+          const entry = trashMeshes[nearTrashRef.current];
+          if (
+            entry &&
+            entry.stage === curStage &&
+            !stgTrash.includes(entry.trashIdx)
+          ) {
+            setShowTrash(entry.trashIdx);
+            setStageTrashTriggered((prev) => {
+              const next = [...prev, entry.trashIdx];
+              stageTrashTriggeredRef.current = next;
+              return next;
+            });
+            setTimeLeft((prev) => Math.max(0, prev - TRASH_PENALTY));
+            // Extra consequences: slow + camera shake
+            slowTimeRef.current = TRASH_SLOW_DURATION;
+            shakeTimeRef.current = TRASH_SHAKE_DURATION;
+            if (entry.beacon) entry.beacon.visible = false;
+            if (entry.ring) entry.ring.material.opacity = 0.06;
+            if (entry.light) entry.light.intensity = 0.2;
+            if (entry.warnDot) entry.warnDot.visible = false;
+          }
         }
       }
 
-      /* —— Beacon pulse animation —— */
-      objMeshes.forEach((o, i) => {
+      /* —— Clue beacon pulse — smooth, slow (safe indicator) —— */
+      clueMeshes.forEach((o, i) => {
         if (!o.group.visible) return;
         if (o.beacon && o.beacon.visible) {
-          o.beacon.position.y = 2.5 + Math.sin(time * 2.2 + i * 1.3) * 0.2;
+          o.beacon.position.y = 2.5 + Math.sin(time * 1.5 + i * 1.3) * 0.2;
           o.beacon.material.emissiveIntensity =
-            1.2 + Math.sin(time * 3 + i * 0.9) * 0.5;
+            1.2 + Math.sin(time * 2 + i * 0.9) * 0.3;
         }
-        if (o.mesh && i !== 4) o.mesh.rotation.y += delta * 0.3;
+        if (o.mesh && o.clueIdx !== 4) o.mesh.rotation.y += delta * 0.3;
       });
 
-      // Decoy beacon pulse (identical to real clues)
-      decoyMeshes.forEach((d, i) => {
-        if (!d.group.visible) return;
-        if (d.beacon && d.beacon.visible) {
-          d.beacon.position.y =
-            2.5 + Math.sin(time * 2.2 + (i + 10) * 1.3) * 0.2;
-          d.beacon.material.emissiveIntensity =
-            1.2 + Math.sin(time * 3 + (i + 10) * 0.9) * 0.5;
+      /* —— Trash beacon pulse — fast, erratic + orbiting warning dot —— */
+      trashMeshes.forEach((t, i) => {
+        if (!t.group.visible) return;
+        if (t.beacon && t.beacon.visible) {
+          t.beacon.position.y =
+            2.5 +
+            Math.sin(time * 4.0 + i * 1.7) * 0.15 +
+            Math.sin(time * 11 + i * 3.1) * 0.06;
+          t.beacon.material.emissiveIntensity =
+            0.8 +
+            Math.sin(time * 5.5 + i * 1.2) * 0.8 +
+            Math.sin(time * 14 + i * 2.5) * 0.3;
         }
-        if (d.mesh) d.mesh.rotation.y += delta * 0.3;
+        if (t.mesh) t.mesh.rotation.y += delta * 0.3;
+        // Orbiting red warning dot
+        if (t.warnDot && t.warnDot.visible) {
+          const orbitR = 0.8;
+          const orbitSpd = 2.5 + Math.sin(i * 2.1) * 0.5;
+          t.warnDot.position.x = Math.cos(time * orbitSpd + i * 1.5) * orbitR;
+          t.warnDot.position.z = Math.sin(time * orbitSpd + i * 1.5) * orbitR;
+          t.warnDot.position.y = 1.5 + Math.sin(time * 3.5 + i) * 0.2;
+        }
       });
 
       // Cart beacon animation
@@ -1695,11 +1815,11 @@ const StickmanMysteryGame = () => {
     };
   }, [currentPlayer?._id, currentRoom?._id, gameState?.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* ── Answer submission ─────────────────────────────── */
-  const handleSubmitAnswer = async (e) => {
+  /* ── Stage answer submission (local check per stage) ─ */
+  const handleStageAnswer = async (e) => {
     e.preventDefault();
     setError("");
-    if (!answer.trim()) {
+    if (!stageAnswer.trim()) {
       setError("Please type an answer.");
       return;
     }
@@ -1708,24 +1828,62 @@ const StickmanMysteryGame = () => {
       return;
     }
 
-    const result = await submitAnswer(answer.trim(), {
-      timeLeft,
-      cluesFound: cluesFound.length,
-      wrongAttempts,
-    });
+    const stg = STAGES[currentStage];
+    const correct =
+      stageAnswer.trim().toLowerCase() === stg.answer.toLowerCase();
 
-    if (!result.success) {
-      setError(result.error || "Submission failed.");
+    if (!correct) {
+      setStageWrongAttempts((p) => p + 1);
+      setStageAnswer("");
+      setError("That's not correct — think again!");
       return;
     }
 
-    if (result.isCorrect) {
-      setSolved(true);
-      setFinalScore(result.score);
+    /* ── Correct! Compute stage score ── */
+    const timeSpent = stageStartTimeRef.current - timeLeft;
+    const trashHit = stageTrashTriggered.length;
+    const score = Math.max(
+      0,
+      STAGE_MAX_SCORE -
+        Math.floor(timeSpent) -
+        trashHit * 20 -
+        stageWrongAttempts * 15,
+    );
+    const summary = {
+      stage: currentStage,
+      name: stg.name,
+      score,
+      timeSpent,
+      trashTriggered: trashHit,
+      wrongAttempts: stageWrongAttempts,
+    };
+    setStageScores((prev) => [...prev, summary]);
+    setShowStageQuestion(false);
+    setStageAnswer("");
+    setError("");
+    setStageWrongAttempts(0);
+
+    if (currentStage < TOTAL_STAGES - 1) {
+      setShowStageSummary(summary);
     } else {
-      setWrongAttempts((prev) => prev + 1);
-      setAnswer("");
-      setError("That's not correct — think again!");
+      /* ── Final stage — submit to server ── */
+      const totalScore = [...stageScores, summary].reduce(
+        (s, x) => s + x.score,
+        0,
+      );
+      const result = await submitAnswer(stg.answer.trim(), {
+        timeLeft,
+        stageScores: [...stageScores, summary],
+        totalScore,
+      });
+      if (result.success) {
+        setFinalScore(result.score || totalScore);
+      } else {
+        setFinalScore(totalScore);
+      }
+      setGameComplete(true);
+      gameCompleteRef.current = true;
+      setShowStageSummary(summary);
     }
   };
 
@@ -1736,6 +1894,15 @@ const StickmanMysteryGame = () => {
   /* ═══════════════════════════════════════════════════
      JSX
      ═══════════════════════════════════════════════════ */
+  const stg = STAGES[Math.min(currentStage, TOTAL_STAGES - 1)];
+  const anyModal =
+    showClue !== null ||
+    showTrash !== null ||
+    showStageQuestion ||
+    showStageSummary !== null ||
+    gameComplete ||
+    gameOver;
+
   return (
     <div className="sm-game">
       {/* Three.js canvas */}
@@ -1750,27 +1917,26 @@ const StickmanMysteryGame = () => {
             ⏱ {fmt(timeLeft)}
           </div>
           <div className="sm-hud-pill sm-clue-count">
-            🔑 {cluesFound.length}/{MYSTERY.objects.length}
+            🔑 {stageCluesFound.length}/5
           </div>
           <div
             className="sm-hud-pill sm-stage-pill"
             style={{
-              borderColor:
-                STAGE_THEMES[Math.min(currentStage, TOTAL_STAGES - 1)]?.label,
-              color:
-                STAGE_THEMES[Math.min(currentStage, TOTAL_STAGES - 1)]?.label,
+              borderColor: stg.theme.label,
+              color: stg.theme.label,
             }}
           >
             🏰 Stage {Math.min(currentStage + 1, TOTAL_STAGES)}/{TOTAL_STAGES}:{" "}
-            {currentStage >= TOTAL_STAGES
-              ? "Complete!"
-              : STAGE_THEMES[currentStage]?.name}
+            {currentStage >= TOTAL_STAGES ? "Complete!" : stg.name}
           </div>
           <div
             className={`sm-hud-pill sm-dash-pill${isDashing ? " dashing" : ""}${!dashReady ? " cooldown" : ""}`}
           >
             💨 {isDashing ? "DASH!" : dashReady ? "Ready" : "Cooldown"}
           </div>
+          {isSlowed && (
+            <div className="sm-hud-pill sm-slowed-pill">🐌 SLOWED</div>
+          )}
         </div>
         <div className="sm-hud-right">
           <div className="sm-hud-pill sm-controls-hint">
@@ -1783,102 +1949,82 @@ const StickmanMysteryGame = () => {
         </div>
       </div>
 
-      {/* Collected clue pills */}
-      {cluesFound.length > 0 &&
-        !showClue &&
-        !showQuestion &&
-        !solved &&
-        !gameOver && (
-          <div className="sm-collected-pills">
-            {cluesFound.map((idx) => (
-              <span
-                key={idx}
-                className="sm-collected-pill"
-                title={MYSTERY.objects[idx].clue}
-                style={{
-                  borderColor: STAGE_THEMES[idx]?.label,
-                  color: STAGE_THEMES[idx]?.label,
-                }}
-              >
-                ✅ Stage {idx + 1}: {MYSTERY.objects[idx].name}
-              </span>
-            ))}
-          </div>
-        )}
+      {/* ── Visual hint bar ──────────────────────── */}
+      {!anyModal && currentStage < TOTAL_STAGES && (
+        <div className="sm-hint-bar">
+          <span className="sm-hint-safe">🟢 Calm glow = Clue</span>
+          <span className="sm-hint-danger">
+            🔴 Fast pulse + red dot = Trash (avoid!)
+          </span>
+        </div>
+      )}
 
-      {/* Proximity prompt — real clue */}
-      {nearObject !== null &&
-        nearDecoy === null &&
-        !showClue &&
-        !showQuestion &&
-        !showDecoyTrap &&
-        !solved &&
-        !gameOver &&
-        !isPaused && (
-          <div
-            className={`sm-prompt ${cluesFoundRef.current.includes(nearObject) ? "collected" : ""}`}
-          >
-            {cluesFoundRef.current.includes(nearObject) ? (
-              `✅ ${MYSTERY.objects[nearObject].name} — already inspected`
-            ) : (
-              <span>
-                Press <kbd>E</kbd> to inspect{" "}
-                <strong>{MYSTERY.objects[nearObject].name}</strong>
-              </span>
-            )}
-          </div>
-        )}
+      {/* ── Collected clue pills (current stage) ── */}
+      {stageCluesFound.length > 0 && !anyModal && (
+        <div className="sm-collected-pills">
+          {stageCluesFound.map((idx) => (
+            <span
+              key={idx}
+              className="sm-collected-pill"
+              title={stg.clues[idx].clue}
+              style={{
+                borderColor: stg.theme.label,
+                color: stg.theme.label,
+              }}
+            >
+              ✅ {stg.clues[idx].name}
+            </span>
+          ))}
+        </div>
+      )}
 
-      {/* Proximity prompt — decoy (looks identical to real) */}
-      {nearDecoy !== null &&
-        nearObject === null &&
-        !showClue &&
-        !showQuestion &&
-        !showDecoyTrap &&
-        !solved &&
-        !gameOver &&
-        !isPaused && (
-          <div
-            className={`sm-prompt ${decoysTriggered.includes(nearDecoy) ? "collected" : ""}`}
-          >
-            {decoysTriggered.includes(nearDecoy) ? (
-              `💀 ${decoyMeshesRef.current[nearDecoy]?.data?.name || "Object"} — it was a trap!`
-            ) : (
-              <span>
-                Press <kbd>E</kbd> to inspect{" "}
-                <strong>
-                  {decoyMeshesRef.current[nearDecoy]?.data?.name || "Object"}
-                </strong>
-              </span>
-            )}
-          </div>
-        )}
+      {/* ── Proximity prompt — clue object ────────── */}
+      {nearClue !== null && nearTrash === null && !anyModal && !isPaused && (
+        <div
+          className={`sm-prompt ${stageCluesFound.includes(nearClue) ? "collected" : ""}`}
+        >
+          {stageCluesFound.includes(nearClue) ? (
+            `✅ ${stg.clues[nearClue].name} — already inspected`
+          ) : (
+            <span>
+              Press <kbd>E</kbd> to inspect{" "}
+              <strong>{stg.clues[nearClue].name}</strong>
+            </span>
+          )}
+        </div>
+      )}
 
-      {/* Cart proximity prompt — stages not complete */}
+      {/* ── Proximity prompt — trash object ────────── */}
+      {nearTrash !== null && nearClue === null && !anyModal && !isPaused && (
+        <div
+          className={`sm-prompt ${stageTrashTriggered.includes(nearTrash) ? "collected" : ""}`}
+        >
+          {stageTrashTriggered.includes(nearTrash) ? (
+            `💀 Already triggered — it was trash!`
+          ) : (
+            <span>
+              Press <kbd>E</kbd> to inspect <strong>Mysterious Object</strong>
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* ── Cart prompt — no clues yet ──────────── */}
+      {nearCart && stageCluesFound.length < 1 && !anyModal && !isPaused && (
+        <div className="sm-prompt collected">
+          🔒 Find at least one clue before answering!
+        </div>
+      )}
+
+      {/* ── Cart prompt — ready to answer ─────────── */}
       {nearCart &&
-        nearObject === null &&
-        currentStage < TOTAL_STAGES &&
-        !showClue &&
-        !showQuestion &&
-        !solved &&
-        !gameOver &&
-        !isPaused && (
-          <div className="sm-prompt collected">
-            🔒 Complete all {TOTAL_STAGES} stages to unlock the final question!
-          </div>
-        )}
-
-      {/* Answer-ready button — only after all stages complete */}
-      {nearCart &&
-        currentStage >= TOTAL_STAGES &&
-        !showQuestion &&
-        !solved &&
-        !gameOver &&
-        showClue === null &&
+        stageCluesFound.length >= 1 &&
+        !showStageQuestion &&
+        !anyModal &&
         !isPaused && (
           <div className="sm-answer-ready">
-            <button onClick={() => setShowQuestion(true)}>
-              🧩 Answer the Mystery
+            <button onClick={() => setShowStageQuestion(true)}>
+              🧩 Answer Stage {currentStage + 1} Question
             </button>
             <div className="sm-answer-hint">
               or press <kbd>E</kbd>
@@ -1894,171 +2040,73 @@ const StickmanMysteryGame = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="sm-modal-icon">🔍</div>
-            <h3>{MYSTERY.objects[showClue].name}</h3>
-            <p className="sm-clue-text">{MYSTERY.objects[showClue].clue}</p>
+            <h3>{stg.clues[showClue].name}</h3>
+            <p className="sm-clue-text">{stg.clues[showClue].clue}</p>
             <div className="sm-penalty-badge">
-              ⏱ −{TIME_PENALTY}s time penalty
+              ⏱ −{CLUE_PENALTY}s time penalty
             </div>
-            <button
-              className="sm-btn"
-              onClick={() => {
-                const idx = showClue;
-                setShowClue(null);
-                // Stage completion check
-                if (idx === currentStage && currentStage < TOTAL_STAGES) {
-                  const timeSpent = stageStartTimeRef.current - timeLeft;
-                  const stgDecoys = stageDecoysRef.current[currentStage];
-                  const score = Math.max(
-                    0,
-                    STAGE_MAX_SCORE - Math.floor(timeSpent) - stgDecoys * 20,
-                  );
-                  const summary = {
-                    stage: currentStage,
-                    score,
-                    timeSpent,
-                    decoysTriggered: stgDecoys,
-                  };
-                  setShowStageSummary(summary);
-                  setStageScores((prev) => [...prev, summary]);
-                }
-              }}
-            >
-              Got it
+            <button className="sm-btn" onClick={() => setShowClue(null)}>
+              Got it ({stageCluesFound.length}/5 clues)
             </button>
           </div>
         </div>
       )}
 
-      {/* ── Decoy trap modal ───────────────────────── */}
-      {showDecoyTrap !== null && (
-        <div className="sm-overlay" onClick={() => setShowDecoyTrap(null)}>
+      {/* ── Trash modal ───────────────────────────── */}
+      {showTrash !== null && (
+        <div className="sm-overlay" onClick={() => setShowTrash(null)}>
           <div
             className="sm-modal sm-trap-modal"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="sm-modal-icon">💀</div>
-            <h3>It&rsquo;s a Trap!</h3>
+            <h3>It&rsquo;s Trash!</h3>
             <p className="sm-clue-text" style={{ borderLeftColor: "#e74c3c" }}>
-              {decoyMeshesRef.current[showDecoyTrap]?.data?.msg ||
-                "This was a decoy!"}
+              {stg.trash[showTrash]?.msg || "This was trash!"}
             </p>
-            <div className="sm-penalty-badge">
-              ⏱ −{DECOY_PENALTY}s time penalty
+            <div className="sm-trap-effects">
+              <span className="sm-trap-effect-badge">⏱ −{TRASH_PENALTY}s</span>
+              <span className="sm-trap-effect-badge">
+                🐌 Slowed {TRASH_SLOW_DURATION}s
+              </span>
+              <span className="sm-trap-effect-badge">📳 Camera shake</span>
             </div>
-            <button className="sm-btn" onClick={() => setShowDecoyTrap(null)}>
+            <button className="sm-btn" onClick={() => setShowTrash(null)}>
               Ouch! Continue
             </button>
           </div>
         </div>
       )}
 
-      {/* ── Stage completion modal ─────────────────── */}
-      {showStageSummary !== null && (
-        <div className="sm-overlay">
-          <div
-            className="sm-modal sm-stage-modal"
-            onClick={(e) => e.stopPropagation()}
-            style={{ borderColor: STAGE_THEMES[showStageSummary.stage]?.label }}
-          >
-            <div className="sm-big-icon">🏆</div>
-            <h2>Stage {showStageSummary.stage + 1} Complete!</h2>
-            <h3
-              style={{
-                color: STAGE_THEMES[showStageSummary.stage]?.label,
-                margin: "4px 0 16px",
-              }}
-            >
-              {STAGE_THEMES[showStageSummary.stage]?.name}
-            </h3>
-            <div
-              className="sm-score-box"
-              style={{
-                borderColor: STAGE_THEMES[showStageSummary.stage]?.label,
-              }}
-            >
-              <span className="sm-score-label">Stage Score</span>
-              <span
-                className="sm-score-value"
-                style={{ color: STAGE_THEMES[showStageSummary.stage]?.label }}
-              >
-                {showStageSummary.score}
-              </span>
-            </div>
-            <div className="sm-stage-stats">
-              <div>⏱ Time spent: {Math.floor(showStageSummary.timeSpent)}s</div>
-              <div>💀 Decoys triggered: {showStageSummary.decoysTriggered}</div>
-              <div>📊 Max possible: {STAGE_MAX_SCORE}</div>
-            </div>
-            <button
-              className="sm-btn sm-btn-primary"
-              onClick={() => {
-                setShowStageSummary(null);
-                if (showStageSummary.stage < TOTAL_STAGES - 1) {
-                  const next = showStageSummary.stage + 1;
-                  setCurrentStage(next);
-                  currentStageRef.current = next;
-                  stageStartTimeRef.current = timeLeft;
-                } else {
-                  setCurrentStage(TOTAL_STAGES);
-                  currentStageRef.current = TOTAL_STAGES;
-                }
-              }}
-            >
-              {showStageSummary.stage < TOTAL_STAGES - 1
-                ? `Continue to Stage ${showStageSummary.stage + 2}: ${STAGE_THEMES[showStageSummary.stage + 1]?.name} →`
-                : "🛒 Go to Answer Cart"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Question modal ────────────────────────── */}
-      {showQuestion && !solved && (
+      {/* ── Stage question modal ──────────────────── */}
+      {showStageQuestion && !gameComplete && (
         <div className="sm-overlay">
           <div
             className="sm-modal sm-question-modal"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="sm-modal-icon">🧩</div>
-            <h3>The Mystery Question</h3>
-            <p className="sm-question-text">{MYSTERY.question}</p>
+            <h3>
+              Stage {currentStage + 1}: {stg.name}
+            </h3>
+            <p className="sm-question-text">{stg.question}</p>
 
             <div className="sm-review">
-              <h4>
-                Your Collected Clues ({cluesFound.length}/
-                {MYSTERY.objects.length})
-              </h4>
-              {cluesFound.map((idx, i) => (
+              <h4>Your Collected Clues ({stageCluesFound.length}/5)</h4>
+              {stageCluesFound.map((idx, i) => (
                 <div key={idx} className="sm-review-row">
                   <span className="sm-review-num">#{i + 1}</span>
-                  <span className="sm-review-name">
-                    {MYSTERY.objects[idx].name}:
-                  </span>
-                  <span className="sm-review-clue">
-                    {MYSTERY.objects[idx].clue}
-                  </span>
+                  <span className="sm-review-name">{stg.clues[idx].name}:</span>
+                  <span className="sm-review-clue">{stg.clues[idx].clue}</span>
                 </div>
               ))}
-              {cluesFound.length < MYSTERY.objects.length && (
-                <p
-                  style={{
-                    color: "#888",
-                    fontSize: "0.78rem",
-                    marginTop: 8,
-                    marginBottom: 0,
-                  }}
-                >
-                  💡 You haven't found all clues yet — answering is harder with
-                  fewer clues!
-                </p>
-              )}
             </div>
 
-            <form className="sm-answer-form" onSubmit={handleSubmitAnswer}>
+            <form className="sm-answer-form" onSubmit={handleStageAnswer}>
               <input
                 type="text"
-                value={answer}
-                onChange={(e) => setAnswer(e.target.value)}
+                value={stageAnswer}
+                onChange={(e) => setStageAnswer(e.target.value)}
                 placeholder="Type your answer…"
                 autoFocus
                 maxLength={50}
@@ -2068,15 +2116,17 @@ const StickmanMysteryGame = () => {
               </button>
             </form>
 
-            {wrongAttempts > 0 && (
-              <div className="sm-attempts">Wrong attempts: {wrongAttempts}</div>
+            {stageWrongAttempts > 0 && (
+              <div className="sm-attempts">
+                Wrong attempts: {stageWrongAttempts}
+              </div>
             )}
             {error && <div className="sm-error">{error}</div>}
 
             <button
               className="sm-btn sm-btn-secondary"
               onClick={() => {
-                setShowQuestion(false);
+                setShowStageQuestion(false);
                 setError("");
               }}
             >
@@ -2086,33 +2136,154 @@ const StickmanMysteryGame = () => {
         </div>
       )}
 
-      {/* ── Solved ────────────────────────────────── */}
-      {solved && !showFinalSummary && !showDashboard && (
-        <div className="sm-overlay sm-overlay-solved">
-          <div className="sm-modal sm-solved-modal">
-            <div className="sm-big-icon">🎉</div>
-            <h2>Mystery Solved!</h2>
-            <p>
-              The answer is: <strong>{MYSTERY.answer}</strong>
-            </p>
-            <div className="sm-score-box">
-              <span className="sm-score-label">Final Score</span>
-              <span className="sm-score-value">{finalScore}</span>
+      {/* ── Stage completion summary ─────────────── */}
+      {showStageSummary !== null && !gameComplete && (
+        <div className="sm-overlay">
+          <div
+            className="sm-modal sm-stage-modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{ borderColor: STAGES[showStageSummary.stage].theme.label }}
+          >
+            <div className="sm-big-icon">🏆</div>
+            <h2>Stage {showStageSummary.stage + 1} Complete!</h2>
+            <h3
+              style={{
+                color: STAGES[showStageSummary.stage].theme.label,
+                margin: "4px 0 16px",
+              }}
+            >
+              {showStageSummary.name}
+            </h3>
+            <div
+              className="sm-score-box"
+              style={{
+                borderColor: STAGES[showStageSummary.stage].theme.label,
+              }}
+            >
+              <span className="sm-score-label">Stage Score</span>
+              <span
+                className="sm-score-value"
+                style={{ color: STAGES[showStageSummary.stage].theme.label }}
+              >
+                {showStageSummary.score}
+              </span>
             </div>
-            <div className="sm-solve-stats">
-              <span>⏱ Time remaining: {fmt(timeLeft)}</span>
-              <span>❌ Wrong attempts: {wrongAttempts}</span>
+            <div className="sm-stage-stats">
+              <div>⏱ Time spent: {Math.floor(showStageSummary.timeSpent)}s</div>
+              <div>💀 Trash triggered: {showStageSummary.trashTriggered}</div>
+              <div>❌ Wrong answers: {showStageSummary.wrongAttempts}</div>
+              <div>📊 Max possible: {STAGE_MAX_SCORE}</div>
             </div>
             <button
               className="sm-btn sm-btn-primary"
-              style={{ marginTop: 12 }}
-              onClick={() => setShowFinalSummary(true)}
+              onClick={() => {
+                setShowStageSummary(null);
+                const next = showStageSummary.stage + 1;
+                setCurrentStage(next);
+                currentStageRef.current = next;
+                stageStartTimeRef.current = timeLeft;
+                setStageCluesFound([]);
+                setStageTrashTriggered([]);
+                setStageWrongAttempts(0);
+                setStageAnswer("");
+                setError("");
+              }}
             >
-              📊 View Stage Summary
+              {showStageSummary.stage < TOTAL_STAGES - 1
+                ? `Continue to Stage ${showStageSummary.stage + 2}: ${STAGES[showStageSummary.stage + 1].name} →`
+                : "🏆 View Final Results"}
             </button>
           </div>
         </div>
       )}
+
+      {/* ── Game Complete — final summary ─────────── */}
+      {gameComplete &&
+        showStageSummary !== null &&
+        !showFinalSummary &&
+        !showDashboard && (
+          <div className="sm-overlay sm-overlay-solved">
+            <div
+              className="sm-modal sm-stage-modal"
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                borderColor: STAGES[showStageSummary.stage].theme.label,
+              }}
+            >
+              <div className="sm-big-icon">🏆</div>
+              <h2>Final Stage Complete!</h2>
+              <h3
+                style={{
+                  color: STAGES[showStageSummary.stage].theme.label,
+                  margin: "4px 0 16px",
+                }}
+              >
+                {showStageSummary.name}
+              </h3>
+              <div
+                className="sm-score-box"
+                style={{
+                  borderColor: STAGES[showStageSummary.stage].theme.label,
+                }}
+              >
+                <span className="sm-score-label">Stage Score</span>
+                <span
+                  className="sm-score-value"
+                  style={{ color: STAGES[showStageSummary.stage].theme.label }}
+                >
+                  {showStageSummary.score}
+                </span>
+              </div>
+              <div className="sm-stage-stats">
+                <div>
+                  ⏱ Time spent: {Math.floor(showStageSummary.timeSpent)}s
+                </div>
+                <div>💀 Trash triggered: {showStageSummary.trashTriggered}</div>
+                <div>❌ Wrong answers: {showStageSummary.wrongAttempts}</div>
+              </div>
+              <button
+                className="sm-btn sm-btn-primary"
+                style={{ marginTop: 12 }}
+                onClick={() => {
+                  setShowStageSummary(null);
+                  setShowFinalSummary(true);
+                }}
+              >
+                📊 View Full Game Summary
+              </button>
+            </div>
+          </div>
+        )}
+
+      {/* ── Game Complete — solved banner ─────────── */}
+      {gameComplete &&
+        showStageSummary === null &&
+        !showFinalSummary &&
+        !showDashboard && (
+          <div className="sm-overlay sm-overlay-solved">
+            <div className="sm-modal sm-solved-modal">
+              <div className="sm-big-icon">🎉</div>
+              <h2>All Stages Complete!</h2>
+              <div className="sm-score-box">
+                <span className="sm-score-label">Final Score</span>
+                <span className="sm-score-value">{finalScore}</span>
+              </div>
+              <div className="sm-solve-stats">
+                <span>⏱ Time remaining: {fmt(timeLeft)}</span>
+                <span>
+                  🏰 Stages cleared: {stageScores.length}/{TOTAL_STAGES}
+                </span>
+              </div>
+              <button
+                className="sm-btn sm-btn-primary"
+                style={{ marginTop: 12 }}
+                onClick={() => setShowFinalSummary(true)}
+              >
+                📊 View Stage Summary
+              </button>
+            </div>
+          </div>
+        )}
 
       {/* ── Final summary with stage breakdown ─────── */}
       {showFinalSummary && !showDashboard && (
@@ -2125,28 +2296,29 @@ const StickmanMysteryGame = () => {
                 <div
                   key={i}
                   className="sm-stage-row"
-                  style={{ borderLeftColor: STAGE_THEMES[s.stage]?.label }}
+                  style={{ borderLeftColor: STAGES[s.stage].theme.label }}
                 >
                   <div className="sm-stage-row-header">
-                    <span style={{ color: STAGE_THEMES[s.stage]?.label }}>
-                      Stage {s.stage + 1}: {STAGE_THEMES[s.stage]?.name}
+                    <span style={{ color: STAGES[s.stage].theme.label }}>
+                      Stage {s.stage + 1}: {s.name}
                     </span>
                     <span
                       className="sm-stage-row-score"
-                      style={{ color: STAGE_THEMES[s.stage]?.label }}
+                      style={{ color: STAGES[s.stage].theme.label }}
                     >
                       {s.score}
                     </span>
                   </div>
                   <div className="sm-stage-row-details">
-                    ⏱ {Math.floor(s.timeSpent)}s · 💀 {s.decoysTriggered} decoy
-                    {s.decoysTriggered !== 1 ? "s" : ""}
+                    ⏱ {Math.floor(s.timeSpent)}s · 💀 {s.trashTriggered} trash
+                    {s.trashTriggered !== 1 ? "" : ""} · ❌ {s.wrongAttempts}{" "}
+                    wrong
                   </div>
                 </div>
               ))}
             </div>
             <div className="sm-score-box" style={{ marginTop: 16 }}>
-              <span className="sm-score-label">Total Stage Score</span>
+              <span className="sm-score-label">Total Score</span>
               <span className="sm-score-value">
                 {stageScores.reduce((sum, s) => sum + s.score, 0)}
               </span>
@@ -2155,7 +2327,7 @@ const StickmanMysteryGame = () => {
               className="sm-score-box"
               style={{ marginTop: 8, borderColor: "rgba(241,196,15,0.3)" }}
             >
-              <span className="sm-score-label">Final Answer Score</span>
+              <span className="sm-score-label">Server Score</span>
               <span className="sm-score-value" style={{ color: "#f1c40f" }}>
                 {finalScore}
               </span>
@@ -2234,7 +2406,7 @@ const StickmanMysteryGame = () => {
       )}
 
       {/* ── Time's up ─────────────────────────────── */}
-      {gameOver && !solved && !showDashboard && (
+      {gameOver && !gameComplete && !showDashboard && (
         <div className="sm-overlay sm-overlay-over">
           <div className="sm-modal sm-over-modal">
             <div className="sm-big-icon">⏰</div>
@@ -2243,24 +2415,21 @@ const StickmanMysteryGame = () => {
               You ran out of time at{" "}
               <strong>Stage {Math.min(currentStage + 1, TOTAL_STAGES)}</strong>.
             </p>
-            <p>
-              The answer was: <strong>{MYSTERY.answer}</strong>
-            </p>
             {stageScores.length > 0 && (
               <div className="sm-stage-breakdown" style={{ marginTop: 12 }}>
                 {stageScores.map((s, i) => (
                   <div
                     key={i}
                     className="sm-stage-row"
-                    style={{ borderLeftColor: STAGE_THEMES[s.stage]?.label }}
+                    style={{ borderLeftColor: STAGES[s.stage].theme.label }}
                   >
                     <div className="sm-stage-row-header">
-                      <span style={{ color: STAGE_THEMES[s.stage]?.label }}>
-                        Stage {s.stage + 1}: {STAGE_THEMES[s.stage]?.name}
+                      <span style={{ color: STAGES[s.stage].theme.label }}>
+                        Stage {s.stage + 1}: {s.name}
                       </span>
                       <span
                         className="sm-stage-row-score"
-                        style={{ color: STAGE_THEMES[s.stage]?.label }}
+                        style={{ color: STAGES[s.stage].theme.label }}
                       >
                         {s.score}
                       </span>
@@ -2270,9 +2439,7 @@ const StickmanMysteryGame = () => {
               </div>
             )}
             <div className="sm-solve-stats">
-              <span>
-                🔑 Clues found: {cluesFound.length}/{MYSTERY.objects.length}
-              </span>
+              <span>🔑 Clues: {stageCluesFound.length}/5 (current stage)</span>
               <span>
                 📊 Total: {stageScores.reduce((sum, s) => sum + s.score, 0)}
               </span>
@@ -2295,10 +2462,11 @@ const StickmanMysteryGame = () => {
             <div className="sm-modal-icon">⏸️</div>
             <h3>Game Paused</h3>
             <p>Waiting for the host to resume…</p>
-            {cluesFound.length > 0 && (
+            {stageCluesFound.length > 0 && (
               <p className="sm-pause-progress">
-                {cluesFound.length} clue{cluesFound.length !== 1 ? "s" : ""}{" "}
-                found so far
+                {stageCluesFound.length} clue
+                {stageCluesFound.length !== 1 ? "s" : ""} found so far (Stage{" "}
+                {currentStage + 1})
               </p>
             )}
           </div>

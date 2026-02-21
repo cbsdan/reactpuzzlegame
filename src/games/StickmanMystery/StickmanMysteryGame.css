@@ -684,3 +684,68 @@
   color: #f1c40f;
   font-size: 1.15rem;
 }
+
+/* ── Slowed pill ────────────────────────────────── */
+.sm-slowed-pill {
+  background: rgba(231, 76, 60, 0.25) !important;
+  border-color: #e74c3c !important;
+  color: #e74c3c !important;
+  animation: sm-slowPulse 0.6s ease-in-out infinite alternate;
+}
+
+@keyframes sm-slowPulse {
+  from {
+    opacity: 0.7;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ── Visual hint bar ────────────────────────────── */
+.sm-hint-bar {
+  position: absolute;
+  top: 62px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 18px;
+  z-index: 10;
+  pointer-events: none;
+  font-size: 0.78rem;
+}
+
+.sm-hint-safe {
+  background: rgba(46, 204, 113, 0.15);
+  border: 1px solid rgba(46, 204, 113, 0.4);
+  color: #2ecc71;
+  padding: 4px 12px;
+  border-radius: 20px;
+}
+
+.sm-hint-danger {
+  background: rgba(231, 76, 60, 0.15);
+  border: 1px solid rgba(231, 76, 60, 0.4);
+  color: #e74c3c;
+  padding: 4px 12px;
+  border-radius: 20px;
+}
+
+/* ── Trap effects badges ────────────────────────── */
+.sm-trap-effects {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: 10px 0 6px;
+}
+
+.sm-trap-effect-badge {
+  background: rgba(231, 76, 60, 0.15);
+  border: 1px solid rgba(231, 76, 60, 0.35);
+  color: #e74c3c;
+  padding: 4px 10px;
+  border-radius: 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
