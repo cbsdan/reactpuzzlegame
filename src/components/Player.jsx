@@ -93,19 +93,27 @@ const Player = () => {
         </div>
       )}
       <div className="player-header">
-        <div className="header-top">
-          <h1>🧩 Puzzle Game</h1>
+        <div className="header-left">
+          <span className="header-logo">🧩</span>
+          <span className="header-title">Puzzle Game</span>
+        </div>
+        <div className="header-center">
+          {currentRoom && (
+            <span className="header-room-code">Room: <strong>{currentRoom.passkey}</strong></span>
+          )}
+          <div
+            className="game-status"
+            style={{ '--status-color': getGameStatusColor() }}
+          >
+            {getGameStatusText()}
+          </div>
+        </div>
+        <div className="header-right">
           {currentPlayer && (
             <button className="exit-btn" onClick={handleExitGame} title="Exit Game">
               ✕
             </button>
           )}
-        </div>
-        <div 
-          className="game-status" 
-          style={{ backgroundColor: getGameStatusColor() }}
-        >
-          {getGameStatusText()}
         </div>
       </div>
 
