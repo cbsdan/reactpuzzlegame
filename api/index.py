@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from datetime import datetime
 from bson.objectid import ObjectId
 import sys
@@ -10,19 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from api.lib.mongodb import get_database
 
 app = Flask(__name__)
-
-# CORS headers
-@app.before_request
-def handle_preflight():
-    if request.method == 'OPTIONS':
-        return '', 204
-
-@app.after_request
-def add_cors(response):
-    response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
-    return response
+CORS(app)
 
 def generate_passkey():
     """Generate a 6-character passkey"""
