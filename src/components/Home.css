@@ -4,7 +4,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #0d1117;
   padding: 1.5rem;
   box-sizing: border-box;
 }
@@ -16,7 +16,6 @@
 
 .home-header {
   text-align: center;
-  color: white;
   margin-bottom: 3rem;
 }
 
@@ -24,12 +23,14 @@
   font-size: 3rem;
   margin: 0 0 1rem 0;
   font-weight: 800;
+  color: #e6edf3;
+  text-shadow: 0 0 40px rgba(124, 58, 237, 0.45);
 }
 
 .home-header p {
   font-size: 1.1rem;
   margin: 0;
-  opacity: 0.95;
+  color: #8b949e;
 }
 
 .mode-selection {
@@ -45,17 +46,18 @@
   justify-content: center;
   gap: 0.75rem;
   padding: 2rem;
-  background: white;
-  border: none;
+  background: #161b22;
+  border: 1px solid #21262d;
   border-radius: 14px;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
 }
 
 .mode-btn:hover:not(:disabled) {
   transform: translateY(-4px);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+  border-color: rgba(124, 58, 237, 0.5);
+  box-shadow: 0 12px 28px rgba(124, 58, 237, 0.2);
 }
 
 .mode-btn:disabled {
@@ -70,12 +72,12 @@
 .mode-text {
   font-size: 1.3rem;
   font-weight: 700;
-  color: #1a1a1a;
+  color: #e6edf3;
 }
 
 .mode-desc {
   font-size: 0.95rem;
-  color: #666;
+  color: #8b949e;
   font-weight: 500;
 }
 
@@ -95,22 +97,23 @@
 }
 
 .mode-card {
-  background: white;
+  background: #161b22;
   padding: 2.5rem;
   border-radius: 14px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+  border: 1px solid #21262d;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
 }
 
 .mode-card h2 {
   margin: 0 0 0.5rem 0;
   font-size: 1.6rem;
-  color: #1a1a1a;
+  color: #e6edf3;
   font-weight: 700;
 }
 
 .info-text {
   margin: 0 0 2rem 0;
-  color: #666;
+  color: #8b949e;
   font-size: 0.95rem;
   font-weight: 500;
 }
@@ -124,27 +127,34 @@
   margin-bottom: 0.5rem;
   font-size: 0.95rem;
   font-weight: 600;
-  color: #1a1a1a;
+  color: #c9d1d9;
 }
 
 .form-input {
   width: 100%;
   padding: 0.85rem;
   font-size: 1rem;
-  border: 2px solid #ddd;
+  background: #0d1117;
+  border: 2px solid #21262d;
   border-radius: 10px;
+  color: #e6edf3;
   box-sizing: border-box;
-  transition: border-color 0.3s;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.form-input::placeholder {
+  color: #484f58;
 }
 
 .form-input:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
 }
 
 .form-input:disabled {
-  background-color: #f5f5f5;
+  background-color: #0d1117;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
@@ -153,7 +163,7 @@
   padding: 1rem;
   font-size: 1rem;
   font-weight: 700;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%);
   color: white;
   border: none;
   border-radius: 10px;
@@ -164,7 +174,7 @@
 
 .confirm-btn:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 8px 20px rgba(124, 58, 237, 0.4);
 }
 
 .confirm-btn:disabled {
@@ -177,17 +187,18 @@
   padding: 0.85rem;
   font-size: 0.95rem;
   font-weight: 600;
-  background: #f5f5f5;
-  color: #666;
-  border: 2px solid #ddd;
+  background: transparent;
+  color: #8b949e;
+  border: 2px solid #21262d;
   border-radius: 10px;
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
 .back-btn:hover:not(:disabled) {
-  background: #eee;
-  border-color: #ccc;
+  background: #161b22;
+  border-color: #30363d;
+  color: #c9d1d9;
 }
 
 .back-btn:disabled {
@@ -196,8 +207,9 @@
 }
 
 .error-message {
-  color: #f44336;
-  background: #ffebee;
+  color: #fca5a5;
+  background: rgba(220, 38, 38, 0.1);
+  border: 1px solid rgba(220, 38, 38, 0.25);
   padding: 0.75rem 1rem;
   border-radius: 8px;
   margin-bottom: 1rem;

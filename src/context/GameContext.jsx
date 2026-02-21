@@ -121,6 +121,15 @@ export const GameProvider = ({ children }) => {
           setPlayers(data.players);
           setCurrentPlayersCount(data.players.length);
           
+          // Keep currentPlayer in sync so score/status always reflects live DB values
+          if (userRole === 'player' && currentPlayer) {
+            const updatedSelf = data.players.find(p => p._id === currentPlayer._id);
+            if (updatedSelf) {
+              setCurrentPlayer(updatedSelf);
+              localStorage.setItem('gamePlayer', JSON.stringify(updatedSelf));
+            }
+          }
+
           // Check if current player was removed
           if (userRole === 'player' && currentPlayer) {
             const stillExists = data.players.some(p => p._id === currentPlayer._id);

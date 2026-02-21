@@ -132,7 +132,17 @@ const Player = () => {
         <div className="game-section">
           <div className="welcome-message">
             <h2>Welcome, {currentPlayer.name}! 👋</h2>
-            <p>Your score: <strong>{currentPlayer.score || 0}</strong></p>
+            <p>Session score: <strong>{currentPlayer.score || 0}</strong>
+            {gameState?.sessions?.length > 0 && (() => {
+              const historyTotal = (gameState.sessions).reduce((sum, s) => {
+                const entry = s.scores?.find(sc => sc.playerId === currentPlayer._id);
+                return sum + (entry?.score || 0);
+              }, 0);
+              return historyTotal > 0
+                ? <span className="welcome-total"> &nbsp;·&nbsp; Total: <strong>{historyTotal + (currentPlayer.score || 0)}</strong></span>
+                : null;
+            })()}
+            </p>
           </div>
 
           {/* Active game area — fullscreen overlay, stays mounted while playing or paused */}

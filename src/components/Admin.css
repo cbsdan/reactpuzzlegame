@@ -124,7 +124,7 @@
   display: flex;
   gap: 1.25rem;
   margin-bottom: 1.25rem;
-  align-items: flex-start;
+  align-items: stretch;
 }
 
 .admin-controls {
@@ -468,11 +468,15 @@
   overflow-x: auto;
 }
 
-
+.players-table {
+  width: 100%;
+  border-collapse: collapse;
+}
 
 .players-table thead {
   background: linear-gradient(135deg, #1a1040 0%, #2d1b69 100%);
   color: white;
+  border-bottom: 2px solid rgba(124, 58, 237, 0.5);
 }
 
 .players-table th {
@@ -587,14 +591,41 @@
 }
 
 .sessions-section h2 {
-  margin: 0 0 0.9rem;
+  margin: 0;
   font-size: 0.95rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.3px;
   color: #e6edf3;
+}
+
+.sessions-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
   border-bottom: 1px solid #21262d;
   padding-bottom: 0.6rem;
+  margin-bottom: 0.9rem;
+}
+
+.clear-sessions-btn {
+  background: rgba(220, 38, 38, 0.1);
+  border: 1px solid rgba(220, 38, 38, 0.25);
+  color: #fca5a5;
+  padding: 0.25rem 0.65rem;
+  border-radius: 6px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.clear-sessions-btn:hover {
+  background: rgba(220, 38, 38, 0.25);
+  border-color: rgba(220, 38, 38, 0.5);
+  color: white;
 }
 
 .sessions-list {

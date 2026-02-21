@@ -43,6 +43,11 @@ const Admin = () => {
     }
   };
 
+  const handleClearSessions = async () => {
+    if (!window.confirm('Clear all session history? This cannot be undone.')) return;
+    await adminAction('clear-sessions');
+  };
+
   const getStatusBadge = (status) => {
     const badges = {
       idle: { text: 'Idle', color: '#2196f3' },
@@ -365,7 +370,12 @@ const Admin = () => {
       {/* Session History */}
       {gameState?.sessions?.length > 0 && (
         <div className="sessions-section">
-          <h2>Session History ({gameState.sessions.length})</h2>
+          <div className="sessions-section-header">
+            <h2>Session History ({gameState.sessions.length})</h2>
+            <button className="clear-sessions-btn" onClick={handleClearSessions} title="Delete all session history">
+              🗑 Clear History
+            </button>
+          </div>
           <div className="sessions-list">
             {[...gameState.sessions].reverse().map((session) => (
               <div key={session.sessionNumber} className="session-card">

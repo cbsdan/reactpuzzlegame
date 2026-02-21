@@ -337,6 +337,11 @@
   font-weight: 500;
 }
 
+.welcome-total {
+  opacity: 0.85;
+  font-size: 0.95rem;
+}
+
 .game-placeholder {
   background: white;
   border-radius: 14px;

@@ -182,6 +182,12 @@ def join_room():
         if not room:
             return jsonify({'success': False, 'error': 'Invalid room passkey'}), 404
         
+        # Check if game is already in progress
+        game_states = db['gamestate']
+        game_state = game_states.find_one({'roomId': room['_id']})
+        if game_state and game_state.get('status', 'idle') != 'idle':
+            return jsonify({'success': False, 'error': 'Game is already in progress. You cannot join right now.'}), 403
+        
         # Add player to room
         new_player = {
             'roomId': room['_id'],
@@ -308,7 +314,7 @@ def room_admin_action(room_id):
         action = data.get('action')
         game_type = data.get('gameType')
         
-        if not action or action not in ['start', 'pause', 'resume', 'restart', 'stop']:
+        if not action or action not in ['start', 'pause', 'resume', 'restart', 'stop', 'clear-sessions']:
             return jsonify({'success': False, 'error': 'Invalid action'}), 400
         
         game_states = db['gamestate']
@@ -386,8 +392,18 @@ def room_admin_action(room_id):
                 clues = generate_clues(target)
                 additional_updates['targetNumber'] = target
                 additional_updates['clues'] = clues
+        elif action == 'clear-sessions':
+            game_states.update_one(
+                {'roomId': room_oid},
+                {'$set': {'sessions': []}, '$inc': {'version': 1}}
+            )
+            result = game_states.find_one({'roomId': room_oid})
+            if result:
+                result['_id'] = str(result['_id'])
+                result['roomId'] = str(result['roomId'])
+                result.pop('targetNumber', None)
+            return jsonify({'success': True, 'action': action, 'gameState': result}), 200
         elif action == 'stop':
-            # Snapshot current session before stopping (if game was active)
             existing_state = game_states.find_one({'roomId': room_oid})
             if existing_state and existing_state.get('status') != 'idle':
                 current_session_num = existing_state.get('sessionNumber', 1)
