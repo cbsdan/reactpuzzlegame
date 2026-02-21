@@ -522,8 +522,14 @@
 }
 
 @keyframes sm-dash-flash {
-  from { opacity: 1; transform: scale(1); }
-  to { opacity: 0.7; transform: scale(1.08); }
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0.7;
+    transform: scale(1.08);
+  }
 }
 
 /* ── Pause ──────────────────────────────────────── */

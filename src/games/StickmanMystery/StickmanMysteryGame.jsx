@@ -22,8 +22,8 @@ const PUSH_FORCE = 18;
 const POSITION_SYNC_MS = 150;
 
 const PLAYER_COLORS = [
-  0xff6b6b, 0x48dbfb, 0xfeca57, 0xff9ff3,
-  0x54a0ff, 0x5f27cd, 0x01a3a4, 0xf368e0,
+  0xff6b6b, 0x48dbfb, 0xfeca57, 0xff9ff3, 0x54a0ff, 0x5f27cd, 0x01a3a4,
+  0xf368e0,
 ];
 
 /* ── Mystery puzzle data ────────────────────────────── */
@@ -454,7 +454,9 @@ const StickmanMysteryGame = () => {
   const [isDashing, setIsDashing] = useState(false);
   const [dashReady, setDashReady] = useState(true);
 
-  useEffect(() => { roomIdRef.current = currentRoom?._id; }, [currentRoom?._id]);
+  useEffect(() => {
+    roomIdRef.current = currentRoom?._id;
+  }, [currentRoom?._id]);
 
   const prevStartedAtRef = useRef(gameState?.startedAt);
   const isPaused = gameState?.status === "paused";
@@ -722,13 +724,21 @@ const StickmanMysteryGame = () => {
       stickman.group.rotation.y = stickmanAngleRef.current;
 
       /* —— Dash (Space) —— */
-      if (keys[" "] && !dashCoolRef.current && canMove && !isDashingRef.current) {
+      if (
+        keys[" "] &&
+        !dashCoolRef.current &&
+        canMove &&
+        !isDashingRef.current
+      ) {
         dashCoolRef.current = true;
         isDashingRef.current = true;
         dashTimerRef.current = DASH_DURATION;
         setIsDashing(true);
         setDashReady(false);
-        setTimeout(() => { dashCoolRef.current = false; setDashReady(true); }, DASH_COOLDOWN * 1000);
+        setTimeout(() => {
+          dashCoolRef.current = false;
+          setDashReady(true);
+        }, DASH_COOLDOWN * 1000);
       }
       if (isDashingRef.current) {
         dashTimerRef.current -= delta;
@@ -736,11 +746,21 @@ const StickmanMysteryGame = () => {
           isDashingRef.current = false;
           setIsDashing(false);
         } else {
-          const dashDir = new THREE.Vector3(0, 0, -1)
-            .applyAxisAngle(new THREE.Vector3(0, 1, 0), stickmanAngleRef.current);
+          const dashDir = new THREE.Vector3(0, 0, -1).applyAxisAngle(
+            new THREE.Vector3(0, 1, 0),
+            stickmanAngleRef.current,
+          );
           stickman.group.position.addScaledVector(dashDir, DASH_SPEED * delta);
-          stickman.group.position.x = THREE.MathUtils.clamp(stickman.group.position.x, -BOUNDARY, BOUNDARY);
-          stickman.group.position.z = THREE.MathUtils.clamp(stickman.group.position.z, -BOUNDARY, BOUNDARY);
+          stickman.group.position.x = THREE.MathUtils.clamp(
+            stickman.group.position.x,
+            -BOUNDARY,
+            BOUNDARY,
+          );
+          stickman.group.position.z = THREE.MathUtils.clamp(
+            stickman.group.position.z,
+            -BOUNDARY,
+            BOUNDARY,
+          );
           isMoving = true;
           // Push nearby other players
           const myX = stickman.group.position.x;
@@ -758,15 +778,21 @@ const StickmanMysteryGame = () => {
               const fx = (dx / len) * PUSH_FORCE;
               const fz = (dz / len) * PUSH_FORCE;
               fetch(`${API_URL}/api/rooms/${roomIdRef.current}/push`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ targetId: otherId, forceX: fx, forceZ: fz }),
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  targetId: otherId,
+                  forceX: fx,
+                  forceZ: fz,
+                }),
               }).catch(() => {});
             }
           });
         }
       } else {
-        otherPlayersRef.current.forEach((data) => { data.pushed = false; });
+        otherPlayersRef.current.forEach((data) => {
+          data.pushed = false;
+        });
       }
 
       /* —— Push velocity (received from other players) —— */
@@ -775,10 +801,20 @@ const StickmanMysteryGame = () => {
         stickman.group.position.z += pushVelocityRef.current.z * delta;
         pushVelocityRef.current.x *= Math.pow(0.04, delta);
         pushVelocityRef.current.z *= Math.pow(0.04, delta);
-        if (Math.abs(pushVelocityRef.current.x) < 0.3) pushVelocityRef.current.x = 0;
-        if (Math.abs(pushVelocityRef.current.z) < 0.3) pushVelocityRef.current.z = 0;
-        stickman.group.position.x = THREE.MathUtils.clamp(stickman.group.position.x, -BOUNDARY, BOUNDARY);
-        stickman.group.position.z = THREE.MathUtils.clamp(stickman.group.position.z, -BOUNDARY, BOUNDARY);
+        if (Math.abs(pushVelocityRef.current.x) < 0.3)
+          pushVelocityRef.current.x = 0;
+        if (Math.abs(pushVelocityRef.current.z) < 0.3)
+          pushVelocityRef.current.z = 0;
+        stickman.group.position.x = THREE.MathUtils.clamp(
+          stickman.group.position.x,
+          -BOUNDARY,
+          BOUNDARY,
+        );
+        stickman.group.position.z = THREE.MathUtils.clamp(
+          stickman.group.position.z,
+          -BOUNDARY,
+          BOUNDARY,
+        );
       }
 
       /* —— Walk cycle —— */
@@ -884,8 +920,16 @@ const StickmanMysteryGame = () => {
       /* —— Interpolate other players —— */
       otherPlayersRef.current.forEach((data) => {
         const g = data.stickman.group;
-        g.position.x = THREE.MathUtils.lerp(g.position.x, data.targetPos.x, 8 * delta);
-        g.position.z = THREE.MathUtils.lerp(g.position.z, data.targetPos.z, 8 * delta);
+        g.position.x = THREE.MathUtils.lerp(
+          g.position.x,
+          data.targetPos.x,
+          8 * delta,
+        );
+        g.position.z = THREE.MathUtils.lerp(
+          g.position.z,
+          data.targetPos.z,
+          8 * delta,
+        );
         let angleDiff = data.targetPos.angle - g.rotation.y;
         while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
         while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
@@ -979,7 +1023,8 @@ const StickmanMysteryGame = () => {
   /* ── Multiplayer position sync ──────────────────────── */
   useEffect(() => {
     if (!currentPlayer?._id || !currentRoom?._id) return;
-    if (gameState?.status !== 'playing' && gameState?.status !== 'paused') return;
+    if (gameState?.status !== "playing" && gameState?.status !== "paused")
+      return;
 
     const myId = currentPlayer._id;
     const roomId = currentRoom._id;
@@ -989,16 +1034,19 @@ const StickmanMysteryGame = () => {
       const pos = stickmanRef.current?.group?.position;
       if (!pos) return;
       try {
-        const resp = await fetch(`${API_URL}/api/rooms/${roomId}/sync-position`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            playerId: myId,
-            x: Math.round(pos.x * 100) / 100,
-            z: Math.round(pos.z * 100) / 100,
-            angle: Math.round(stickmanAngleRef.current * 100) / 100,
-          }),
-        });
+        const resp = await fetch(
+          `${API_URL}/api/rooms/${roomId}/sync-position`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              playerId: myId,
+              x: Math.round(pos.x * 100) / 100,
+              z: Math.round(pos.z * 100) / 100,
+              angle: Math.round(stickmanAngleRef.current * 100) / 100,
+            }),
+          },
+        );
         const data = await resp.json();
         if (!data.success) return;
 
@@ -1011,8 +1059,10 @@ const StickmanMysteryGame = () => {
         // Update other player stickmen
         const scene = sceneRef.current;
         if (!scene) return;
-        const others = (data.positions || []).filter(p => p.playerId !== myId);
-        const currentIds = new Set(others.map(p => p.playerId));
+        const others = (data.positions || []).filter(
+          (p) => p.playerId !== myId,
+        );
+        const currentIds = new Set(others.map((p) => p.playerId));
 
         // Remove players who left
         for (const [id, d] of otherPlayersRef.current) {
@@ -1029,7 +1079,7 @@ const StickmanMysteryGame = () => {
             const sm = buildStickman(color);
             sm.group.position.set(p.x, 0, p.z);
             sm.group.rotation.y = p.angle;
-            const label = createTextSprite(p.name || '???', '#ffffff');
+            const label = createTextSprite(p.name || "???", "#ffffff");
             label.position.y = 2.5;
             sm.group.add(label);
             scene.add(sm.group);
@@ -1041,11 +1091,15 @@ const StickmanMysteryGame = () => {
             });
           } else {
             otherPlayersRef.current.get(p.playerId).targetPos = {
-              x: p.x, z: p.z, angle: p.angle,
+              x: p.x,
+              z: p.z,
+              angle: p.angle,
             };
           }
         });
-      } catch (e) { /* ignore network errors */ }
+      } catch (e) {
+        /* ignore network errors */
+      }
     };
 
     syncIntervalRef.current = setInterval(sync, POSITION_SYNC_MS);
@@ -1119,8 +1173,10 @@ const StickmanMysteryGame = () => {
           <div className="sm-hud-pill sm-clue-count">
             🔑 {cluesFound.length}/{MYSTERY.objects.length}
           </div>
-          <div className={`sm-hud-pill sm-dash-pill${isDashing ? ' dashing' : ''}${!dashReady ? ' cooldown' : ''}`}>
-            💨 {isDashing ? 'DASH!' : dashReady ? 'Ready' : 'Cooldown'}
+          <div
+            className={`sm-hud-pill sm-dash-pill${isDashing ? " dashing" : ""}${!dashReady ? " cooldown" : ""}`}
+          >
+            💨 {isDashing ? "DASH!" : dashReady ? "Ready" : "Cooldown"}
           </div>
         </div>
         <div className="sm-hud-right">
