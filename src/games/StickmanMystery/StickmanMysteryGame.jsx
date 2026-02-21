@@ -827,6 +827,9 @@ const StickmanMysteryGame = () => {
   const decoysTriggeredRef = useRef([]);
   const nearDecoyRef = useRef(null);
   const torchFlamesRef = useRef([]);
+  const currentStageRef = useRef(0);
+  const stageStartTimeRef = useRef(GAME_DURATION);
+  const stageDecoysRef = useRef([0, 0, 0, 0, 0]);
 
   /* ── Multiplayer refs ──────────────────────────────── */
   const otherPlayersRef = useRef(new Map());
