@@ -2,7 +2,6 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
-  "env": ["MONGODB_URI"],
   "functions": {
     "api/index.py": {
       "runtime": "python3.11"
