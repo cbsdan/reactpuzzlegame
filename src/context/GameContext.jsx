@@ -22,7 +22,7 @@ export const GameProvider = ({ children }) => {
   // Long polling for real-time updates
   const pollForUpdates = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/events?lastVersion=${currentVersion}`);
+      const response = await fetch(`${API_URL}/events?lastVersion=${currentVersion}`);
       const data = await response.json();
       
       if (data.success && data.hasUpdate) {
@@ -42,8 +42,8 @@ export const GameProvider = ({ children }) => {
   const fetchInitialData = async () => {
     try {
       const [gameStateRes, playersRes] = await Promise.all([
-        fetch(`${API_URL}/api/game-state`),
-        fetch(`${API_URL}/api/players`)
+        fetch(`${API_URL}/game-state`),
+        fetch(`${API_URL}/players`)
       ]);
       
       const gameStateData = await gameStateRes.json();
@@ -68,7 +68,7 @@ export const GameProvider = ({ children }) => {
   // Add player
   const addPlayer = async (name) => {
     try {
-      const response = await fetch(`${API_URL}/api/players`, {
+      const response = await fetch(`${API_URL}/players`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name })
@@ -78,7 +78,7 @@ export const GameProvider = ({ children }) => {
       
       if (data.success) {
         // Force refresh
-        const playersRes = await fetch(`${API_URL}/api/players`);
+        const playersRes = await fetch(`${API_URL}/players`);
         const playersData = await playersRes.json();
         if (playersData.success) {
           setPlayers(playersData.players);
@@ -96,7 +96,7 @@ export const GameProvider = ({ children }) => {
   // Admin actions
   const adminAction = async (action) => {
     try {
-      const response = await fetch(`${API_URL}/api/admin`, {
+      const response = await fetch(`${API_URL}/admin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action })

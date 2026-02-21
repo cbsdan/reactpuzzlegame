@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port 3000",
+    "dev:flask": "python api/index.py",
+    "dev:both": "npm run dev & python api/index.py",
     "dev:vercel": "vercel dev",
     "build": "vite build",
     "lint": "eslint .",

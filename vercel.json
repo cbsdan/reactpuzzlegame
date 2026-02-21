@@ -2,7 +2,34 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
+  "env": [
+    "MONGODB_URI"
+  ],
+  "functions": {
+    "api/**/*.py": {
+      "runtime": "python3.11"
+    }
+  },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" }
+    {
+      "source": "/api/game-state",
+      "destination": "/api/game-state.py"
+    },
+    {
+      "source": "/api/players",
+      "destination": "/api/players.py"
+    },
+    {
+      "source": "/api/events",
+      "destination": "/api/events.py"
+    },
+    {
+      "source": "/api/admin",
+      "destination": "/api/admin.py"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
   ]
 }
