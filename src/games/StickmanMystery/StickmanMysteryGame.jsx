@@ -74,6 +74,41 @@ const MYSTERY = {
   ],
 };
 
+/* ── Wall layout ────────────────────────────────────── */
+const WALL_SEGMENTS = [
+  // Perimeter walls
+  { x: 0, z: -29, w: 60, d: 2, h: 3.5 },
+  { x: 0, z: 29, w: 60, d: 2, h: 3.5 },
+  { x: -29, z: 0, w: 2, d: 60, h: 3.5 },
+  { x: 29, z: 0, w: 2, d: 60, h: 3.5 },
+  // Interior walls — corridors & nooks
+  { x: -10, z: -8, w: 12, d: 0.6, h: 2.8 },
+  { x: 8, z: 3, w: 0.6, d: 14, h: 2.8 },
+  { x: -5, z: 16, w: 10, d: 0.6, h: 2.8 },
+  { x: 18, z: -10, w: 0.6, d: 10, h: 2.8 },
+  { x: -20, z: -16, w: 8, d: 0.6, h: 2.8 },
+  { x: 5, z: -22, w: 0.6, d: 6, h: 2.8 },
+  { x: -16, z: 8, w: 0.6, d: 10, h: 2.8 },
+  { x: 22, z: 20, w: 8, d: 0.6, h: 2.8 },
+  { x: -24, z: 22, w: 0.6, d: 6, h: 2.8 },
+  { x: 14, z: -18, w: 6, d: 0.6, h: 2.8 },
+];
+
+/* ── Decorative (non-clue) object catalogue ─────────── */
+const DECOR_TYPES = [
+  { name: "Barrel", color: 0x8b5e3c, emissive: 0x3d2a1a, shape: "barrel", radius: 0.5 },
+  { name: "Wooden Crate", color: 0x9e7b4f, emissive: 0x4a3820, shape: "crate", radius: 0.55 },
+  { name: "Boulder", color: 0x5a5a6e, emissive: 0x2a2a33, shape: "rock", radius: 0.6 },
+  { name: "Mushroom", color: 0xe74c3c, emissive: 0x722626, shape: "mushroom", radius: 0.3 },
+  { name: "Dead Stump", color: 0x5c4033, emissive: 0x2e201a, shape: "stump", radius: 0.5 },
+  { name: "Broken Pillar", color: 0x6b6b80, emissive: 0x34343f, shape: "brokenPillar", radius: 0.45 },
+  { name: "Old Pot", color: 0x8b7355, emissive: 0x453928, shape: "pot", radius: 0.4 },
+  { name: "Tombstone", color: 0x7f8c8d, emissive: 0x3e4445, shape: "tombstone", radius: 0.5 },
+  { name: "Rusted Shield", color: 0xb87333, emissive: 0x5a3818, shape: "shield", radius: 0.45 },
+  { name: "Bone Pile", color: 0xd5c4a1, emissive: 0x6a6250, shape: "bones", radius: 0.4 },
+];
+const DECOR_COUNT = 22;
+
 /* ── Helpers ─────────────────────────────────────────── */
 
 /** Create a billboard text sprite */
@@ -397,6 +432,289 @@ function buildCartMesh() {
   return { group, beacon, ring, light, scroll };
 }
 
+/** Build a wall mesh from segment data */
+function buildWallMesh(w) {
+  const group = new THREE.Group();
+  const isPerimeter = w.w >= 50 || w.d >= 50;
+  const mat = new THREE.MeshStandardMaterial({
+    color: isPerimeter ? 0x1a1a32 : 0x2a2a48,
+    roughness: 0.92,
+    metalness: 0.08,
+  });
+  const wall = new THREE.Mesh(new THREE.BoxGeometry(w.w, w.h, w.d), mat);
+  wall.position.set(w.x, w.h / 2, w.z);
+  wall.castShadow = true;
+  wall.receiveShadow = true;
+  group.add(wall);
+
+  // Torch on interior walls
+  if (!isPerimeter) {
+    const torchLight = new THREE.PointLight(0xff6633, 0.6, 8);
+    torchLight.position.set(w.x, w.h + 0.5, w.z);
+    group.add(torchLight);
+    const flameMat = new THREE.MeshStandardMaterial({
+      color: 0xff6633,
+      emissive: 0xff4400,
+      emissiveIntensity: 1.5,
+      transparent: true,
+      opacity: 0.85,
+    });
+    const flame = new THREE.Mesh(
+      new THREE.SphereGeometry(0.08, 8, 8),
+      flameMat,
+    );
+    flame.position.set(w.x, w.h + 0.2, w.z);
+    group.add(flame);
+  }
+  return group;
+}
+
+/** Build a decorative (non-clue) object */
+function buildDecorObject(typeData) {
+  const group = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({
+    color: typeData.color,
+    emissive: typeData.emissive,
+    emissiveIntensity: 0.15,
+    roughness: 0.85,
+    metalness: 0.1,
+  });
+  switch (typeData.shape) {
+    case "barrel": {
+      const barrel = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.4, 0.35, 0.9, 12),
+        mat,
+      );
+      barrel.position.y = 0.45;
+      barrel.castShadow = true;
+      group.add(barrel);
+      const ringMat = new THREE.MeshStandardMaterial({
+        color: 0x3a3a3a,
+        roughness: 0.7,
+        metalness: 0.5,
+      });
+      [0.15, 0.75].forEach((y) => {
+        const ring = new THREE.Mesh(
+          new THREE.TorusGeometry(0.41, 0.025, 8, 16),
+          ringMat,
+        );
+        ring.position.y = y;
+        ring.rotation.x = Math.PI / 2;
+        group.add(ring);
+      });
+      break;
+    }
+    case "crate": {
+      const crate = new THREE.Mesh(
+        new THREE.BoxGeometry(0.8, 0.8, 0.8),
+        mat,
+      );
+      crate.position.y = 0.4;
+      crate.castShadow = true;
+      crate.rotation.y = Math.random() * Math.PI;
+      group.add(crate);
+      break;
+    }
+    case "rock": {
+      const rock = new THREE.Mesh(
+        new THREE.DodecahedronGeometry(0.55, 0),
+        mat,
+      );
+      rock.position.y = 0.3;
+      rock.castShadow = true;
+      rock.rotation.set(Math.random(), Math.random(), 0);
+      group.add(rock);
+      break;
+    }
+    case "mushroom": {
+      const stemMat = new THREE.MeshStandardMaterial({
+        color: 0xf5deb3,
+        roughness: 0.9,
+      });
+      const stem = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.07, 0.09, 0.35, 8),
+        stemMat,
+      );
+      stem.position.y = 0.175;
+      group.add(stem);
+      const cap = new THREE.Mesh(
+        new THREE.SphereGeometry(
+          0.22, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2,
+        ),
+        mat,
+      );
+      cap.position.y = 0.35;
+      cap.castShadow = true;
+      group.add(cap);
+      const glow = new THREE.PointLight(typeData.color, 0.25, 2.5);
+      glow.position.y = 0.45;
+      group.add(glow);
+      break;
+    }
+    case "stump": {
+      const stump = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.35, 0.42, 0.5, 8),
+        mat,
+      );
+      stump.position.y = 0.25;
+      stump.castShadow = true;
+      group.add(stump);
+      break;
+    }
+    case "brokenPillar": {
+      const pillar = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.28, 0.35, 1.2, 6),
+        mat,
+      );
+      pillar.position.y = 0.6;
+      pillar.rotation.z = 0.12;
+      pillar.castShadow = true;
+      group.add(pillar);
+      break;
+    }
+    case "pot": {
+      const pot = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.22, 0.32, 0.45, 12),
+        mat,
+      );
+      pot.position.y = 0.225;
+      pot.castShadow = true;
+      group.add(pot);
+      break;
+    }
+    case "tombstone": {
+      const stone = new THREE.Mesh(
+        new THREE.BoxGeometry(0.55, 0.9, 0.12),
+        mat,
+      );
+      stone.position.y = 0.45;
+      stone.castShadow = true;
+      group.add(stone);
+      const base = new THREE.Mesh(
+        new THREE.BoxGeometry(0.7, 0.12, 0.25),
+        mat,
+      );
+      base.position.y = 0.06;
+      group.add(base);
+      break;
+    }
+    case "shield": {
+      const disc = new THREE.Mesh(
+        new THREE.CircleGeometry(0.35, 8),
+        mat,
+      );
+      disc.position.set(0, 0.55, 0);
+      disc.rotation.x = -0.2;
+      disc.castShadow = true;
+      group.add(disc);
+      const stickMat = new THREE.MeshStandardMaterial({
+        color: 0x5c4033,
+        roughness: 0.9,
+      });
+      const stick = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.025, 0.025, 0.9, 6),
+        stickMat,
+      );
+      stick.position.y = 0.45;
+      stick.rotation.z = 0.12;
+      group.add(stick);
+      break;
+    }
+    case "bones": {
+      for (let i = 0; i < 5; i++) {
+        const bone = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.03, 0.03, 0.3, 6),
+          mat,
+        );
+        bone.position.set(
+          (Math.random() - 0.5) * 0.4,
+          0.03,
+          (Math.random() - 0.5) * 0.4,
+        );
+        bone.rotation.set(
+          Math.random() * Math.PI * 0.5,
+          Math.random() * Math.PI,
+          Math.random() * Math.PI * 0.5,
+        );
+        group.add(bone);
+      }
+      break;
+    }
+    default: {
+      const box = new THREE.Mesh(
+        new THREE.BoxGeometry(0.6, 0.6, 0.6),
+        mat,
+      );
+      box.position.y = 0.3;
+      box.castShadow = true;
+      group.add(box);
+    }
+  }
+  return group;
+}
+
+/** Check if a point is inside any wall (with padding radius) */
+function isInsideWall(x, z, radius, walls) {
+  for (const w of walls) {
+    const halfW = w.w / 2 + radius;
+    const halfD = w.d / 2 + radius;
+    if (Math.abs(x - w.x) < halfW && Math.abs(z - w.z) < halfD) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Generate a random position that doesn't overlap walls or existing points */
+function generateRandomPos(existing, walls, minDist, boundary, avoidCenter) {
+  for (let attempt = 0; attempt < 200; attempt++) {
+    const x = (Math.random() - 0.5) * boundary * 2;
+    const z = (Math.random() - 0.5) * boundary * 2;
+    if (isInsideWall(x, z, 1.5, walls)) continue;
+    if (avoidCenter && Math.sqrt(x * x + z * z) < avoidCenter) continue;
+    let tooClose = false;
+    for (const [ex, ez] of existing) {
+      if (Math.sqrt((x - ex) ** 2 + (z - ez) ** 2) < minDist) {
+        tooClose = true;
+        break;
+      }
+    }
+    if (tooClose) continue;
+    return [x, z];
+  }
+  return null;
+}
+
+/** Resolve collisions against walls (AABB) and decor objects (circle) */
+function resolveCollisions(pos, walls, decors, radius) {
+  for (const w of walls) {
+    const halfW = w.w / 2 + radius;
+    const halfD = w.d / 2 + radius;
+    const dx = pos.x - w.x;
+    const dz = pos.z - w.z;
+    if (Math.abs(dx) < halfW && Math.abs(dz) < halfD) {
+      const overlapX = halfW - Math.abs(dx);
+      const overlapZ = halfD - Math.abs(dz);
+      if (overlapX < overlapZ) {
+        pos.x += dx > 0 ? overlapX : -overlapX;
+      } else {
+        pos.z += dz > 0 ? overlapZ : -overlapZ;
+      }
+    }
+  }
+  for (const d of decors) {
+    const ddx = pos.x - d.x;
+    const ddz = pos.z - d.z;
+    const dist = Math.sqrt(ddx * ddx + ddz * ddz);
+    const minDist = d.r + radius;
+    if (dist < minDist && dist > 0.001) {
+      const push = minDist - dist;
+      pos.x += (ddx / dist) * push;
+      pos.z += (ddz / dist) * push;
+    }
+  }
+}
+
 /* ═══════════════════════════════════════════════════════
    Component
    ═══════════════════════════════════════════════════════ */
@@ -428,6 +746,8 @@ const StickmanMysteryGame = () => {
   const isPausedRef = useRef(false);
   const nearCartRef = useRef(false);
   const cartMeshRef = useRef(null);
+  const wallBoxesRef = useRef([]);
+  const decorCollidersRef = useRef([]);
 
   /* ── Multiplayer refs ──────────────────────────────── */
   const otherPlayersRef = useRef(new Map());
@@ -625,28 +945,24 @@ const StickmanMysteryGame = () => {
       ),
     );
 
-    // ── Decorative pillars ────────────────────────────
-    const pillarMat = new THREE.MeshStandardMaterial({
-      color: 0x222240,
-      roughness: 0.9,
+    // ── Walls ─────────────────────────────────────────
+    const wallBoxes = WALL_SEGMENTS.map((w) => ({ ...w }));
+    wallBoxesRef.current = wallBoxes;
+    WALL_SEGMENTS.forEach((w) => {
+      const wallMesh = buildWallMesh(w);
+      scene.add(wallMesh);
     });
-    const pillarPositions = [
-      [18, 0, 0],
-      [-18, 0, 0],
-      [0, 0, 18],
-      [0, 0, -18],
-      [15, 0, 15],
-      [-15, 0, -15],
-    ];
-    pillarPositions.forEach(([px, , pz]) => {
-      const pillar = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.3, 0.4, 4, 6),
-        pillarMat,
-      );
-      pillar.position.set(px, 2, pz);
-      pillar.castShadow = true;
-      pillar.receiveShadow = true;
-      scene.add(pillar);
+
+    // ── Random position generation ────────────────────
+    const occupied = [[0, 0], [CART_POS[0], CART_POS[2]]];
+    const randomPositions = MYSTERY.objects.map((obj) => {
+      const pos = generateRandomPos(occupied, wallBoxes, 5, BOUNDARY - 2, 6);
+      if (pos) {
+        occupied.push(pos);
+        return pos;
+      }
+      occupied.push([obj.pos[0], obj.pos[2]]);
+      return [obj.pos[0], obj.pos[2]];
     });
 
     // ── Stickman ──────────────────────────────────────
@@ -654,9 +970,11 @@ const StickmanMysteryGame = () => {
     scene.add(stickman.group);
     stickmanRef.current = stickman;
 
-    // ── 5 Mystery objects ─────────────────────────────
+    // ── 5 Mystery objects (randomised positions) ──────
     const objMeshes = MYSTERY.objects.map((data, i) => {
       const obj = buildObjectMesh(data, i);
+      const rp = randomPositions[i];
+      obj.group.position.set(rp[0], 0, rp[1]);
       scene.add(obj.group);
       return obj;
     });
@@ -666,6 +984,22 @@ const StickmanMysteryGame = () => {
     const cart = buildCartMesh();
     scene.add(cart.group);
     cartMeshRef.current = cart;
+
+    // ── Decorative (non-clue) objects ─────────────────
+    const decorColliders = [];
+    for (let i = 0; i < DECOR_COUNT; i++) {
+      const typeIdx = Math.floor(Math.random() * DECOR_TYPES.length);
+      const typeData = DECOR_TYPES[typeIdx];
+      const pos = generateRandomPos(occupied, wallBoxes, 3, BOUNDARY - 2, 3);
+      if (!pos) continue;
+      occupied.push(pos);
+      const decorMesh = buildDecorObject(typeData);
+      decorMesh.position.set(pos[0], 0, pos[1]);
+      decorMesh.rotation.y = Math.random() * Math.PI * 2;
+      scene.add(decorMesh);
+      decorColliders.push({ x: pos[0], z: pos[1], r: typeData.radius });
+    }
+    decorCollidersRef.current = decorColliders;
 
     // ── Animation loop ────────────────────────────────
     const clock = clockRef.current;
@@ -719,6 +1053,7 @@ const StickmanMysteryGame = () => {
             -BOUNDARY,
             BOUNDARY,
           );
+          resolveCollisions(stickman.group.position, wallBoxes, decorColliders, 0.4);
         }
       }
       stickman.group.rotation.y = stickmanAngleRef.current;
@@ -761,6 +1096,7 @@ const StickmanMysteryGame = () => {
             -BOUNDARY,
             BOUNDARY,
           );
+          resolveCollisions(stickman.group.position, wallBoxes, decorColliders, 0.4);
           isMoving = true;
           // Push nearby other players
           const myX = stickman.group.position.x;
@@ -815,6 +1151,7 @@ const StickmanMysteryGame = () => {
           -BOUNDARY,
           BOUNDARY,
         );
+        resolveCollisions(stickman.group.position, wallBoxes, decorColliders, 0.4);
       }
 
       /* —— Walk cycle —— */
@@ -853,7 +1190,8 @@ const StickmanMysteryGame = () => {
       const px = stickman.group.position.x;
       const pz = stickman.group.position.z;
       for (let i = 0; i < objMeshes.length; i++) {
-        const [ox, , oz] = MYSTERY.objects[i].pos;
+        const ox = objMeshes[i].group.position.x;
+        const oz = objMeshes[i].group.position.z;
         const d = Math.sqrt((px - ox) ** 2 + (pz - oz) ** 2);
         if (d < INTERACT_DIST && d < nearestDist) {
           nearest = i;
