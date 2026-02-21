@@ -1,0 +1,490 @@
+.mystery-container {
+  background: #161b22;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  overflow: visible;
+  position: relative;
+  color: #e6edf3;
+}
+
+/* Header */
+.mystery-header {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  color: white;
+  padding: 1.5rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.mystery-title {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.mystery-icon {
+  font-size: 2.5rem;
+}
+
+.mystery-title h2 {
+  margin: 0 0 0.2rem;
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.mystery-title p {
+  margin: 0;
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.mystery-stats {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.stat-pill {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  padding: 0.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 70px;
+}
+
+.score-pill {
+  background: rgba(255, 215, 0, 0.15);
+  border-color: rgba(255, 215, 0, 0.4);
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.stat-val {
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+}
+
+/* Paused overlay */
+.mystery-paused-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(15, 12, 41, 0.75);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mystery-paused-card {
+  background: #1c2128;
+  border: 1px solid rgba(124, 58, 237, 0.35);
+  border-radius: 20px;
+  padding: 3rem 2.5rem;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  max-width: 340px;
+  animation: popIn 0.3s ease-out;
+}
+
+.mystery-paused-icon {
+  font-size: 3.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.mystery-paused-card h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.6rem;
+  color: #e6edf3;
+}
+
+.mystery-paused-card p {
+  margin: 0 0 0.25rem;
+  color: #8b949e;
+  font-size: 0.95rem;
+}
+
+.mystery-paused-progress {
+  margin-top: 0.5rem !important;
+  color: #a78bfa !important;
+  font-weight: 600 !important;
+}
+
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.85); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* Body */
+.mystery-body {
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+/* Clues */
+.clues-section h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1.1rem;
+  color: #e6edf3;
+}
+
+.clues-hint {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  color: #8b949e;
+}
+
+.clues-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+}
+
+.clue-card {
+  background: #0d1117;
+  border: 1px solid #2d2f5e;
+  border-radius: 12px;
+  padding: 1.2rem;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.3s ease;
+  font-size: 0.9rem;
+  min-height: 90px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.clue-card:hover {
+  border-color: #7c3aed;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(124, 58, 237, 0.2);
+}
+
+.clue-revealed {
+  background: rgba(124, 58, 237, 0.1);
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.2);
+}
+
+.clue-number {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #6366f1;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.clue-text {
+  font-size: 0.95rem;
+  color: #c4b5fd;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.clue-hidden {
+  color: #6b7280;
+  font-size: 0.85rem;
+}
+
+/* Guess section */
+.guess-section h3 {
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+  color: #e6edf3;
+}
+
+.guess-form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.2rem;
+}
+
+.digit-input-wrapper {
+  display: flex;
+  gap: 0.75rem;
+  cursor: text;
+}
+
+.digit-box {
+  width: 64px;
+  height: 72px;
+  border: 2px solid #2d2f5e;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #8b949e;
+  background: #0d1117;
+  transition: all 0.2s ease;
+  font-family: 'Courier New', monospace;
+}
+
+.digit-box.filled {
+  border-color: #7c3aed;
+  background: rgba(124, 58, 237, 0.12);
+  color: #c4b5fd;
+}
+
+.guess-input-hidden {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  /* pointer-events kept alive so .focus() works */
+}
+
+.guess-btn {
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  color: white;
+  border: none;
+  padding: 0.9rem 2.5rem;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.guess-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
+}
+
+.guess-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.guess-error {
+  color: #fca5a5;
+  background: rgba(220, 38, 38, 0.1);
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  border-radius: 8px;
+  padding: 0.6rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-align: center;
+}
+
+.legend {
+  display: flex;
+  gap: 1.25rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+  color: #6b7280;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #8b949e;
+  font-size: 0.82rem;
+}
+
+/* Shared tile style — used in legend and history */
+.legend-tile,
+.history-tile {
+  width: 40px;
+  height: 44px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  font-weight: 800;
+  font-family: 'Courier New', monospace;
+  color: white;
+  flex-shrink: 0;
+}
+
+.legend-tile {
+  width: 28px;
+  height: 30px;
+  border-radius: 5px;
+  font-size: 0.9rem;
+}
+
+/* Bull = green */
+.bull-tile  { background: #16a34a; }
+/* Cow  = amber/yellow */
+.cow-tile   { background: #d97706; }
+/* Miss = slate grey */
+.miss-tile  { background: #9ca3af; }
+
+/* Solved banner */
+.solved-banner {
+  background: linear-gradient(135deg, rgba(22, 163, 74, 0.12) 0%, rgba(34, 197, 94, 0.08) 100%);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 16px;
+  padding: 2.5rem;
+  text-align: center;
+  animation: slideIn 0.5s ease-out;
+}
+
+.solved-icon {
+  font-size: 3.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.solved-banner h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.8rem;
+  color: #86efac;
+}
+
+.solved-banner p {
+  color: #4ade80;
+  margin: 0 0 1.25rem;
+  font-size: 1rem;
+}
+
+.final-score {
+  display: inline-block;
+  background: linear-gradient(135deg, #facc15 0%, #f59e0b 100%);
+  color: #1a1a00;
+  font-size: 1.4rem;
+  font-weight: 700;
+  padding: 0.75rem 2rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+/* History — Wordle-style rows */
+.history-section h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1.1rem;
+  color: #e6edf3;
+}
+
+/* Legend shown inside history after first guess */
+.history-legend {
+  background: rgba(124, 58, 237, 0.07);
+  border: 1px solid rgba(124, 58, 237, 0.2);
+  border-radius: 10px;
+  padding: 0.65rem 1rem;
+  margin-bottom: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.history-legend-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #a78bfa;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.history-legend-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.history-entry {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: #0d1117;
+  border: 1px solid #21262d;
+  border-radius: 10px;
+  padding: 0.6rem 0.9rem;
+  animation: slideIn 0.2s ease-out;
+}
+
+.history-entry-correct {
+  background: rgba(22, 163, 74, 0.08);
+  border-color: rgba(34, 197, 94, 0.35);
+  border-left: 3px solid #22c55e;
+}
+
+.history-num {
+  min-width: 24px;
+  font-size: 0.78rem;
+  color: #9ca3af;
+  font-weight: 700;
+  text-align: right;
+}
+
+.history-tiles {
+  display: flex;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.history-summary {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.summary-correct {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #4ade80;
+}
+
+.summary-hints {
+  display: flex;
+  gap: 0.3rem;
+  align-items: center;
+}
+
+.hint-bull {
+  background: #16a34a;
+  color: white;
+  font-weight: 700;
+  font-size: 0.8rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 5px;
+}
+
+.hint-cow {
+  background: #d97706;
+  color: white;
+  font-weight: 700;
+  font-size: 0.8rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 5px;
+}
+
+.hint-miss {
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

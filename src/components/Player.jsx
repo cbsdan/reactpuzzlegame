@@ -1,11 +1,27 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useGame } from '../context/GameContext';
+import { getGame } from '../games/index';
 import './Player.css';
 
 const Player = () => {
-  const { gameState, players, addPlayer } = useGame();
+  const { gameState, players, addPlayer, currentPlayer, currentRoom, exitGame, removedNotification, clearRemovedNotification } = useGame();
+
+  // Game is 'active' (mounted) while playing or paused — unmounts only on stop/idle
+  const activeGame = (gameState?.status === 'playing' || gameState?.status === 'paused')
+    ? getGame(gameState?.gameType)
+    : null;
+
+  // Lock body scroll when fullscreen game is active
+  const isGameActive = !!activeGame;
+  useEffect(() => {
+    if (isGameActive) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [isGameActive]);
   const [playerName, setPlayerName] = useState('');
-  const [currentPlayer, setCurrentPlayer] = useState(null);
   const [error, setError] = useState('');
 
   const handleJoinGame = async (e) => {
@@ -20,10 +36,16 @@ const Player = () => {
     const result = await addPlayer(playerName);
     
     if (result.success) {
-      setCurrentPlayer(result.player);
       setPlayerName('');
     } else {
       setError(result.error || 'Failed to join game');
+    }
+  };
+
+  const handleExitGame = async () => {
+    const result = await exitGame();
+    if (!result.success) {
+      setError(result.error || 'Failed to exit game');
     }
   };
 
@@ -59,8 +81,26 @@ const Player = () => {
 
   return (
     <div className="player-container">
+      {removedNotification && (
+        <div className="kicked-overlay">
+          <div className="kicked-modal">
+            <button className="kicked-close" onClick={clearRemovedNotification} title="Close">✕</button>
+            <div className="kicked-icon">🚫</div>
+            <h2>You've Been Kicked</h2>
+            <p>The host has removed you from the game.</p>
+            <div className="kicked-redirect">Returning to home...</div>
+          </div>
+        </div>
+      )}
       <div className="player-header">
-        <h1>🧩 Puzzle Game</h1>
+        <div className="header-top">
+          <h1>🧩 Puzzle Game</h1>
+          {currentPlayer && (
+            <button className="exit-btn" onClick={handleExitGame} title="Exit Game">
+              ✕
+            </button>
+          )}
+        </div>
         <div 
           className="game-status" 
           style={{ backgroundColor: getGameStatusColor() }}
@@ -71,7 +111,8 @@ const Player = () => {
 
       {!currentPlayer ? (
         <div className="join-section">
-          <h2>Join the Game</h2>
+          <h2>Enter Your Name</h2>
+          <p className="join-info">Room Code: <strong>{currentRoom?.passkey}</strong></p>
           <form onSubmit={handleJoinGame}>
             <input
               type="text"
@@ -94,27 +135,48 @@ const Player = () => {
             <p>Your score: <strong>{currentPlayer.score || 0}</strong></p>
           </div>
 
-          <div className="game-placeholder">
-            <div className="placeholder-content">
-              <h3>🎯 Game Area</h3>
-              <p>Game implementation will go here</p>
-              <div className="puzzle-preview">
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
-                  <div key={num} className="puzzle-tile">
-                    {num}
-                  </div>
-                ))}
+          {/* Active game area — fullscreen overlay, stays mounted while playing or paused */}
+          {activeGame && (() => {
+            const GameComponent = activeGame.PlayerComponent;
+            return (
+              <div className="game-fullscreen-overlay">
+                <div className="game-fullscreen-topbar">
+                  <span className="game-fullscreen-title">
+                    {activeGame.icon} {activeGame.name}
+                    {gameState?.status === 'paused' && (
+                      <span className="game-topbar-paused"> ⏸️ Paused</span>
+                    )}
+                  </span>
+                  <button className="game-fullscreen-exit" onClick={handleExitGame} title="Exit Game">
+                    ✕ Exit
+                  </button>
+                </div>
+                <div className="game-fullscreen-content">
+                  <GameComponent />
+                </div>
+              </div>
+            );
+          })()}
+
+          {gameState?.status !== 'playing' && gameState?.status !== 'paused' && (
+            <div className="game-placeholder">
+              <div className="placeholder-content">
+                <h3>⏳ Waiting for Host</h3>
+                <p>The host will start the game soon. Get ready!</p>
+                <div className="waiting-animation">
+                  <span>•</span><span>•</span><span>•</span>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           <div className="players-list">
-            <h3>Active Players ({players.length})</h3>
+            <h3>Players in Room ({players.length})</h3>
             <div className="players-grid">
               {players.map((player) => (
-                <div key={player._id} className="player-card">
-                  <span className="player-icon">👤</span>
-                  <span className="player-name">{player.name}</span>
+                <div key={player._id} className={`player-card ${player._id === currentPlayer._id ? 'me' : ''}`}>
+                  <span className="player-icon">{player._id === currentPlayer._id ? '🙋' : '👤'}</span>
+                  <span className="player-name">{player.name}{player._id === currentPlayer._id ? ' (You)' : ''}</span>
                   <span className="player-score">{player.score || 0}</span>
                 </div>
               ))}

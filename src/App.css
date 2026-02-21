@@ -1,21 +1,27 @@
 #root {
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
+  width: 100%;
+  min-height: 100vh;
 }
 
 .app {
   min-height: 100vh;
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+}
+
+.app.app-admin {
+  background: #0d1117;
 }
 
 .view-toggle {
   background: white;
-  padding: 1rem;
+  padding: 1.5rem 2rem;
   display: flex;
   justify-content: center;
-  gap: 1rem;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  gap: 2rem;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -28,29 +34,19 @@
   border: 2px solid #667eea;
   background: white;
   color: #667eea;
-  border-radius: 25px;
+  border-radius: 30px;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.3s ease;
 }
 
 .toggle-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 12px rgba(102, 126, 234, 0.4);
 }
 
 .toggle-btn.active {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border-color: transparent;
-}
-
-@media (max-width: 768px) {
-  .view-toggle {
-    flex-direction: column;
-    padding: 0.5rem;
-  }
-
-  .toggle-btn {
-    width: 100%;
-  }
+  box-shadow: 0 6px 14px rgba(102, 126, 234, 0.35);
 }

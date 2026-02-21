@@ -1,33 +1,36 @@
-import { useState } from 'react'
+import { useGame } from './context/GameContext'
 import { GameProvider } from './context/GameContext'
 import Player from './components/Player'
 import Admin from './components/Admin'
+import Home from './components/Home'
 import './App.css'
 
-function App() {
-  const [isAdmin, setIsAdmin] = useState(false)
+function AppContent() {
+  const { currentRoom, userRole } = useGame()
 
+  // Show home screen if not in a room
+  if (!currentRoom) {
+    return <Home />
+  }
+
+  // Show Admin or Player based on user role
+  return userRole === 'admin' ? <Admin /> : <Player />
+}
+
+function App() {
   return (
     <GameProvider>
-      <div className="app">
-        <div className="view-toggle">
-          <button 
-            className={`toggle-btn ${!isAdmin ? 'active' : ''}`}
-            onClick={() => setIsAdmin(false)}
-          >
-            👤 Player View
-          </button>
-          <button 
-            className={`toggle-btn ${isAdmin ? 'active' : ''}`}
-            onClick={() => setIsAdmin(true)}
-          >
-            👨‍💼 Admin View
-          </button>
-        </div>
-        
-        {isAdmin ? <Admin /> : <Player />}
-      </div>
+      <AppInner />
     </GameProvider>
+  )
+}
+
+function AppInner() {
+  const { userRole, currentRoom } = useGame()
+  return (
+    <div className={`app${currentRoom && userRole === 'admin' ? ' app-admin' : ''}`}>
+      <AppContent />
+    </div>
   )
 }
 

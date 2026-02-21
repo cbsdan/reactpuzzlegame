@@ -1,0 +1,259 @@
+.nm-admin-dashboard {
+  background: #0d1117;
+  border-radius: 10px;
+  border: 1px solid #21262d;
+  overflow: hidden;
+  margin-top: 1rem;
+}
+
+/* Header */
+.nm-dashboard-header {
+  background: linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%);
+  color: white;
+  padding: 1.2rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.nm-dashboard-title {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.nm-dashboard-icon {
+  font-size: 2rem;
+}
+
+.nm-dashboard-title h3 {
+  margin: 0 0 0.15rem;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.nm-dashboard-title p {
+  margin: 0;
+  font-size: 0.8rem;
+  opacity: 0.65;
+}
+
+.nm-dashboard-pills {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.nm-pill {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  padding: 0.4rem 0.9rem;
+  text-align: center;
+  min-width: 64px;
+}
+
+.solved-pill {
+  background: rgba(34, 197, 94, 0.2);
+  border-color: rgba(34, 197, 94, 0.4);
+}
+
+.playing-pill {
+  background: rgba(251, 191, 36, 0.15);
+  border-color: rgba(251, 191, 36, 0.4);
+}
+
+.nm-answer-pill {
+  background: rgba(250, 204, 21, 0.15);
+  border: 1.5px solid rgba(250, 204, 21, 0.5);
+  border-radius: 10px;
+  padding: 0.4rem 0.9rem;
+  text-align: center;
+  min-width: 80px;
+  cursor: pointer;
+  transition: background 0.2s;
+  user-select: none;
+}
+
+.nm-answer-pill:hover {
+  background: rgba(250, 204, 21, 0.28);
+}
+
+.nm-answer-val {
+  color: #fef08a;
+  letter-spacing: 3px;
+}
+
+.nm-pill-val {
+  display: block;
+  font-size: 1.2rem;
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+  line-height: 1;
+}
+
+.nm-pill-label {
+  font-size: 0.7rem;
+  opacity: 0.8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Clues panel */
+.nm-clues-panel {
+  padding: 0.85rem 1.25rem;
+  background: #161b22;
+  border-bottom: 1px solid #21262d;
+}
+
+.nm-clues-panel h4 {
+  margin: 0 0 0.6rem;
+  font-size: 0.8rem;
+  color: #a78bfa;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.nm-clues-list {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.nm-clue-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.83rem;
+}
+
+.nm-clue-num {
+  color: #a78bfa;
+  font-weight: 700;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.nm-clue-text {
+  color: #c9d1d9;
+}
+
+/* Leaderboard */
+.nm-leaderboard {
+  overflow: hidden;
+}
+
+.nm-lb-header {
+  display: grid;
+  grid-template-columns: 48px 1fr 80px 100px 90px 70px;
+  background: #161b22;
+  padding: 0.5rem 1rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #8b949e;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid #21262d;
+}
+
+.nm-lb-row {
+  display: grid;
+  grid-template-columns: 48px 1fr 80px 100px 90px 70px;
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid #161b22;
+  align-items: center;
+  font-size: 0.88rem;
+  transition: background 0.12s;
+}
+
+.nm-lb-row:last-child {
+  border-bottom: none;
+}
+
+.nm-lb-row:hover {
+  background: rgba(124, 58, 237, 0.06);
+}
+
+.nm-row-solved {
+  background: rgba(22, 163, 74, 0.06);
+}
+
+.nm-row-solved:hover {
+  background: rgba(22, 163, 74, 0.1);
+}
+
+.nm-lb-rank {
+  font-size: 1rem;
+  text-align: center;
+}
+
+.nm-lb-name {
+  font-weight: 600;
+  color: #e6edf3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nm-lb-guesses {
+  text-align: center;
+  color: #8b949e;
+  font-family: 'Courier New', monospace;
+}
+
+.nm-lb-status {
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.nm-row-solved .nm-lb-status {
+  color: #16a34a;
+}
+
+.nm-row-playing .nm-lb-status {
+  color: #d97706;
+}
+
+.nm-lb-time {
+  font-size: 0.8rem;
+  color: #6b7280;
+  font-family: 'Courier New', monospace;
+}
+
+.nm-lb-score {
+  font-weight: 700;
+  color: #a78bfa;
+  font-family: 'Courier New', monospace;
+  text-align: right;
+}
+
+.nm-row-solved .nm-lb-score {
+  color: #4ade80;
+}
+
+.nm-empty {
+  padding: 2rem;
+  text-align: center;
+  color: #6b7280;
+  font-size: 0.88rem;
+}
+
+/* Responsive: collapse some columns on small screens */
+@media (max-width: 600px) {
+  .nm-lb-header,
+  .nm-lb-row {
+    grid-template-columns: 36px 1fr 70px 80px;
+  }
+
+  .nm-lb-header span:nth-child(5),
+  .nm-lb-row .nm-lb-time {
+    display: none;
+  }
+}
