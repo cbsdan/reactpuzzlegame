@@ -1,15 +1,17 @@
 {
-  "name": "reactpuzzlegame",
+  "name": "react-puzzle-game",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --port 3000",
+    "dev:vercel": "vercel dev",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
+    "mongodb": "^7.1.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
