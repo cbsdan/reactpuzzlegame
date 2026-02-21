@@ -26,9 +26,13 @@ export const GameProvider = ({ children }) => {
       const data = await response.json();
       
       if (data.success && data.hasUpdate) {
-        setGameState(data.gameState);
-        setPlayers(data.players);
-        setCurrentVersion(data.version);
+        if (data.gameState) {
+          setGameState(data.gameState);
+          setCurrentVersion(data.gameState.version || currentVersion);
+        }
+        if (data.players) {
+          setPlayers(data.players);
+        }
       }
     } catch (error) {
       console.error('Polling error:', error);
@@ -49,12 +53,12 @@ export const GameProvider = ({ children }) => {
       const gameStateData = await gameStateRes.json();
       const playersData = await playersRes.json();
       
-      if (gameStateData.success) {
+      if (gameStateData.success && gameStateData.gameState) {
         setGameState(gameStateData.gameState);
         setCurrentVersion(gameStateData.gameState.version || 0);
       }
       
-      if (playersData.success) {
+      if (playersData.success && playersData.players) {
         setPlayers(playersData.players);
       }
       
@@ -76,17 +80,17 @@ export const GameProvider = ({ children }) => {
       
       const data = await response.json();
       
-      if (data.success) {
+      if (data.success && data.player) {
         // Force refresh
         const playersRes = await fetch(`${API_URL}/players`);
         const playersData = await playersRes.json();
-        if (playersData.success) {
+        if (playersData.success && playersData.players) {
           setPlayers(playersData.players);
         }
         return { success: true, player: data.player };
       }
       
-      return { success: false, error: data.error };
+      return { success: false, error: data.error || 'Failed to add player' };
     } catch (error) {
       console.error('Failed to add player:', error);
       return { success: false, error: error.message };
@@ -104,13 +108,13 @@ export const GameProvider = ({ children }) => {
       
       const data = await response.json();
       
-      if (data.success) {
+      if (data.success && data.gameState) {
         setGameState(data.gameState);
         setCurrentVersion(data.gameState.version || 0);
         return { success: true };
       }
       
-      return { success: false, error: data.error };
+      return { success: false, error: data.error || 'No game state returned' };
     } catch (error) {
       console.error('Admin action failed:', error);
       return { success: false, error: error.message };

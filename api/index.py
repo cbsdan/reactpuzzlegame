@@ -252,6 +252,18 @@ def admin():
         game_states = db['gamestate']
         players = db['players']
         
+        # Ensure gamestate doc exists
+        existing_state = game_states.find_one({'type': 'current'})
+        if not existing_state:
+            game_states.insert_one({
+                'type': 'current',
+                'status': 'idle',
+                'startedAt': None,
+                'pausedAt': None,
+                'updatedAt': datetime.utcnow(),
+                'version': 0
+            })
+        
         new_status = None
         additional_updates = {}
         
@@ -284,7 +296,6 @@ def admin():
                 '$set': update_data,
                 '$inc': {'version': 1}
             },
-            upsert=True,
             return_document=True
         )
         
