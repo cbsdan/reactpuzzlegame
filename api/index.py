@@ -7,8 +7,8 @@ import os
 import secrets
 import random
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from api.lib.mongodb import get_database
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from lib.mongodb import get_database
 
 app = Flask(__name__)
 CORS(app)
