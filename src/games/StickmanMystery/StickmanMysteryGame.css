@@ -202,6 +202,26 @@
   transform: scale(1.06);
 }
 
+.sm-answer-hint {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.78rem;
+  margin-top: 8px;
+}
+
+.sm-answer-hint kbd {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-family: inherit;
+  color: #fff;
+  margin: 0 1px;
+}
+
 @keyframes sm-glow {
   0%,
   100% {
@@ -482,6 +502,28 @@
 }
 .sm-overlay-over .sm-modal {
   border-color: rgba(231, 76, 60, 0.3);
+}
+
+/* ── Dash pill ──────────────────────────────────── */
+.sm-dash-pill {
+  transition: all 0.2s ease;
+}
+
+.sm-dash-pill.dashing {
+  color: #feca57;
+  border-color: rgba(254, 202, 87, 0.5);
+  background: rgba(254, 202, 87, 0.2);
+  animation: sm-dash-flash 0.12s infinite alternate;
+}
+
+.sm-dash-pill.cooldown:not(.dashing) {
+  color: #888;
+  border-color: rgba(136, 136, 136, 0.25);
+}
+
+@keyframes sm-dash-flash {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0.7; transform: scale(1.08); }
 }
 
 /* ── Pause ──────────────────────────────────────── */

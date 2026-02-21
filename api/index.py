@@ -724,5 +724,90 @@ def events():
 
 
 
+# ── Multiplayer position sync for Stickman game ──────────────────────
+@app.route('/api/rooms/<room_id>/sync-position', methods=['POST'])
+def sync_position(room_id):
+    db = get_database()
+    if db is None:
+        return jsonify({'success': False, 'error': 'Database not configured'}), 503
+    try:
+        room_oid = ObjectId(room_id)
+        data = request.get_json() or {}
+        player_id = data.get('playerId')
+        x = float(data.get('x', 0))
+        z = float(data.get('z', 0))
+        angle = float(data.get('angle', 0))
+
+        if not player_id:
+            return jsonify({'success': False, 'error': 'playerId required'}), 400
+
+        players_collection = db['players']
+
+        # Update this player's position
+        players_collection.update_one(
+            {'_id': ObjectId(player_id), 'roomId': room_oid},
+            {'$set': {'posX': x, 'posZ': z, 'posAngle': angle, 'posUpdatedAt': datetime.utcnow()}}
+        )
+
+        # Read & clear any pending push for this player
+        player_doc = players_collection.find_one_and_update(
+            {'_id': ObjectId(player_id), 'roomId': room_oid, 'pendingPushX': {'$exists': True}},
+            {'$unset': {'pendingPushX': '', 'pendingPushZ': ''}},
+            return_document=False  # return the doc BEFORE clearing so we read the push
+        )
+        pending_push = None
+        if player_doc and 'pendingPushX' in player_doc:
+            pending_push = {'fx': player_doc['pendingPushX'], 'fz': player_doc['pendingPushZ']}
+
+        # Get all players' positions in this room
+        all_players = list(players_collection.find(
+            {'roomId': room_oid, 'posX': {'$exists': True}},
+            {'_id': 1, 'name': 1, 'posX': 1, 'posZ': 1, 'posAngle': 1}
+        ))
+
+        positions = []
+        for p in all_players:
+            positions.append({
+                'playerId': str(p['_id']),
+                'name': p.get('name', ''),
+                'x': p.get('posX', 0),
+                'z': p.get('posZ', 0),
+                'angle': p.get('posAngle', 0),
+            })
+
+        return jsonify({
+            'success': True,
+            'positions': positions,
+            'pendingPush': pending_push,
+        }), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/rooms/<room_id>/push', methods=['POST'])
+def push_player(room_id):
+    db = get_database()
+    if db is None:
+        return jsonify({'success': False, 'error': 'Database not configured'}), 503
+    try:
+        room_oid = ObjectId(room_id)
+        data = request.get_json() or {}
+        target_id = data.get('targetId')
+        fx = float(data.get('forceX', 0))
+        fz = float(data.get('forceZ', 0))
+
+        if not target_id:
+            return jsonify({'success': False, 'error': 'targetId required'}), 400
+
+        players_collection = db['players']
+        players_collection.update_one(
+            {'_id': ObjectId(target_id), 'roomId': room_oid},
+            {'$set': {'pendingPushX': fx, 'pendingPushZ': fz}}
+        )
+
+        return jsonify({'success': True}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

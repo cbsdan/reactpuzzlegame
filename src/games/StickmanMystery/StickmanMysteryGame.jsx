@@ -3,6 +3,8 @@ import * as THREE from "three";
 import { useGame } from "../../context/GameContext";
 import "./StickmanMysteryGame.css";
 
+const API_URL = import.meta.env.VITE_API_URL || "";
+
 /* ── Constants ──────────────────────────────────────── */
 const GAME_DURATION = 300; // 5 min countdown
 const TIME_PENALTY = 30; // seconds lost per clue
@@ -10,6 +12,19 @@ const INTERACT_DIST = 3.5;
 const MOVE_SPEED = 8;
 const TURN_SPEED = 3;
 const BOUNDARY = 28;
+const CART_POS = [0, 0, -15];
+const CART_INTERACT_DIST = 4;
+const DASH_SPEED = 22;
+const DASH_DURATION = 0.25; // seconds
+const DASH_COOLDOWN = 2; // seconds
+const PUSH_DIST = 2;
+const PUSH_FORCE = 18;
+const POSITION_SYNC_MS = 150;
+
+const PLAYER_COLORS = [
+  0xff6b6b, 0x48dbfb, 0xfeca57, 0xff9ff3,
+  0x54a0ff, 0x5f27cd, 0x01a3a4, 0xf368e0,
+];
 
 /* ── Mystery puzzle data ────────────────────────────── */
 const MYSTERY = {
@@ -87,11 +102,12 @@ function createTextSprite(text, color = "#ffffff") {
 }
 
 /** Build the stickman character (returns object with group + limb refs) */
-function buildStickman() {
+function buildStickman(color = 0x00ffd0) {
   const group = new THREE.Group();
+  const emissive = new THREE.Color(color).multiplyScalar(0.4);
   const mat = new THREE.MeshStandardMaterial({
-    color: 0x00ffd0,
-    emissive: 0x006650,
+    color,
+    emissive,
     roughness: 0.5,
     metalness: 0.2,
   });
@@ -144,7 +160,7 @@ function buildStickman() {
   group.add(rightLeg);
 
   // Small glow under stickman
-  const glow = new THREE.PointLight(0x00ffd0, 0.6, 4);
+  const glow = new THREE.PointLight(color, 0.6, 4);
   glow.position.y = 0.5;
   group.add(glow);
 
@@ -265,11 +281,127 @@ function buildObjectMesh(objData, index) {
   return { group, mesh: mainMesh, beacon, ring, light, label };
 }
 
+/** Build the answer cart — the player must come here to submit their answer */
+function buildCartMesh() {
+  const group = new THREE.Group();
+
+  // Wagon body
+  const bodyMat = new THREE.MeshStandardMaterial({
+    color: 0x8b6914,
+    emissive: 0x4a3a0a,
+    emissiveIntensity: 0.3,
+    roughness: 0.65,
+    metalness: 0.1,
+  });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.7, 1.1), bodyMat);
+  body.position.y = 0.75;
+  body.castShadow = true;
+  body.receiveShadow = true;
+  group.add(body);
+
+  // Side rails
+  const railMat = new THREE.MeshStandardMaterial({
+    color: 0x6b4f12,
+    roughness: 0.8,
+  });
+  [
+    [-0.85, 1.2, 0],
+    [0.85, 1.2, 0],
+  ].forEach(([rx, ry, rz]) => {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.5, 1.1), railMat);
+    rail.position.set(rx, ry, rz);
+    rail.castShadow = true;
+    group.add(rail);
+  });
+
+  // Wheels
+  const wheelMat = new THREE.MeshStandardMaterial({
+    color: 0x3a3a3a,
+    roughness: 0.75,
+    metalness: 0.4,
+  });
+  const wheelGeo = new THREE.TorusGeometry(0.25, 0.06, 8, 16);
+  [
+    [-0.7, 0.25, 0.6],
+    [0.7, 0.25, 0.6],
+    [-0.7, 0.25, -0.6],
+    [0.7, 0.25, -0.6],
+  ].forEach(([wx, wy, wz]) => {
+    const wheel = new THREE.Mesh(wheelGeo, wheelMat);
+    wheel.position.set(wx, wy, wz);
+    wheel.rotation.y = Math.PI / 2;
+    wheel.castShadow = true;
+    group.add(wheel);
+  });
+
+  // Glowing scroll on top
+  const scrollMat = new THREE.MeshStandardMaterial({
+    color: 0xf5deb3,
+    emissive: 0xdaa520,
+    emissiveIntensity: 0.6,
+    roughness: 0.4,
+  });
+  const scroll = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.12, 0.12, 0.7, 12),
+    scrollMat,
+  );
+  scroll.position.y = 1.35;
+  scroll.rotation.z = Math.PI / 2;
+  scroll.castShadow = true;
+  group.add(scroll);
+
+  // Beacon
+  const beaconMat = new THREE.MeshStandardMaterial({
+    color: 0xff6b35,
+    emissive: 0xff6b35,
+    emissiveIntensity: 1.5,
+    transparent: true,
+    opacity: 0.9,
+  });
+  const beacon = new THREE.Mesh(
+    new THREE.SphereGeometry(0.18, 12, 12),
+    beaconMat,
+  );
+  beacon.position.y = 2.8;
+  group.add(beacon);
+
+  // Ground ring
+  const ringMat = new THREE.MeshStandardMaterial({
+    color: 0xff6b35,
+    emissive: 0xff6b35,
+    emissiveIntensity: 0.6,
+    transparent: true,
+    opacity: 0.25,
+    side: THREE.DoubleSide,
+  });
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(CART_INTERACT_DIST - 0.3, CART_INTERACT_DIST, 48),
+    ringMat,
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.02;
+  group.add(ring);
+
+  // Point light
+  const light = new THREE.PointLight(0xff6b35, 2.5, 14);
+  light.position.y = 2.2;
+  group.add(light);
+
+  // Label
+  const label = createTextSprite("Answer Cart", "#ff6b35");
+  label.position.y = 3.5;
+  group.add(label);
+
+  group.position.set(CART_POS[0], CART_POS[1], CART_POS[2]);
+
+  return { group, beacon, ring, light, scroll };
+}
+
 /* ═══════════════════════════════════════════════════════
    Component
    ═══════════════════════════════════════════════════════ */
 const StickmanMysteryGame = () => {
-  const { submitAnswer, currentPlayer, gameState } = useGame();
+  const { submitAnswer, currentPlayer, gameState, currentRoom } = useGame();
 
   /* ── Three.js refs ─────────────────────────────────── */
   const containerRef = useRef(null);
@@ -294,6 +426,17 @@ const StickmanMysteryGame = () => {
   const solvedRef = useRef(false);
   const gameOverRef = useRef(false);
   const isPausedRef = useRef(false);
+  const nearCartRef = useRef(false);
+  const cartMeshRef = useRef(null);
+
+  /* ── Multiplayer refs ──────────────────────────────── */
+  const otherPlayersRef = useRef(new Map());
+  const pushVelocityRef = useRef({ x: 0, z: 0 });
+  const isDashingRef = useRef(false);
+  const dashCoolRef = useRef(false);
+  const dashTimerRef = useRef(0);
+  const syncIntervalRef = useRef(null);
+  const roomIdRef = useRef(currentRoom?._id);
 
   /* ── React state ───────────────────────────────────── */
   const [timeLeft, setTimeLeft] = useState(GAME_DURATION);
@@ -307,6 +450,11 @@ const StickmanMysteryGame = () => {
   const [finalScore, setFinalScore] = useState(0);
   const [wrongAttempts, setWrongAttempts] = useState(0);
   const [gameOver, setGameOver] = useState(false);
+  const [nearCart, setNearCart] = useState(false);
+  const [isDashing, setIsDashing] = useState(false);
+  const [dashReady, setDashReady] = useState(true);
+
+  useEffect(() => { roomIdRef.current = currentRoom?._id; }, [currentRoom?._id]);
 
   const prevStartedAtRef = useRef(gameState?.startedAt);
   const isPaused = gameState?.status === "paused";
@@ -345,6 +493,12 @@ const StickmanMysteryGame = () => {
       cluesFoundRef.current = [];
       solvedRef.current = false;
       gameOverRef.current = false;
+      isDashingRef.current = false;
+      dashCoolRef.current = false;
+      dashTimerRef.current = 0;
+      pushVelocityRef.current = { x: 0, z: 0 };
+      setIsDashing(false);
+      setDashReady(true);
       // reset stickman position
       if (stickmanRef.current) {
         stickmanRef.current.group.position.set(0, 0, 0);
@@ -506,6 +660,11 @@ const StickmanMysteryGame = () => {
     });
     objMeshesRef.current = objMeshes;
 
+    // ── Answer Cart ───────────────────────────────────
+    const cart = buildCartMesh();
+    scene.add(cart.group);
+    cartMeshRef.current = cart;
+
     // ── Animation loop ────────────────────────────────
     const clock = clockRef.current;
     clock.start();
@@ -562,6 +721,66 @@ const StickmanMysteryGame = () => {
       }
       stickman.group.rotation.y = stickmanAngleRef.current;
 
+      /* —— Dash (Space) —— */
+      if (keys[" "] && !dashCoolRef.current && canMove && !isDashingRef.current) {
+        dashCoolRef.current = true;
+        isDashingRef.current = true;
+        dashTimerRef.current = DASH_DURATION;
+        setIsDashing(true);
+        setDashReady(false);
+        setTimeout(() => { dashCoolRef.current = false; setDashReady(true); }, DASH_COOLDOWN * 1000);
+      }
+      if (isDashingRef.current) {
+        dashTimerRef.current -= delta;
+        if (dashTimerRef.current <= 0) {
+          isDashingRef.current = false;
+          setIsDashing(false);
+        } else {
+          const dashDir = new THREE.Vector3(0, 0, -1)
+            .applyAxisAngle(new THREE.Vector3(0, 1, 0), stickmanAngleRef.current);
+          stickman.group.position.addScaledVector(dashDir, DASH_SPEED * delta);
+          stickman.group.position.x = THREE.MathUtils.clamp(stickman.group.position.x, -BOUNDARY, BOUNDARY);
+          stickman.group.position.z = THREE.MathUtils.clamp(stickman.group.position.z, -BOUNDARY, BOUNDARY);
+          isMoving = true;
+          // Push nearby other players
+          const myX = stickman.group.position.x;
+          const myZ = stickman.group.position.z;
+          otherPlayersRef.current.forEach((data, otherId) => {
+            if (data.pushed) return;
+            const ox = data.targetPos.x;
+            const oz = data.targetPos.z;
+            const dist = Math.sqrt((myX - ox) ** 2 + (myZ - oz) ** 2);
+            if (dist < PUSH_DIST) {
+              data.pushed = true;
+              const dx = ox - myX || 0.01;
+              const dz = oz - myZ || 0.01;
+              const len = Math.sqrt(dx * dx + dz * dz);
+              const fx = (dx / len) * PUSH_FORCE;
+              const fz = (dz / len) * PUSH_FORCE;
+              fetch(`${API_URL}/api/rooms/${roomIdRef.current}/push`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ targetId: otherId, forceX: fx, forceZ: fz }),
+              }).catch(() => {});
+            }
+          });
+        }
+      } else {
+        otherPlayersRef.current.forEach((data) => { data.pushed = false; });
+      }
+
+      /* —— Push velocity (received from other players) —— */
+      if (pushVelocityRef.current.x !== 0 || pushVelocityRef.current.z !== 0) {
+        stickman.group.position.x += pushVelocityRef.current.x * delta;
+        stickman.group.position.z += pushVelocityRef.current.z * delta;
+        pushVelocityRef.current.x *= Math.pow(0.04, delta);
+        pushVelocityRef.current.z *= Math.pow(0.04, delta);
+        if (Math.abs(pushVelocityRef.current.x) < 0.3) pushVelocityRef.current.x = 0;
+        if (Math.abs(pushVelocityRef.current.z) < 0.3) pushVelocityRef.current.z = 0;
+        stickman.group.position.x = THREE.MathUtils.clamp(stickman.group.position.x, -BOUNDARY, BOUNDARY);
+        stickman.group.position.z = THREE.MathUtils.clamp(stickman.group.position.z, -BOUNDARY, BOUNDARY);
+      }
+
       /* —— Walk cycle —— */
       if (isMoving && canMove) {
         walkCycleRef.current += delta * 10;
@@ -610,22 +829,37 @@ const StickmanMysteryGame = () => {
         setNearObject(nearest);
       }
 
+      /* —— Cart proximity —— */
+      const cartDx = px - CART_POS[0];
+      const cartDz = pz - CART_POS[2];
+      const cartDist = Math.sqrt(cartDx * cartDx + cartDz * cartDz);
+      const isNearCart = cartDist < CART_INTERACT_DIST;
+      if (isNearCart !== nearCartRef.current) {
+        nearCartRef.current = isNearCart;
+        setNearCart(isNearCart);
+      }
+
       /* —— E‑key interaction —— */
       if (keys["e"] && !interactCoolRef.current && canMove) {
         interactCoolRef.current = true;
         setTimeout(() => {
           interactCoolRef.current = false;
         }, 400);
-        const idx = nearObjRef.current;
-        if (idx !== null && !cluesFoundRef.current.includes(idx)) {
-          setShowClue(idx);
-          setCluesFound((prev) => [...prev, idx]);
-          setTimeLeft((prev) => Math.max(0, prev - TIME_PENALTY));
-          // dim collected object
-          const o = objMeshes[idx];
-          if (o.beacon) o.beacon.visible = false;
-          if (o.ring) o.ring.material.opacity = 0.08;
-          if (o.light) o.light.intensity = 0.35;
+        // Answer cart takes priority
+        if (nearCartRef.current && cluesFoundRef.current.length > 0) {
+          setShowQuestion(true);
+        } else {
+          const idx = nearObjRef.current;
+          if (idx !== null && !cluesFoundRef.current.includes(idx)) {
+            setShowClue(idx);
+            setCluesFound((prev) => [...prev, idx]);
+            setTimeLeft((prev) => Math.max(0, prev - TIME_PENALTY));
+            // dim collected object
+            const o = objMeshes[idx];
+            if (o.beacon) o.beacon.visible = false;
+            if (o.ring) o.ring.material.opacity = 0.08;
+            if (o.light) o.light.intensity = 0.35;
+          }
         }
       }
 
@@ -638,6 +872,40 @@ const StickmanMysteryGame = () => {
         }
         // slow rotate main mesh
         if (o.mesh && i !== 4) o.mesh.rotation.y += delta * 0.3;
+      });
+
+      // Cart beacon animation
+      if (cart.beacon) {
+        cart.beacon.position.y = 2.8 + Math.sin(time * 2.5) * 0.25;
+        cart.beacon.material.emissiveIntensity =
+          1.2 + Math.sin(time * 3.5) * 0.5;
+      }
+
+      /* —— Interpolate other players —— */
+      otherPlayersRef.current.forEach((data) => {
+        const g = data.stickman.group;
+        g.position.x = THREE.MathUtils.lerp(g.position.x, data.targetPos.x, 8 * delta);
+        g.position.z = THREE.MathUtils.lerp(g.position.z, data.targetPos.z, 8 * delta);
+        let angleDiff = data.targetPos.angle - g.rotation.y;
+        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+        g.rotation.y += angleDiff * 8 * delta;
+        const dx = data.targetPos.x - g.position.x;
+        const dz = data.targetPos.z - g.position.z;
+        const moveDist = Math.sqrt(dx * dx + dz * dz);
+        if (moveDist > 0.05) {
+          data.walkCycle = (data.walkCycle || 0) + delta * 10;
+          const s = Math.sin(data.walkCycle);
+          data.stickman.leftLeg.rotation.x = s * 0.6;
+          data.stickman.rightLeg.rotation.x = -s * 0.6;
+          data.stickman.leftArm.rotation.x = -s * 0.5;
+          data.stickman.rightArm.rotation.x = s * 0.5;
+        } else {
+          data.stickman.leftLeg.rotation.x *= 0.85;
+          data.stickman.rightLeg.rotation.x *= 0.85;
+          data.stickman.leftArm.rotation.x *= 0.85;
+          data.stickman.rightArm.rotation.x *= 0.85;
+        }
       });
 
       renderer.render(scene, camera);
@@ -708,6 +976,91 @@ const StickmanMysteryGame = () => {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /* ── Multiplayer position sync ──────────────────────── */
+  useEffect(() => {
+    if (!currentPlayer?._id || !currentRoom?._id) return;
+    if (gameState?.status !== 'playing' && gameState?.status !== 'paused') return;
+
+    const myId = currentPlayer._id;
+    const roomId = currentRoom._id;
+    let colorIdx = 0;
+
+    const sync = async () => {
+      const pos = stickmanRef.current?.group?.position;
+      if (!pos) return;
+      try {
+        const resp = await fetch(`${API_URL}/api/rooms/${roomId}/sync-position`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            playerId: myId,
+            x: Math.round(pos.x * 100) / 100,
+            z: Math.round(pos.z * 100) / 100,
+            angle: Math.round(stickmanAngleRef.current * 100) / 100,
+          }),
+        });
+        const data = await resp.json();
+        if (!data.success) return;
+
+        // Apply pending push from another player
+        if (data.pendingPush) {
+          pushVelocityRef.current.x += data.pendingPush.fx;
+          pushVelocityRef.current.z += data.pendingPush.fz;
+        }
+
+        // Update other player stickmen
+        const scene = sceneRef.current;
+        if (!scene) return;
+        const others = (data.positions || []).filter(p => p.playerId !== myId);
+        const currentIds = new Set(others.map(p => p.playerId));
+
+        // Remove players who left
+        for (const [id, d] of otherPlayersRef.current) {
+          if (!currentIds.has(id)) {
+            scene.remove(d.stickman.group);
+            otherPlayersRef.current.delete(id);
+          }
+        }
+
+        // Add new / update existing
+        others.forEach((p) => {
+          if (!otherPlayersRef.current.has(p.playerId)) {
+            const color = PLAYER_COLORS[colorIdx++ % PLAYER_COLORS.length];
+            const sm = buildStickman(color);
+            sm.group.position.set(p.x, 0, p.z);
+            sm.group.rotation.y = p.angle;
+            const label = createTextSprite(p.name || '???', '#ffffff');
+            label.position.y = 2.5;
+            sm.group.add(label);
+            scene.add(sm.group);
+            otherPlayersRef.current.set(p.playerId, {
+              stickman: sm,
+              targetPos: { x: p.x, z: p.z, angle: p.angle },
+              walkCycle: 0,
+              pushed: false,
+            });
+          } else {
+            otherPlayersRef.current.get(p.playerId).targetPos = {
+              x: p.x, z: p.z, angle: p.angle,
+            };
+          }
+        });
+      } catch (e) { /* ignore network errors */ }
+    };
+
+    syncIntervalRef.current = setInterval(sync, POSITION_SYNC_MS);
+    sync();
+
+    return () => {
+      clearInterval(syncIntervalRef.current);
+      const scene = sceneRef.current;
+      if (scene) {
+        otherPlayersRef.current.forEach((d) => scene.remove(d.stickman.group));
+      }
+      otherPlayersRef.current.clear();
+    };
+  }, [currentPlayer?._id, currentRoom?._id, gameState?.status]); // eslint-disable-line react-hooks/exhaustive-deps
+
   /* ── Answer submission ─────────────────────────────── */
   const handleSubmitAnswer = async (e) => {
     e.preventDefault();
@@ -766,13 +1119,17 @@ const StickmanMysteryGame = () => {
           <div className="sm-hud-pill sm-clue-count">
             🔑 {cluesFound.length}/{MYSTERY.objects.length}
           </div>
+          <div className={`sm-hud-pill sm-dash-pill${isDashing ? ' dashing' : ''}${!dashReady ? ' cooldown' : ''}`}>
+            💨 {isDashing ? 'DASH!' : dashReady ? 'Ready' : 'Cooldown'}
+          </div>
         </div>
         <div className="sm-hud-right">
           <div className="sm-hud-pill sm-controls-hint">
             <kbd>W</kbd>
             <kbd>A</kbd>
             <kbd>S</kbd>
-            <kbd>D</kbd> Move &nbsp;· <kbd>E</kbd> Interact
+            <kbd>D</kbd> Move &nbsp;· <kbd>E</kbd> Interact &nbsp;·{" "}
+            <kbd>Space</kbd> Dash
           </div>
         </div>
       </div>
@@ -817,8 +1174,23 @@ const StickmanMysteryGame = () => {
           </div>
         )}
 
-      {/* Answer-ready button */}
-      {allClues &&
+      {/* Cart proximity prompt — no clues yet */}
+      {nearCart &&
+        nearObject === null &&
+        cluesFound.length === 0 &&
+        !showClue &&
+        !showQuestion &&
+        !solved &&
+        !gameOver &&
+        !isPaused && (
+          <div className="sm-prompt collected">
+            🔒 Find at least one clue before answering!
+          </div>
+        )}
+
+      {/* Answer-ready button — only at the Answer Cart */}
+      {nearCart &&
+        cluesFound.length > 0 &&
         !showQuestion &&
         !solved &&
         !gameOver &&
@@ -828,6 +1200,9 @@ const StickmanMysteryGame = () => {
             <button onClick={() => setShowQuestion(true)}>
               🧩 Answer the Mystery
             </button>
+            <div className="sm-answer-hint">
+              or press <kbd>E</kbd>
+            </div>
           </div>
         )}
 
@@ -863,14 +1238,34 @@ const StickmanMysteryGame = () => {
             <p className="sm-question-text">{MYSTERY.question}</p>
 
             <div className="sm-review">
-              <h4>Your Collected Clues</h4>
-              {MYSTERY.objects.map((obj, i) => (
-                <div key={i} className="sm-review-row">
+              <h4>
+                Your Collected Clues ({cluesFound.length}/
+                {MYSTERY.objects.length})
+              </h4>
+              {cluesFound.map((idx, i) => (
+                <div key={idx} className="sm-review-row">
                   <span className="sm-review-num">#{i + 1}</span>
-                  <span className="sm-review-name">{obj.name}:</span>
-                  <span className="sm-review-clue">{obj.clue}</span>
+                  <span className="sm-review-name">
+                    {MYSTERY.objects[idx].name}:
+                  </span>
+                  <span className="sm-review-clue">
+                    {MYSTERY.objects[idx].clue}
+                  </span>
                 </div>
               ))}
+              {cluesFound.length < MYSTERY.objects.length && (
+                <p
+                  style={{
+                    color: "#888",
+                    fontSize: "0.78rem",
+                    marginTop: 8,
+                    marginBottom: 0,
+                  }}
+                >
+                  💡 You haven't found all clues yet — answering is harder with
+                  fewer clues!
+                </p>
+              )}
             </div>
 
             <form className="sm-answer-form" onSubmit={handleSubmitAnswer}>
