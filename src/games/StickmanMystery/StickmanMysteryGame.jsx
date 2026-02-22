@@ -245,27 +245,116 @@ export const DEFAULT_STAGES = [
   },
 ];
 
-/** Resolve object shape id to a Three.js mesh */
+/** Resolve object shape id to a Three.js mesh — higher-quality geometry */
 function resolveObjectShape(shapeId, mainMat) {
   switch (shapeId) {
-    case "chest":
-      return (() => { const m = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.6, 0.7), mainMat); m.position.y = 0.72; return m; })();
-    case "orb":
-      return (() => { const mat2 = mainMat.clone(); mat2.transparent = true; mat2.opacity = 0.82; const m = new THREE.Mesh(new THREE.SphereGeometry(0.4, 8, 8), mat2); m.position.y = 0.85; return m; })();
-    case "tome":
-      return (() => { const m = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.14, 0.95), mainMat); m.position.y = 0.52; m.rotation.y = 0.3; return m; })();
-    case "lantern":
-      return (() => { const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.35), mainMat); m.position.y = 0.9; return m; })();
-    case "mirror":
-      return (() => { const m = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.6, 1.0), mainMat); m.position.y = 1.22; return m; })();
-    case "diamond":
-      return (() => { const m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.38), mainMat); m.position.y = 0.9; return m; })();
-    case "pillar":
-      return (() => { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 1.2, 8), mainMat); m.position.y = 0.8; return m; })();
-    case "crystal":
-      return (() => { const m = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.9, 6), mainMat); m.position.y = 0.85; return m; })();
-    default:
-      return (() => { const m = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.7), mainMat); m.position.y = 0.75; return m; })();
+    case "chest": {
+      // Ornate chest — box body + ridge bar on top
+      const grp = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.62, 0.72), mainMat);
+      body.position.y = 0.72;
+      grp.add(body);
+      const ridgeMat = mainMat.clone();
+      ridgeMat.emissiveIntensity = Math.min((ridgeMat.emissiveIntensity ?? 0.5) + 0.4, 1.2);
+      const ridge = new THREE.Mesh(new THREE.BoxGeometry(1.08, 0.1, 0.74), ridgeMat);
+      ridge.position.y = 1.07;
+      grp.add(ridge);
+      grp.position.y = 0; // positioned by parent
+      // tag so animation loop can grab it
+      grp.isMeshGroup = true;
+      return grp;
+    }
+    case "orb": {
+      const mat2 = mainMat.clone();
+      mat2.transparent = true;
+      mat2.opacity = 0.84;
+      const m = new THREE.Mesh(new THREE.SphereGeometry(0.42, 16, 16), mat2);
+      m.position.y = 0.88;
+      return m;
+    }
+    case "tome": {
+      // Flat open tome — spine + pages
+      const grp = new THREE.Group();
+      const spine = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.16, 0.98), mainMat);
+      spine.position.set(-0.36, 0.53, 0);
+      grp.add(spine);
+      const page = new THREE.Mesh(new THREE.BoxGeometry(0.64, 0.12, 0.96), mainMat);
+      page.position.set(0.0, 0.52, 0);
+      grp.add(page);
+      grp.rotation.y = 0.28;
+      grp.isMeshGroup = true;
+      return grp;
+    }
+    case "lantern": {
+      // Lantern — octahedron + thin cage ring
+      const grp = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.OctahedronGeometry(0.36, 0), mainMat);
+      body.position.y = 0.9;
+      grp.add(body);
+      const cageMat = mainMat.clone();
+      cageMat.wireframe = true;
+      cageMat.emissiveIntensity = 0.15;
+      const cage = new THREE.Mesh(new THREE.OctahedronGeometry(0.44, 0), cageMat);
+      cage.position.y = 0.9;
+      grp.add(cage);
+      grp.isMeshGroup = true;
+      return grp;
+    }
+    case "mirror": {
+      // Mirror — slab with inner glow face
+      const grp = new THREE.Group();
+      const slab = new THREE.Mesh(new THREE.BoxGeometry(0.09, 1.62, 1.02), mainMat);
+      slab.position.y = 1.22;
+      grp.add(slab);
+      const faceMat = mainMat.clone();
+      faceMat.emissiveIntensity = (faceMat.emissiveIntensity ?? 0.5) * 1.5;
+      faceMat.transparent = true;
+      faceMat.opacity = 0.6;
+      const face = new THREE.Mesh(new THREE.PlaneGeometry(0.88, 1.5), faceMat);
+      face.position.set(0.055, 1.22, 0);
+      face.rotation.y = Math.PI / 2;
+      grp.add(face);
+      grp.isMeshGroup = true;
+      return grp;
+    }
+    case "diamond": {
+      const m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.4, 1), mainMat);
+      m.position.y = 0.92;
+      return m;
+    }
+    case "pillar": {
+      // Column with capital and base
+      const grp = new THREE.Group();
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 1.15, 10), mainMat);
+      shaft.position.y = 0.82;
+      grp.add(shaft);
+      const capital = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.18, 0.14, 8), mainMat);
+      capital.position.y = 1.46;
+      grp.add(capital);
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.1, 8), mainMat);
+      base.position.y = 0.25;
+      grp.add(base);
+      grp.isMeshGroup = true;
+      return grp;
+    }
+    case "crystal": {
+      // Crystal cluster — two offset cones
+      const grp = new THREE.Group();
+      const main = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.95, 7), mainMat);
+      main.position.y = 0.87;
+      grp.add(main);
+      const shard = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.6, 6), mainMat);
+      shard.position.set(0.22, 0.72, 0.12);
+      shard.rotation.z = 0.22;
+      grp.add(shard);
+      grp.isMeshGroup = true;
+      return grp;
+    }
+    default: {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.72, 0.72), mainMat);
+      m.position.y = 0.76;
+      return m;
+    }
   }
 }
 
@@ -369,35 +458,51 @@ function buildStickman(color = 0x00ffd0) {
   return { group, head, body, leftArm, rightArm, leftLeg, rightLeg };
 }
 
-/** Build a mystery object (pedestal + shape + beacon + label + light) */
+/** Build a mystery object (pedestal + shape + beacon + rune ring + label) */
 function buildObjectMesh(objData, index) {
   const group = new THREE.Group();
 
-  // Stone pedestal
+  // Stone pedestal — hexagonal with inset band
   const pedMat = new THREE.MeshStandardMaterial({
-    color: 0x333344,
-    roughness: 0.85,
-    metalness: 0.15,
+    color: 0x252535,
+    emissive: 0x0a0a18,
+    emissiveIntensity: 0.3,
+    roughness: 0.88,
+    metalness: 0.18,
   });
   const pedestal = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.5, 0.7, 0.4, 6),
+    new THREE.CylinderGeometry(0.48, 0.68, 0.42, 7),
     pedMat,
   );
-  pedestal.position.y = 0.2;
+  pedestal.position.y = 0.21;
   group.add(pedestal);
+
+  // Pedestal inset band — carved groove
+  const bandMat = new THREE.MeshStandardMaterial({
+    color: objData.color,
+    emissive: objData.emissive,
+    emissiveIntensity: 0.35,
+    roughness: 0.6,
+    metalness: 0.25,
+  });
+  const band = new THREE.Mesh(
+    new THREE.TorusGeometry(0.52, 0.035, 4, 18),
+    bandMat,
+  );
+  band.rotation.x = Math.PI / 2;
+  band.position.y = 0.28;
+  group.add(band);
 
   // Main shape — unique per object
   const mainMat = new THREE.MeshStandardMaterial({
     color: objData.color,
     emissive: objData.emissive,
-    emissiveIntensity: 0.5,
-    roughness: 0.35,
-    metalness: 0.3,
+    emissiveIntensity: 0.55,
+    roughness: 0.3,
+    metalness: 0.35,
   });
 
-  let mainMesh;
-  mainMesh = resolveObjectShape(objData.objectShape || "chest", mainMat);
-  mainMesh.castShadow = false;
+  const mainMesh = resolveObjectShape(objData.objectShape || "chest", mainMat);
   group.add(mainMesh);
 
   // Floating beacon (pulsing sphere)
@@ -407,28 +512,55 @@ function buildObjectMesh(objData, index) {
     opacity: 0.9,
   });
   const beacon = new THREE.Mesh(
-    new THREE.SphereGeometry(0.14, 6, 6),
+    new THREE.SphereGeometry(0.13, 8, 8),
     beaconMat,
   );
   beacon.position.y = 2.5;
   group.add(beacon);
 
-  // Proximity ring on the ground
+  // Horizontal rune ring — slowly rotates, sits above pedestal
+  const runeRingMat = new THREE.MeshBasicMaterial({
+    color: objData.beaconColor,
+    transparent: true,
+    opacity: 0.5,
+  });
+  const runeRing = new THREE.Mesh(
+    new THREE.TorusGeometry(0.58, 0.028, 4, 28),
+    runeRingMat,
+  );
+  runeRing.rotation.x = Math.PI / 2;
+  runeRing.position.y = 0.72;
+  group.add(runeRing);
+
+  // Outer wide proximity ring on the ground
   const ringMat = new THREE.MeshBasicMaterial({
     color: objData.beaconColor,
     transparent: true,
-    opacity: 0.2,
+    opacity: 0.18,
     side: THREE.DoubleSide,
   });
   const ring = new THREE.Mesh(
-    new THREE.RingGeometry(INTERACT_DIST - 0.3, INTERACT_DIST, 16),
+    new THREE.RingGeometry(INTERACT_DIST - 0.3, INTERACT_DIST, 20),
     ringMat,
   );
   ring.rotation.x = -Math.PI / 2;
   ring.position.y = 0.03;
   group.add(ring);
 
-  // No per-object point light — emissive material provides the glow
+  // Subtle floor glow pool under object
+  const poolMat = new THREE.MeshBasicMaterial({
+    color: objData.beaconColor,
+    transparent: true,
+    opacity: 0.08,
+    side: THREE.DoubleSide,
+  });
+  const pool = new THREE.Mesh(
+    new THREE.CircleGeometry(1.0, 16),
+    poolMat,
+  );
+  pool.rotation.x = -Math.PI / 2;
+  pool.position.y = 0.02;
+  group.add(pool);
 
   // Name label
   const label = createTextSprite(objData.name, objData.labelColor || "#ffffff");
@@ -438,7 +570,7 @@ function buildObjectMesh(objData, index) {
   // World position
   group.position.set(objData.pos[0], objData.pos[1], objData.pos[2]);
 
-  return { group, mesh: mainMesh, beacon, ring, light: null, label };
+  return { group, mesh: mainMesh, beacon, runeRing, ring, light: null, label };
 }
 
 /** Build the answer cart — the player must come here to submit their answer */
@@ -557,59 +689,127 @@ function buildCartMesh() {
   return { group, beacon, ring, light, scroll };
 }
 
-/** Build a wall mesh from segment data — lighter stone colour */
+/** Build a wall mesh from segment data — dark dungeon stone */
 function buildWallMesh(w) {
   const group = new THREE.Group();
   const isPerimeter = w.w >= 50 || w.d >= 50;
+  // Dark, weathered granite stone
   const mat = new THREE.MeshStandardMaterial({
-    color: isPerimeter ? 0xb0b0b8 : 0xd0d0d8,
-    roughness: 0.82,
-    metalness: 0.08,
+    color: isPerimeter ? 0x18182c : 0x141428,
+    emissive: 0x07070e,
+    emissiveIntensity: 0.2,
+    roughness: 0.96,
+    metalness: 0.03,
   });
-  // Subtle stone-brick look via a top cap
   const wall = new THREE.Mesh(new THREE.BoxGeometry(w.w, w.h, w.d), mat);
   wall.position.set(w.x, w.h / 2, w.z);
   wall.castShadow = true;
   wall.receiveShadow = true;
   group.add(wall);
 
-  // Lighter cap on top of wall
+  // Slightly lighter stone coping on top
   const capMat = new THREE.MeshStandardMaterial({
-    color: isPerimeter ? 0xc8c8d0 : 0xe8e8f0,
-    roughness: 0.75,
-    metalness: 0.1,
+    color: isPerimeter ? 0x22223a : 0x1c1c32,
+    emissive: 0x0a0a15,
+    emissiveIntensity: 0.1,
+    roughness: 0.9,
+    metalness: 0.05,
   });
   const cap = new THREE.Mesh(
-    new THREE.BoxGeometry(w.w + 0.1, 0.12, w.d + 0.1),
+    new THREE.BoxGeometry(w.w + 0.1, 0.14, w.d + 0.1),
     capMat,
   );
-  cap.position.set(w.x, w.h + 0.06, w.z);
+  cap.position.set(w.x, w.h + 0.07, w.z);
   cap.receiveShadow = true;
   group.add(cap);
+
+  // Horizontal mortar groove lines on perimeter walls — two dark strips
+  if (isPerimeter && w.h >= 3) {
+    const grooveMat = new THREE.MeshStandardMaterial({
+      color: 0x0d0d1a,
+      roughness: 1.0,
+      metalness: 0.0,
+    });
+    [1.0, 2.0].forEach((gy) => {
+      const groove = new THREE.Mesh(
+        new THREE.BoxGeometry(w.w + 0.05, 0.06, w.d + 0.05),
+        grooveMat,
+      );
+      groove.position.set(w.x, gy, w.z);
+      group.add(groove);
+    });
+  }
 
   return group;
 }
 
-/** Build a wall-mounted torch (returns group with animated flame ref) */
+/** Build a wall-mounted torch (returns group with animated flame refs) */
 function buildTorch(x, y, z) {
   const group = new THREE.Group();
-  // Flame only — skip heavy bracket mesh
-  const flameMat = new THREE.MeshBasicMaterial({
-    color: 0xff8833,
-    transparent: true,
-    opacity: 0.85,
+
+  // Iron wall sconce bracket
+  const bracketMat = new THREE.MeshStandardMaterial({
+    color: 0x2e1e08,
+    roughness: 0.7,
+    metalness: 0.65,
   });
-  const flame = new THREE.Mesh(new THREE.SphereGeometry(0.1, 5, 5), flameMat);
-  flame.position.set(x, y + 0.3, z);
+  const bracket = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.035, 0.06, 0.32, 5),
+    bracketMat,
+  );
+  bracket.position.set(x, y - 0.04, z);
+  group.add(bracket);
+
+  // Iron cup / holder at top
+  const cupMat = new THREE.MeshStandardMaterial({
+    color: 0x4a3010,
+    roughness: 0.65,
+    metalness: 0.7,
+  });
+  const cup = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.1, 0.065, 0.14, 6),
+    cupMat,
+  );
+  cup.position.set(x, y + 0.16, z);
+  group.add(cup);
+
+  // Outer flame cone (orange, pointing up)
+  const flameMat = new THREE.MeshBasicMaterial({
+    color: 0xff5500,
+    transparent: true,
+    opacity: 0.78,
+  });
+  const flame = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.36, 7), flameMat);
+  flame.position.set(x, y + 0.41, z);
   group.add(flame);
 
-  // Warm light — low intensity, short range
-  const torchLight = new THREE.PointLight(0xff6633, 0.5, 6);
-  torchLight.position.set(x, y + 0.35, z);
+  // Inner flame core (bright yellow-white)
+  const coreMat = new THREE.MeshBasicMaterial({
+    color: 0xffe080,
+    transparent: true,
+    opacity: 0.95,
+  });
+  const core = new THREE.Mesh(new THREE.SphereGeometry(0.065, 6, 5), coreMat);
+  core.position.set(x, y + 0.29, z);
+  group.add(core);
+
+  // Outer glow halo
+  const flareMat = new THREE.MeshBasicMaterial({
+    color: 0xff3300,
+    transparent: true,
+    opacity: 0.28,
+  });
+  const flare = new THREE.Mesh(new THREE.SphereGeometry(0.21, 6, 5), flareMat);
+  flare.position.set(x, y + 0.34, z);
+  group.add(flare);
+
+  // Warm flickering point light — wider range than before
+  const torchLight = new THREE.PointLight(0xff6622, 1.1, 11);
+  torchLight.position.set(x, y + 0.42, z);
   torchLight.castShadow = false;
   group.add(torchLight);
 
-  return { group, flame, light: torchLight };
+  return { group, flame, core, flare, light: torchLight };
 }
 
 /** Build a trash object — looks similar to clues but with subtle warning hints */
@@ -1151,8 +1351,8 @@ const StickmanMysteryGame = () => {
 
     // ── Scene ─────────────────────────────────────────
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0a0a1a);
-    scene.fog = new THREE.FogExp2(0x0a0a1a, 0.04);
+    scene.background = new THREE.Color(0x05050e);
+    scene.fog = new THREE.FogExp2(0x05050e, 0.030);
     sceneRef.current = scene;
 
     // ── Raycaster for mouse hover ─────────────────────
@@ -1178,9 +1378,11 @@ const StickmanMysteryGame = () => {
     rendererRef.current = renderer;
 
     // ── Lights ────────────────────────────────────────
-    scene.add(new THREE.AmbientLight(0x222244, 0.7));
+    // Deep purple ambient — just enough to see the dungeon
+    scene.add(new THREE.AmbientLight(0x0f0820, 0.95));
 
-    const dirLight = new THREE.DirectionalLight(0x8888cc, 0.4);
+    // Weak cool directional — simulates a far moonbeam filtering in
+    const dirLight = new THREE.DirectionalLight(0x5544aa, 0.28);
     dirLight.position.set(10, 20, 8);
     dirLight.castShadow = true;
     dirLight.shadow.mapSize.set(1024, 1024);
@@ -1190,41 +1392,83 @@ const StickmanMysteryGame = () => {
     dirLight.shadow.camera.bottom = -22;
     scene.add(dirLight);
 
-    // hemisphere fill
-    scene.add(new THREE.HemisphereLight(0x1a1a3e, 0x0a0a1a, 0.3));
+    // Hemisphere — dark sky, darker ground
+    scene.add(new THREE.HemisphereLight(0x14103a, 0x06060f, 0.35));
 
-    // ── Ground ────────────────────────────────────────
+    // Faint up-glow from the enchanted floor (spooky purple)
+    const floorGlow = new THREE.PointLight(0x1a0a40, 0.7, 32);
+    floorGlow.position.set(0, 0.4, 0);
+    scene.add(floorGlow);
+
+    // ── Ground — dark enchanted stone floor ──────────
     const groundMat = new THREE.MeshStandardMaterial({
-      color: 0x16162a,
-      roughness: 0.95,
-      metalness: 0.05,
+      color: 0x0c0c1a,
+      emissive: 0x060612,
+      emissiveIntensity: 0.25,
+      roughness: 0.98,
+      metalness: 0.0,
     });
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     scene.add(ground);
 
-    const grid = new THREE.GridHelper(50, 25, 0x2a2a50, 0x1e1e3e);
-    grid.position.y = 0.01;
+    // Coarse stone-slab grid (spacing ~2 m)
+    const grid = new THREE.GridHelper(50, 25, 0x18182e, 0x101020);
+    grid.position.y = 0.011;
     scene.add(grid);
+    // Fine mortar joints between slabs
+    const fineGrid = new THREE.GridHelper(50, 100, 0x0e0e1c, 0x0c0c1a);
+    fineGrid.position.y = 0.013;
+    scene.add(fineGrid);
 
-    // ── Stars ─────────────────────────────────────────
-    const starCount = 250;
+    // Central arcane summoning circle on the floor
+    const arcaneRing1 = new THREE.Mesh(
+      new THREE.RingGeometry(3.1, 3.4, 36),
+      new THREE.MeshBasicMaterial({ color: 0x2a1a6e, transparent: true, opacity: 0.32, side: THREE.DoubleSide }),
+    );
+    arcaneRing1.rotation.x = -Math.PI / 2;
+    arcaneRing1.position.y = 0.015;
+    scene.add(arcaneRing1);
+
+    const arcaneRing2 = new THREE.Mesh(
+      new THREE.RingGeometry(4.6, 4.8, 36),
+      new THREE.MeshBasicMaterial({ color: 0x1e1060, transparent: true, opacity: 0.2, side: THREE.DoubleSide }),
+    );
+    arcaneRing2.rotation.x = -Math.PI / 2;
+    arcaneRing2.position.y = 0.015;
+    scene.add(arcaneRing2);
+
+    // Inner glow disc
+    const glowDisc = new THREE.Mesh(
+      new THREE.CircleGeometry(2.8, 32),
+      new THREE.MeshBasicMaterial({ color: 0x120a38, transparent: true, opacity: 0.55, side: THREE.DoubleSide }),
+    );
+    glowDisc.rotation.x = -Math.PI / 2;
+    glowDisc.position.y = 0.014;
+    scene.add(glowDisc);
+
+    // ── Stars — varied-colour night sky ──────────────
+    const starCount = 420;
     const starPositions = new Float32Array(starCount * 3);
+    const starColors    = new Float32Array(starCount * 3);
     for (let i = 0; i < starCount; i++) {
-      starPositions[i * 3] = (Math.random() - 0.5) * 160;
-      starPositions[i * 3 + 1] = Math.random() * 50 + 12;
-      starPositions[i * 3 + 2] = (Math.random() - 0.5) * 160;
+      starPositions[i * 3]     = (Math.random() - 0.5) * 220;
+      starPositions[i * 3 + 1] = Math.random() * 65 + 20;
+      starPositions[i * 3 + 2] = (Math.random() - 0.5) * 220;
+      // White, faint-blue, or faint-purple tint
+      const tint = Math.random();
+      starColors[i * 3]     = tint < 0.6 ? 1.0 : tint < 0.8 ? 0.72 : 0.85;
+      starColors[i * 3 + 1] = tint < 0.6 ? 1.0 : tint < 0.8 ? 0.72 : 0.6;
+      starColors[i * 3 + 2] = tint < 0.6 ? 1.0 : tint < 0.8 ? 1.0  : 1.0;
     }
     const starGeo = new THREE.BufferGeometry();
-    starGeo.setAttribute(
-      "position",
-      new THREE.BufferAttribute(starPositions, 3),
-    );
+    starGeo.setAttribute("position", new THREE.BufferAttribute(starPositions, 3));
+    starGeo.setAttribute("color",    new THREE.BufferAttribute(starColors, 3));
     scene.add(
       new THREE.Points(
         starGeo,
-        new THREE.PointsMaterial({ color: 0xffffff, size: 0.25 }),
+        new THREE.PointsMaterial({ vertexColors: true, size: 0.2, transparent: true, opacity: 0.82 }),
       ),
     );
 
@@ -1258,6 +1502,49 @@ const StickmanMysteryGame = () => {
       }
     });
     torchFlamesRef.current = torchFlames;
+
+    // ── Decorative stone columns at dungeon corners ───
+    const colMat = new THREE.MeshStandardMaterial({
+      color: 0x1a1a2e,
+      emissive: 0x080810,
+      emissiveIntensity: 0.2,
+      roughness: 0.95,
+      metalness: 0.04,
+    });
+    const colCapMat = new THREE.MeshStandardMaterial({
+      color: 0x22223a,
+      emissive: 0x0a0a1a,
+      emissiveIntensity: 0.15,
+      roughness: 0.9,
+      metalness: 0.06,
+    });
+    [[-15, -15], [15, -15], [-15, 15], [15, 15]].forEach(([cx, cz]) => {
+      const colGroup = new THREE.Group();
+      // Base plinth
+      const plinth = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.28, 0.82), colCapMat);
+      plinth.position.y = 0.14;
+      colGroup.add(plinth);
+      // Shaft
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.34, 3.5, 8), colMat);
+      shaft.position.y = 2.05;
+      colGroup.add(shaft);
+      // Capital flare
+      const capital = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.27, 0.26, 8), colCapMat);
+      capital.position.y = 4.0;
+      colGroup.add(capital);
+      // Abacus slab
+      const abacus = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.14, 0.92), colCapMat);
+      abacus.position.y = 4.2;
+      colGroup.add(abacus);
+      // Subtle emissive rune ring at mid-column
+      const colRuneMat = new THREE.MeshBasicMaterial({ color: 0x1e1040, transparent: true, opacity: 0.35 });
+      const colRune = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.025, 4, 16), colRuneMat);
+      colRune.rotation.x = Math.PI / 2;
+      colRune.position.y = 2.0;
+      colGroup.add(colRune);
+      colGroup.position.set(cx, 0, cz);
+      scene.add(colGroup);
+    });
 
     // ── Random position generation ────────────────────
     const occupied = [
@@ -1730,7 +2017,20 @@ const StickmanMysteryGame = () => {
           o.beacon.material.opacity =
             0.6 + Math.sin(time * 2 + i * 0.9) * 0.3;
         }
-        if (o.mesh && o.clueIdx !== 4) o.mesh.rotation.y += delta * 0.3;
+        // Rune ring: slow clockwise spin + gentle vertical bob
+        if (o.runeRing) {
+          o.runeRing.rotation.z += delta * (0.55 + (i % 3) * 0.1);
+          o.runeRing.position.y = 0.72 + Math.sin(time * 1.1 + i * 0.8) * 0.18;
+          o.runeRing.material.opacity = 0.38 + Math.sin(time * 1.8 + i * 1.1) * 0.16;
+        }
+        if (o.mesh && o.clueIdx !== 4) {
+          if (o.mesh.isMeshGroup) {
+            // rotate the whole group
+            o.mesh.rotation.y += delta * 0.28;
+          } else {
+            o.mesh.rotation.y += delta * 0.3;
+          }
+        }
       });
 
       /* —— Trash beacon pulse — fast, erratic + orbiting warning dot —— */
@@ -1764,16 +2064,30 @@ const StickmanMysteryGame = () => {
           1.2 + Math.sin(time * 3.5) * 0.5;
       }
 
-      // Torch flame flicker
+      // Torch flame flicker — cone + core + flare all animated
       torchFlames.forEach((t, i) => {
-        const flicker =
-          0.8 +
-          Math.sin(time * 8 + i * 2.7) * 0.15 +
-          Math.sin(time * 13 + i * 1.3) * 0.05;
-        t.flame.scale.setScalar(flicker);
-        t.flame.material.opacity =
-          0.7 + Math.sin(time * 10 + i * 3) * 0.2;
-        t.light.intensity = 0.4 + Math.sin(time * 7 + i * 2) * 0.15;
+        const f1 = Math.sin(time * 9.2 + i * 2.7);
+        const f2 = Math.sin(time * 14.5 + i * 1.3);
+        const flicker = 0.82 + f1 * 0.13 + f2 * 0.05;
+        // Outer flame cone: scale + sway
+        t.flame.scale.set(
+          flicker * (1 + Math.sin(time * 17 + i * 3.1) * 0.06),
+          0.9 + f1 * 0.12,
+          flicker * (1 + Math.cos(time * 15 + i * 2.4) * 0.06),
+        );
+        t.flame.material.opacity = 0.65 + f1 * 0.22;
+        // Inner core: bright pulsing heart
+        if (t.core) {
+          t.core.scale.setScalar(0.88 + Math.sin(time * 11.5 + i * 1.8) * 0.14);
+          t.core.material.opacity = 0.88 + Math.sin(time * 13 + i * 2.5) * 0.1;
+        }
+        // Outer flare halo: slow breathe
+        if (t.flare) {
+          t.flare.scale.setScalar(0.85 + Math.sin(time * 6 + i * 2.1) * 0.18);
+          t.flare.material.opacity = 0.2 + Math.sin(time * 8.5 + i * 1.9) * 0.12;
+        }
+        // Point light intensity
+        t.light.intensity = 0.75 + f1 * 0.28 + f2 * 0.08;
       });
 
       /* —— Mouse hover raycasting —— */
