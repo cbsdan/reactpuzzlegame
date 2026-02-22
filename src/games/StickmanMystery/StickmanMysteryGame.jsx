@@ -2696,7 +2696,6 @@ const StickmanMysteryGame = () => {
               {stg.trash[showTrash]?.msg || "This was trash!"}
             </p>
             <div className="sm-trap-effects">
-              <span className="sm-trap-effect-badge">⏱ −{TRASH_PENALTY}s</span>
               <span className="sm-trap-effect-badge">
                 🐌 Slowed {TRASH_SLOW_DURATION}s
               </span>
