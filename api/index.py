@@ -50,8 +50,10 @@ def generate_passkey():
     return secrets.token_hex(3).upper()
 
 def generate_target_number():
-    """Generate a random 4-digit number (can have repeats, first digit non-zero)"""
-    return str(random.randint(1000, 9999))
+    """Generate a 4-digit number with all unique digits (first digit non-zero)"""
+    first = random.randint(1, 9)
+    rest = random.sample([d for d in range(0, 10) if d != first], 3)
+    return str(first) + ''.join(str(d) for d in rest)
 
 def generate_clues(number):
     """Generate 3 mystery clues for the target number without revealing it"""
@@ -335,7 +337,7 @@ def room_admin_action(room_id):
         action = data.get('action')
         game_type = data.get('gameType')
         
-        if not action or action not in ['start', 'pause', 'resume', 'restart', 'stop', 'clear-sessions']:
+        if not action or action not in ['start', 'pause', 'resume', 'restart', 'stop', 'clear-sessions', 'delete-session']:
             return jsonify({'success': False, 'error': 'Invalid action'}), 400
         
         game_states = db['gamestate']
@@ -360,6 +362,7 @@ def room_admin_action(room_id):
             new_status = 'playing'
             additional_updates['startedAt'] = datetime.utcnow()
             additional_updates['pausedAt'] = None
+            additional_updates['totalPausedMs'] = 0
             additional_updates['sessionNumber'] = 1
             additional_updates['sessions'] = []  # fresh start clears history
             if game_type:
@@ -372,12 +375,30 @@ def room_admin_action(room_id):
                 elif game_type == 'stickman-mystery':
                     additional_updates['mysteryAnswer'] = 'LIGHT'
                     additional_updates['mysteryQuestion'] = 'All five clues describe the same thing. What am I?'
+                    # Store admin custom configuration if provided
+                    stickman_config = data.get('stickmanConfig')
+                    if stickman_config:
+                        additional_updates['stickmanConfig'] = stickman_config
+                    else:
+                        additional_updates['stickmanConfig'] = None
+            # Reset all player progress for the new game
+            players_collection.update_many(
+                {'roomId': room_oid},
+                {'$set': {'score': 0, 'solved': False, 'guessCount': 0,
+                          'progress': None, 'posX': None, 'posZ': None, 'posAngle': None}}
+            )
         elif action == 'pause':
             new_status = 'paused'
             additional_updates['pausedAt'] = datetime.utcnow()
         elif action == 'resume':
-            # Resume from pause: restore playing status, keep existing startedAt and target unchanged
+            # Resume from pause: accumulate paused duration
             new_status = 'playing'
+            existing_state = existing_state or game_states.find_one({'roomId': room_oid})
+            paused_at = existing_state.get('pausedAt') if existing_state else None
+            prev_total = existing_state.get('totalPausedMs', 0) if existing_state else 0
+            if paused_at:
+                pause_delta = (datetime.utcnow() - paused_at).total_seconds() * 1000
+                additional_updates['totalPausedMs'] = int(prev_total + pause_delta)
             additional_updates['pausedAt'] = None
         elif action == 'restart':
             existing_state = game_states.find_one({'roomId': room_oid})
@@ -407,8 +428,13 @@ def room_admin_action(room_id):
             new_status = 'playing'
             additional_updates['startedAt'] = datetime.utcnow()
             additional_updates['pausedAt'] = None
+            additional_updates['totalPausedMs'] = 0
             additional_updates['sessionNumber'] = current_session_num + 1
-            players_collection.update_many({'roomId': room_oid}, {'$set': {'score': 0, 'solved': False, 'guessCount': 0}})
+            players_collection.update_many(
+                {'roomId': room_oid},
+                {'$set': {'score': 0, 'solved': False, 'guessCount': 0,
+                          'progress': None, 'posX': None, 'posZ': None, 'posAngle': None}}
+            )
             # Generate new target if game type exists
             gt = existing_state.get('gameType') if existing_state else None
             if gt == 'number-mystery':
@@ -423,6 +449,20 @@ def room_admin_action(room_id):
             game_states.update_one(
                 {'roomId': room_oid},
                 {'$set': {'sessions': []}, '$inc': {'version': 1}}
+            )
+            result = game_states.find_one({'roomId': room_oid})
+            if result:
+                result['_id'] = str(result['_id'])
+                result['roomId'] = str(result['roomId'])
+                result.pop('targetNumber', None)
+            return jsonify({'success': True, 'action': action, 'gameState': result}), 200
+        elif action == 'delete-session':
+            session_number = data.get('sessionNumber')
+            if session_number is None:
+                return jsonify({'success': False, 'error': 'sessionNumber required'}), 400
+            game_states.update_one(
+                {'roomId': room_oid},
+                {'$pull': {'sessions': {'sessionNumber': session_number}}, '$inc': {'version': 1}}
             )
             result = game_states.find_one({'roomId': room_oid})
             if result:
@@ -457,11 +497,13 @@ def room_admin_action(room_id):
             new_status = 'idle'
             additional_updates['startedAt'] = None
             additional_updates['pausedAt'] = None
+            additional_updates['totalPausedMs'] = 0
             additional_updates['gameType'] = None
             additional_updates['targetNumber'] = None
             additional_updates['clues'] = None
             additional_updates['mysteryAnswer'] = None
             additional_updates['mysteryQuestion'] = None
+            additional_updates['stickmanConfig'] = None
         
         update_data = {
             'status': new_status,
@@ -619,26 +661,47 @@ def submit_answer(room_id):
         if not game_state or game_state.get('status') != 'playing':
             return jsonify({'success': False, 'error': 'Game is not active'}), 400
 
-        correct_answer = str(game_state.get('mysteryAnswer', '')).strip()
-        is_correct = answer.upper() == correct_answer.upper()
+        game_type = game_state.get('gameType', '')
+        players_collection = db['players']
         score = 0
+        is_correct = False
 
-        if is_correct:
-            # Score = 1000 − elapsed*2 − wrongAttempts*100  (elapsed = 300 − timeLeft)
-            elapsed = 300 - max(0, time_left)
-            score = max(0, int(1000 - elapsed * 2 - wrong_attempts * 100))
-
-            players_collection = db['players']
+        if game_type == 'stickman-mystery':
+            # Stickman has multi-stage scoring computed client-side; trust totalScore
+            total_score = int(data.get('totalScore', 0))
+            # The client validates each stage answer locally, so we accept and record
+            is_correct = True
+            score = max(0, total_score)
             players_collection.update_one(
                 {'_id': ObjectId(player_id)},
                 {'$set': {
                     'score': score,
                     'solved': True,
                     'solvedAt': datetime.utcnow(),
-                    'guessCount': wrong_attempts + 1
+                    'guessCount': wrong_attempts + 1,
+                    'stageScores': data.get('stageScores', [])
                 }}
             )
             game_states.update_one({'roomId': room_oid}, {'$inc': {'version': 1}})
+        else:
+            correct_answer = str(game_state.get('mysteryAnswer', '')).strip()
+            is_correct = answer.upper() == correct_answer.upper()
+
+            if is_correct:
+                # Score = 1000 − elapsed*2 − wrongAttempts*100  (elapsed = 300 − timeLeft)
+                elapsed = 300 - max(0, time_left)
+                score = max(0, int(1000 - elapsed * 2 - wrong_attempts * 100))
+
+                players_collection.update_one(
+                    {'_id': ObjectId(player_id)},
+                    {'$set': {
+                        'score': score,
+                        'solved': True,
+                        'solvedAt': datetime.utcnow(),
+                        'guessCount': wrong_attempts + 1
+                    }}
+                )
+                game_states.update_one({'roomId': room_oid}, {'$inc': {'version': 1}})
 
         return jsonify({
             'success': True,
@@ -685,6 +748,11 @@ def events():
         
         is_admin = request.args.get('isAdmin', 'false').lower() == 'true'
 
+        # Always serialize players so progress/stage data stays live
+        for player in players:
+            player['_id'] = str(player['_id'])
+            player['roomId'] = str(player['roomId'])
+
         if has_update:
             if game_state and '_id' in game_state:
                 game_state['_id'] = str(game_state['_id'])
@@ -693,10 +761,6 @@ def events():
                 if not is_admin:
                     game_state.pop('targetNumber', None)  # only strip for non-admins
                     game_state.pop('mysteryAnswer', None)
-            
-            for player in players:
-                player['_id'] = str(player['_id'])
-                player['roomId'] = str(player['roomId'])
             
             return jsonify({
                 'success': True,
@@ -708,11 +772,13 @@ def events():
                 'timestamp': datetime.utcnow().isoformat()
             }), 200
         
+        # No game-state update but always return fresh player list (progress data updates every 150ms)
         return jsonify({
             'success': True,
             'hasUpdate': False,
             'version': current_version,
             'playersCount': current_players_count,
+            'players': players,
             'timestamp': datetime.utcnow().isoformat()
         }), 200
     
@@ -737,16 +803,31 @@ def sync_position(room_id):
         x = float(data.get('x', 0))
         z = float(data.get('z', 0))
         angle = float(data.get('angle', 0))
+        current_stage = data.get('stage')  # which stage this player is on
 
         if not player_id:
             return jsonify({'success': False, 'error': 'playerId required'}), 400
 
         players_collection = db['players']
 
+        # Build update - position + optional progress data
+        update_fields = {
+            'posX': x, 'posZ': z, 'posAngle': angle,
+            'posUpdatedAt': datetime.utcnow()
+        }
+        if current_stage is not None:
+            update_fields['currentStage'] = int(current_stage)
+        progress = data.get('progress')
+        if progress and isinstance(progress, dict):
+            update_fields['progress'] = progress
+            # Mirror live accumulated score to top-level so admin dashboard shows it
+            if 'score' in progress:
+                update_fields['score'] = int(progress['score'])
+
         # Update this player's position
         players_collection.update_one(
             {'_id': ObjectId(player_id), 'roomId': room_oid},
-            {'$set': {'posX': x, 'posZ': z, 'posAngle': angle, 'posUpdatedAt': datetime.utcnow()}}
+            {'$set': update_fields}
         )
 
         # Read & clear any pending push for this player
@@ -759,9 +840,12 @@ def sync_position(room_id):
         if player_doc and 'pendingPushX' in player_doc:
             pending_push = {'fx': player_doc['pendingPushX'], 'fz': player_doc['pendingPushZ']}
 
-        # Get all players' positions in this room
+        # Get all players' positions in this room — filter by same stage if set
+        pos_filter = {'roomId': room_oid, 'posX': {'$exists': True}}
+        if current_stage is not None:
+            pos_filter['currentStage'] = int(current_stage)
         all_players = list(players_collection.find(
-            {'roomId': room_oid, 'posX': {'$exists': True}},
+            pos_filter,
             {'_id': 1, 'name': 1, 'posX': 1, 'posZ': 1, 'posAngle': 1}
         ))
 

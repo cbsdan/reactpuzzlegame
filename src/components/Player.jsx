@@ -283,10 +283,17 @@ const Player = () => {
                   <span className="player-icon">
                     {player._id === currentPlayer._id ? "🙋" : "👤"}
                   </span>
-                  <span className="player-name">
-                    {player.name}
-                    {player._id === currentPlayer._id ? " (You)" : ""}
-                  </span>
+                  <div className="player-info">
+                    <span className="player-name">
+                      {player.name}
+                      {player._id === currentPlayer._id ? " (You)" : ""}
+                    </span>
+                    {gameState?.gameType === 'stickman-mystery' && isGameRunning && player.progress && (
+                      <span className="player-stage-tag">
+                        {player.solved ? '✅ Solved' : `Stage ${player.progress.stage || '?'}/${player.progress.totalStages || '?'}`}
+                      </span>
+                    )}
+                  </div>
                   <span className="player-score">{player.score || 0}</span>
                 </div>
               ))}

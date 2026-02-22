@@ -71,13 +71,6 @@
   padding: 0.4rem 0.9rem;
   text-align: center;
   min-width: 80px;
-  cursor: pointer;
-  transition: background 0.2s;
-  user-select: none;
-}
-
-.nm-answer-pill:hover {
-  background: rgba(250, 204, 21, 0.28);
 }
 
 .nm-answer-val {

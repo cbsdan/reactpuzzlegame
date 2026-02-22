@@ -32,47 +32,43 @@ export const GameProvider = ({ children }) => {
 
   const API_URL = import.meta.env.VITE_API_URL || "";
 
-  // Refs so the beforeunload handler always sees the latest player/room values
-  const currentPlayerRef = useRef(null);
-  const currentRoomRef = useRef(null);
+  // ── Session persistence across reloads ────────────────
+  // On reload: sessionStorage survives, so we skip disconnect.
+  // On tab/browser close: sessionStorage is destroyed; a new tab
+  // will detect the stale localStorage data and clean up.
   useEffect(() => {
-    currentPlayerRef.current = currentPlayer;
-  }, [currentPlayer]);
-  useEffect(() => {
-    currentRoomRef.current = currentRoom;
-  }, [currentRoom]);
-
-  // Auto-disconnect when the browser tab / window is closed
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      const player = currentPlayerRef.current;
-      const room = currentRoomRef.current;
-      if (player && room) {
-        // keepalive ensures the request is sent even as the page tears down
-        fetch(`${API_URL}/api/rooms/${room._id}/players/${player._id}`, {
-          method: "DELETE",
-          keepalive: true,
-        }).catch(() => {});
-        // Clear persisted session so they won't auto-rejoin on next open
-        localStorage.removeItem("gameRoom");
-        localStorage.removeItem("gamePlayer");
-        localStorage.removeItem("userRole");
-        localStorage.removeItem("currentVersion");
-      }
-    };
-
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, []); // empty deps — reads fresh values via refs
+    // Mark that this tab has an active session (persists across reloads)
+    sessionStorage.setItem("gameTabActive", "1");
+  }, []);
 
   // Restore session from localStorage on mount
   useEffect(() => {
+    const tabWasActive = sessionStorage.getItem("gameTabActive");
     const savedRoom = localStorage.getItem("gameRoom");
     const savedPlayer = localStorage.getItem("gamePlayer");
     const savedRole = localStorage.getItem("userRole");
     const savedVersion = localStorage.getItem("currentVersion");
 
     if (savedRoom && savedRole) {
+      // If sessionStorage flag is missing, this is a NEW tab (previous tab
+      // was closed). Clean up the stale session on the server.
+      if (!tabWasActive && savedPlayer) {
+        try {
+          const room = JSON.parse(savedRoom);
+          const player = JSON.parse(savedPlayer);
+          fetch(`${API_URL}/api/rooms/${room._id}/players/${player._id}`, {
+            method: "DELETE",
+          }).catch(() => {});
+        } catch {}
+        localStorage.removeItem("gameRoom");
+        localStorage.removeItem("gamePlayer");
+        localStorage.removeItem("userRole");
+        localStorage.removeItem("currentVersion");
+        setInitialized(true);
+        return;
+      }
+
+      // Otherwise restore the session (reload or same-tab navigation)
       try {
         const room = JSON.parse(savedRoom);
         setCurrentRoom(room);
@@ -106,12 +102,13 @@ export const GameProvider = ({ children }) => {
     }
   }, []);
 
-  // Clear session from localStorage
+  // Clear session from localStorage + sessionStorage
   const clearSession = useCallback(() => {
     localStorage.removeItem("gameRoom");
     localStorage.removeItem("gamePlayer");
     localStorage.removeItem("userRole");
     localStorage.removeItem("currentVersion");
+    sessionStorage.removeItem("gameTabActive");
   }, []);
 
   // Long polling for real-time updates
@@ -170,7 +167,19 @@ export const GameProvider = ({ children }) => {
           }
         }
       } else if (data.success) {
-        // No update but update playersCount from response
+        // No game-state update — still refresh player list so progress/stage stay live
+        if (data.players) {
+          setPlayers(data.players);
+          if (userRole === "player" && currentPlayer) {
+            const updatedSelf = data.players.find(
+              (p) => p._id === currentPlayer._id,
+            );
+            if (updatedSelf) {
+              setCurrentPlayer(updatedSelf);
+              localStorage.setItem("gamePlayer", JSON.stringify(updatedSelf));
+            }
+          }
+        }
         if (data.playersCount !== undefined) {
           setCurrentPlayersCount(data.playersCount);
         }
@@ -360,7 +369,7 @@ export const GameProvider = ({ children }) => {
   };
 
   // Admin actions
-  const adminAction = async (action, gameType = null) => {
+  const adminAction = async (action, gameType = null, config = null) => {
     if (!currentRoom || userRole !== "admin") {
       return { success: false, error: "Unauthorized" };
     }
@@ -368,6 +377,7 @@ export const GameProvider = ({ children }) => {
     try {
       const body = { action };
       if (gameType) body.gameType = gameType;
+      if (config) Object.assign(body, config);
 
       const response = await fetch(
         `${API_URL}/api/rooms/${currentRoom._id}/admin`,

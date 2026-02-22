@@ -6,40 +6,60 @@ import "./StickmanMysteryGame.css";
 const API_URL = import.meta.env.VITE_API_URL || "";
 
 /* ── Constants ──────────────────────────────────────── */
-const GAME_DURATION = 300; // 5 min countdown
+export const GAME_DURATION = 2700; // 45 min countdown
 const CLUE_PENALTY = 15; // seconds lost per clue opened
 const TRASH_PENALTY = 30; // seconds lost per trash opened
-const TRASH_SLOW_DURATION = 4; // seconds of slowed movement after trash
+const TRASH_SLOW_DURATION = 7; // seconds of slowed movement after trash
 const TRASH_SHAKE_DURATION = 1; // seconds of camera shake after trash
 const SLOW_FACTOR = 0.4; // movement multiplier during slow
-const WRONG_ANSWER_PENALTY = 10; // seconds lost per wrong answer
+const WRONG_ANSWER_PENALTY = 10; // score points deducted per wrong answer
 const INTERACT_DIST = 3.5;
 const MOVE_SPEED = 8;
 const TURN_SPEED = 3;
-const BOUNDARY = 28;
-const CART_POS = [0, 0, -15];
+const BOUNDARY = 18;
+const CART_POS = [0, 0, -10];
 const CART_INTERACT_DIST = 4;
 const DASH_SPEED = 22;
 const DASH_DURATION = 0.25; // seconds
-const DASH_COOLDOWN = 2; // seconds
+const DASH_COOLDOWN = 1.5; // seconds
+const JUMP_COOLDOWN = 1.5; // seconds
+const JUMP_HEIGHT = 2.5;
+const JUMP_DURATION = 0.5; // seconds
 const PUSH_DIST = 2;
 const PUSH_FORCE = 18;
 const POSITION_SYNC_MS = 150;
 const TOTAL_STAGES = 5;
-const STAGE_MAX_SCORE = 200;
-const CLUES_PER_STAGE = 5;
+const STAGE_MAX_SCORE = 1000;
 
 const PLAYER_COLORS = [
   0xff6b6b, 0x48dbfb, 0xfeca57, 0xff9ff3, 0x54a0ff, 0x5f27cd, 0x01a3a4,
   0xf368e0,
 ];
 
-/* ── 5 Stages — each with 5 clue objects + 3 trash ─── */
-const STAGES = [
+/* ── Available 3D object shapes for clue representation ── */
+export const AVAILABLE_OBJECTS = [
+  { id: "chest", name: "Chest (Box)", icon: "📦" },
+  { id: "orb", name: "Orb (Sphere)", icon: "🔮" },
+  { id: "tome", name: "Tome (Flat Book)", icon: "📖" },
+  { id: "lantern", name: "Lantern (Octahedron)", icon: "🏮" },
+  { id: "mirror", name: "Mirror (Tall Slab)", icon: "🪞" },
+  { id: "diamond", name: "Diamond (Icosahedron)", icon: "💎" },
+  { id: "pillar", name: "Pillar (Cylinder)", icon: "🏛️" },
+  { id: "crystal", name: "Crystal (Cone)", icon: "🔷" },
+];
+
+/* ── 5 Stages — varied puzzle types inspired by escape room classics ── */
+/* Puzzle types: Stage1=Addition, Stage2=Letter Values(A=1), Stage3=Multiply-Subtract, Stage4=Direction Turns, Stage5=Caesar Cipher */
+export const DEFAULT_STAGES = [
   {
     name: "The Awakening",
-    answer: "WATER",
-    question: "All five clues describe the same thing. What am I?",
+    answer: "23",
+    question: "You found two numbers hidden in the chamber. Solve: First Number + Second Number = ?",
+    hint: "Simply add the two values you collected from the clues.",
+    storyline: "You awaken in an ancient dungeon. The air is damp and cold. Two glowing ledgers catch your eye. Each holds a secret number — add them together to break the first seal!",
+    objective: "Collect both number clues, then walk to the Answer Cart. Add the two values together and type the total.",
+    clueCount: 2,
+    trashCount: 1,
     theme: {
       color: 0x00e5ff,
       emissive: 0x006b80,
@@ -47,37 +67,32 @@ const STAGES = [
       label: "#00e5ff",
     },
     clues: [
-      {
-        name: "Ancient Vessel",
-        clue: "I fall from the sky but never get hurt.",
-      },
-      { name: "Crystal Flask", clue: "I can be solid, liquid, or gas." },
-      { name: "Stone Basin", clue: "Fish live inside me." },
-      {
-        name: "Sealed Amphora",
-        clue: "I make up about 60% of the human body.",
-      },
-      {
-        name: "Jade Fountain",
-        clue: "I always run downhill but I have no legs.",
-      },
+      { name: "Worn Ledger", clue: "First Number = 14", objectShape: "tome" },
+      { name: "Crystal Flask", clue: "Second Number = 9", objectShape: "orb" },
     ],
     trash: [
-      {
-        name: "Cracked Urn",
-        msg: "The urn crumbles to dust… worthless trash!",
-      },
-      {
-        name: "Rusted Helm",
-        msg: "The helm falls apart in your hands… it was junk!",
-      },
-      { name: "Broken Tablet", msg: "The writing fades away… just garbage!" },
+      { name: "Cracked Urn", msg: "The urn crumbles to dust… worthless trash!" },
+    ],
+    altAnswers: [
+      { answer: "12", question: "You found two numbers hidden in the chamber. Solve: First Number + Second Number = ?", clues: [
+        { name: "Stone Tablet", clue: "First Number = 7", objectShape: "pillar" },
+        { name: "Rune Orb", clue: "Second Number = 5", objectShape: "chest" },
+      ]},
+      { answer: "30", question: "You found two numbers hidden in the chamber. Solve: First Number + Second Number = ?", clues: [
+        { name: "Ancient Chest", clue: "First Number = 18", objectShape: "chest" },
+        { name: "Jade Bowl", clue: "Second Number = 12", objectShape: "lantern" },
+      ]},
     ],
   },
   {
     name: "The Shadows",
-    answer: "FIRE",
-    question: "All five clues describe the same thing. What am I?",
+    answer: "13",
+    question: "Three rune tablets each reveal an input→output pair. Crack the hidden rule, then apply it: what is the output when the input is 6?",
+    hint: "Look at each pair: multiply the input by 2, then add 1. Try it on every pair to confirm, then apply it to 6.",
+    storyline: "Beyond the first gate, darkness swallows you whole. Three glowing tablets flicker on the walls, each engraved with a mysterious pair of numbers linked by an arrow. The shadow priests sealed this vault with a numeric rule — only those who can see the pattern will pass!",
+    objective: "Collect all 3 pattern tablets. Each shows \"input → output\". Discover the rule linking them, then calculate the missing output for input 6.",
+    clueCount: 3,
+    trashCount: 2,
     theme: {
       color: 0xbb86fc,
       emissive: 0x5d4380,
@@ -85,40 +100,36 @@ const STAGES = [
       label: "#bb86fc",
     },
     clues: [
-      {
-        name: "Obsidian Cube",
-        clue: "I dance on a wick but I'm not a dancer.",
-      },
-      {
-        name: "Shadow Prism",
-        clue: "I need oxygen to stay alive, but I'm not an animal.",
-      },
-      {
-        name: "Dark Chalice",
-        clue: "Campers gather around me for warmth at night.",
-      },
-      {
-        name: "Void Crystal",
-        clue: "I can spread through forests faster than any animal can run.",
-      },
-      {
-        name: "Night Lantern",
-        clue: "I am the reason early humans could cook their food.",
-      },
+      { name: "Shadow Tablet I",  clue: "Pattern Pair I:  2 ➜ 5",  objectShape: "chest" },
+      { name: "Shadow Tablet II", clue: "Pattern Pair II: 4 ➜ 9",  objectShape: "orb" },
+      { name: "Shadow Tablet III",clue: "Pattern Pair III: 6 ➜ ?", objectShape: "lantern" },
     ],
     trash: [
-      {
-        name: "Empty Coffer",
-        msg: "The coffer is empty… nothing but a waste of time!",
-      },
+      { name: "Empty Coffer", msg: "The coffer is empty… nothing but a waste of time!" },
       { name: "Dead Compass", msg: "The needle spins wildly… it was cursed!" },
-      { name: "Cursed Coin", msg: "The coin burns your hand… it was a trap!" },
+    ],
+    altAnswers: [
+      { answer: "11", question: "Three rune tablets each reveal an input→output pair. Crack the hidden rule, then apply it: what is the output when the input is 5?", clues: [
+        { name: "Void Tablet I",  clue: "Pattern Pair I:  1 ➜ 3",  objectShape: "diamond" },
+        { name: "Void Tablet II", clue: "Pattern Pair II: 3 ➜ 7",  objectShape: "crystal" },
+        { name: "Void Tablet III",clue: "Pattern Pair III: 5 ➜ ?", objectShape: "tome" },
+      ]},
+      { answer: "19", question: "Three rune tablets each reveal an input→output pair. Crack the hidden rule, then apply it: what is the output when the input is 6?", clues: [
+        { name: "Night Tablet I",  clue: "Pattern Pair I:  2 ➜ 7",  objectShape: "mirror" },
+        { name: "Night Tablet II", clue: "Pattern Pair II: 4 ➜ 13", objectShape: "chest" },
+        { name: "Night Tablet III",clue: "Pattern Pair III: 6 ➜ ?", objectShape: "pillar" },
+      ]},
     ],
   },
   {
     name: "The Inferno",
-    answer: "TIME",
-    question: "All five clues describe the same thing. What am I?",
+    answer: "25",
+    question: "Three scorched tablets each show a number and its secret value. Find the hidden rule — then calculate the secret value for 5.",
+    hint: "Try multiplying each number by itself (squaring it). Does the rule hold for all three tablets?",
+    storyline: "The chamber glows red-hot. Lava cracks beneath the floor. Three scorched stone tablets are mounted on the wall. Each one bears a single number and a result — but the formula connecting them has been burned away. Only the mathematician who rediscovers the rule will survive the Inferno!",
+    objective: "Collect all 3 scorched tablets. Each shows \"Number → Secret Value\". Find the mathematical rule and apply it to find the secret value of 5.",
+    clueCount: 3,
+    trashCount: 2,
     theme: {
       color: 0xff5252,
       emissive: 0x802929,
@@ -126,37 +137,36 @@ const STAGES = [
       label: "#ff5252",
     },
     clues: [
-      {
-        name: "Molten Orb",
-        clue: "I never stop moving forward, yet I have no legs.",
-      },
-      {
-        name: "Flame Codex",
-        clue: "Everyone wants more of me, but no one can save me.",
-      },
-      { name: "Ember Crown", clue: "Doctors say I heal all wounds." },
-      {
-        name: "Blazing Mirror",
-        clue: "Clocks and watches exist only to track me.",
-      },
-      {
-        name: "Scorched Relic",
-        clue: "I fly when you're having fun but crawl when you're bored.",
-      },
+      { name: "Scorched Tablet I",  clue: "3 ➜ 9",  objectShape: "orb" },
+      { name: "Scorched Tablet II", clue: "4 ➜ 16", objectShape: "tome" },
+      { name: "Scorched Tablet III",clue: "5 ➜ ?",  objectShape: "lantern" },
     ],
     trash: [
       { name: "Ash Pile", msg: "Just a pile of ash… nothing useful here!" },
-      {
-        name: "Burnt Scroll",
-        msg: "The scroll is too burnt to read… total waste!",
-      },
-      { name: "Cinder Stone", msg: "The stone is just a worthless cinder!" },
+      { name: "Burnt Scroll", msg: "The scroll is too burnt to read… total waste!" },
+    ],
+    altAnswers: [
+      { answer: "64", question: "Three scorched tablets each show a number and its secret value. Find the hidden rule — then calculate the secret value for 4.", clues: [
+        { name: "Lava Tablet I",  clue: "2 ➜ 8",  objectShape: "diamond" },
+        { name: "Lava Tablet II", clue: "3 ➜ 27", objectShape: "mirror" },
+        { name: "Lava Tablet III",clue: "4 ➜ ?",  objectShape: "chest" },
+      ]},
+      { answer: "30", question: "Three scorched tablets each show a number and its secret value. Find the hidden rule — then calculate the secret value for 5.", clues: [
+        { name: "Ember Tablet I",  clue: "3 ➜ 12", objectShape: "crystal" },
+        { name: "Ember Tablet II", clue: "4 ➜ 20", objectShape: "pillar" },
+        { name: "Ember Tablet III",clue: "5 ➜ ?",  objectShape: "orb" },
+      ]},
     ],
   },
   {
     name: "The Radiance",
-    answer: "SHADOW",
-    question: "All five clues describe the same thing. What am I?",
+    answer: "WEST",
+    question: "Follow the compass directions listed in your clues — in order. You start NORTH. What direction are you facing at the end? (NORTH / EAST / SOUTH / WEST)",
+    hint: "Face NORTH. Each turn rotates you 90°: RIGHT = clockwise, LEFT = counter-clockwise.",
+    storyline: "Blinding golden light floods the chamber. A compass rose is carved into the floor. Four glowing stones describe a sequence of turns. Only the navigator who reaches the correct final bearing may proceed!",
+    objective: "Collect all 4 direction clues. Follow each turn from the starting direction (NORTH) and submit your final bearing.",
+    clueCount: 4,
+    trashCount: 3,
     theme: {
       color: 0xffab00,
       emissive: 0x805500,
@@ -164,37 +174,40 @@ const STAGES = [
       label: "#ffab00",
     },
     clues: [
-      {
-        name: "Sun Stone",
-        clue: "I follow you everywhere during the day, but vanish at night.",
-      },
-      { name: "Light Shard", clue: "I can only exist when there is light." },
-      {
-        name: "Golden Eye",
-        clue: "The brighter the light, the darker I become.",
-      },
-      {
-        name: "Radiant Key",
-        clue: "I copy your every move perfectly, but I am flat.",
-      },
-      {
-        name: "Prism Heart",
-        clue: "Peter Pan once lost me and needed help getting me back.",
-      },
+      { name: "Compass Rose", clue: "You start facing NORTH", objectShape: "chest" },
+      { name: "Wind Vane I", clue: "First turn: RIGHT", objectShape: "orb" },
+      { name: "Sun Dial II", clue: "Second turn: RIGHT", objectShape: "tome" },
+      { name: "Sky Chart III", clue: "Third turn: RIGHT", objectShape: "lantern" },
     ],
     trash: [
-      {
-        name: "Fool's Gold",
-        msg: "It's just fool's gold… completely worthless!",
-      },
+      { name: "Fool's Gold", msg: "It's just fool's gold… completely worthless!" },
       { name: "Tarnished Ring", msg: "The ring turns to rust… it was cursed!" },
       { name: "Hollow Gem", msg: "The gem is hollow inside… just a trick!" },
+    ],
+    altAnswers: [
+      { answer: "EAST", question: "Follow the compass directions listed in your clues — in order. You start NORTH. What direction are you facing at the end? (NORTH / EAST / SOUTH / WEST)", clues: [
+        { name: "Bearing Stone", clue: "You start facing NORTH", objectShape: "diamond" },
+        { name: "Course Rune I", clue: "First turn: RIGHT", objectShape: "mirror" },
+        { name: "Course Rune II", clue: "Second turn: LEFT", objectShape: "crystal" },
+        { name: "Course Rune III", clue: "Third turn: RIGHT", objectShape: "pillar" },
+      ]},
+      { answer: "SOUTH", question: "Follow the compass directions listed in your clues — in order. You start NORTH. What direction are you facing at the end? (NORTH / EAST / SOUTH / WEST)", clues: [
+        { name: "Astrolabe", clue: "You start facing NORTH", objectShape: "chest" },
+        { name: "Heading Slab I", clue: "First turn: RIGHT", objectShape: "orb" },
+        { name: "Heading Slab II", clue: "Second turn: RIGHT", objectShape: "chest" },
+        { name: "Heading Slab III", clue: "Third turn: LEFT", objectShape: "tome" },
+      ]},
     ],
   },
   {
     name: "The Revelation",
-    answer: "ECHO",
-    question: "All five clues describe the same thing. What am I?",
+    answer: "VAULT",
+    question: "Five rune stones each hold one encoded letter. The ancient cipher shifts every letter FORWARD 3 positions (A→D, B→E … Z→C). Decode the 5-letter word by shifting each letter BACK 3.",
+    hint: "Reverse the shift: subtract 3 from each letter's alphabet position. Y→V, D→A, X→U, O→L, W→T.",
+    storyline: "The final chamber. Ancient runes glow green on every wall. Five encoded letters are carved into stone pillars. The cipher of the ancients shifts every letter forward by three — only by reversing the shift will the great door open!",
+    objective: "Collect all 5 rune stones. Each shows one encoded letter. Shift each letter BACK by 3 to decode, then submit the 5-letter word.",
+    clueCount: 5,
+    trashCount: 3,
     theme: {
       color: 0x00e676,
       emissive: 0x00733b,
@@ -202,72 +215,76 @@ const STAGES = [
       label: "#00e676",
     },
     clues: [
-      {
-        name: "Verdant Tome",
-        clue: "I repeat everything you say, but I have no voice of my own.",
-      },
-      {
-        name: "Life Seed",
-        clue: "I am born in mountains, caves, and large empty halls.",
-      },
-      { name: "Emerald Scale", clue: "I get weaker every time I speak." },
-      {
-        name: "Nature's Core",
-        clue: "Shout into a canyon and I will answer you.",
-      },
-      {
-        name: "Genesis Orb",
-        clue: "I am not a parrot, but I copy every sound you make.",
-      },
+      { name: "Verdant Rune I", clue: "Encoded letter 1: Y", objectShape: "tome" },
+      { name: "Verdant Rune II", clue: "Encoded letter 2: D", objectShape: "orb" },
+      { name: "Verdant Rune III", clue: "Encoded letter 3: X", objectShape: "lantern" },
+      { name: "Verdant Rune IV", clue: "Encoded letter 4: O", objectShape: "chest" },
+      { name: "Verdant Rune V", clue: "Encoded letter 5: W", objectShape: "diamond" },
     ],
     trash: [
-      {
-        name: "Dead Root",
-        msg: "The root withers in your hands… cursed garbage!",
-      },
+      { name: "Dead Root", msg: "The root withers in your hands… cursed garbage!" },
       { name: "Withered Leaf", msg: "The leaf crumbles to nothing… a trap!" },
       { name: "Hollow Bark", msg: "The bark is hollow and rotten… just junk!" },
+    ],
+    altAnswers: [
+      { answer: "FLAME", question: "Five rune stones each hold one encoded letter. The ancient cipher shifts every letter FORWARD 3 positions (A→D, B→E … Z→C). Decode the 5-letter word by shifting each letter BACK 3.", clues: [
+        { name: "Ember Glyph I", clue: "Encoded letter 1: I", objectShape: "orb" },
+        { name: "Ember Glyph II", clue: "Encoded letter 2: O", objectShape: "chest" },
+        { name: "Ember Glyph III", clue: "Encoded letter 3: D", objectShape: "pillar" },
+        { name: "Ember Glyph IV", clue: "Encoded letter 4: P", objectShape: "diamond" },
+        { name: "Ember Glyph V", clue: "Encoded letter 5: H", objectShape: "crystal" },
+      ]},
+      { answer: "STONE", question: "Five rune stones each hold one encoded letter. The ancient cipher shifts every letter FORWARD 3 positions (A→D, B→E … Z→C). Decode the 5-letter word by shifting each letter BACK 3.", clues: [
+        { name: "Rock Cipher I", clue: "Encoded letter 1: V", objectShape: "mirror" },
+        { name: "Rock Cipher II", clue: "Encoded letter 2: W", objectShape: "tome" },
+        { name: "Rock Cipher III", clue: "Encoded letter 3: R", objectShape: "orb" },
+        { name: "Rock Cipher IV", clue: "Encoded letter 4: Q", objectShape: "chest" },
+        { name: "Rock Cipher V", clue: "Encoded letter 5: H", objectShape: "lantern" },
+      ]},
     ],
   },
 ];
 
+/** Resolve object shape id to a Three.js mesh */
+function resolveObjectShape(shapeId, mainMat) {
+  switch (shapeId) {
+    case "chest":
+      return (() => { const m = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.6, 0.7), mainMat); m.position.y = 0.72; return m; })();
+    case "orb":
+      return (() => { const mat2 = mainMat.clone(); mat2.transparent = true; mat2.opacity = 0.82; const m = new THREE.Mesh(new THREE.SphereGeometry(0.4, 8, 8), mat2); m.position.y = 0.85; return m; })();
+    case "tome":
+      return (() => { const m = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.14, 0.95), mainMat); m.position.y = 0.52; m.rotation.y = 0.3; return m; })();
+    case "lantern":
+      return (() => { const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.35), mainMat); m.position.y = 0.9; return m; })();
+    case "mirror":
+      return (() => { const m = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.6, 1.0), mainMat); m.position.y = 1.22; return m; })();
+    case "diamond":
+      return (() => { const m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.38), mainMat); m.position.y = 0.9; return m; })();
+    case "pillar":
+      return (() => { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 1.2, 8), mainMat); m.position.y = 0.8; return m; })();
+    case "crystal":
+      return (() => { const m = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.9, 6), mainMat); m.position.y = 0.85; return m; })();
+    default:
+      return (() => { const m = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.7), mainMat); m.position.y = 0.75; return m; })();
+  }
+}
+
 /* ── Wall layout — maze style ───────────────────────── */
 const WALL_SEGMENTS = [
-  // Perimeter walls
-  { x: 0, z: -28, w: 58, d: 1.2, h: 3.2 },
-  { x: 0, z: 28, w: 58, d: 1.2, h: 3.2 },
-  { x: -28, z: 0, w: 1.2, d: 58, h: 3.2 },
-  { x: 28, z: 0, w: 1.2, d: 58, h: 3.2 },
-  // ── Outer ring ──
-  { x: -20, z: -20, w: 14, d: 0.6, h: 2.6 },
-  { x: 14, z: -20, w: 14, d: 0.6, h: 2.6 },
-  { x: -20, z: 20, w: 18, d: 0.6, h: 2.6 },
-  { x: 18, z: 20, w: 10, d: 0.6, h: 2.6 },
-  { x: -20, z: -6, w: 0.6, d: 28, h: 2.6 },
-  { x: 20, z: 4, w: 0.6, d: 24, h: 2.6 },
-  // ── Mid ring ──
-  { x: -12, z: -12, w: 10, d: 0.6, h: 2.6 },
-  { x: 8, z: -12, w: 12, d: 0.6, h: 2.6 },
-  { x: -12, z: 12, w: 12, d: 0.6, h: 2.6 },
-  { x: 12, z: 12, w: 8, d: 0.6, h: 2.6 },
-  { x: -12, z: 0, w: 0.6, d: 24, h: 2.6 },
-  { x: 12, z: -2, w: 0.6, d: 20, h: 2.6 },
-  // ── Inner corridors ──
-  { x: -4, z: -6, w: 8, d: 0.6, h: 2.6 },
-  { x: 4, z: 6, w: 8, d: 0.6, h: 2.6 },
-  { x: 0, z: 0, w: 0.6, d: 8, h: 2.6 },
-  // ── Dead-end nooks and T-junctions ──
-  { x: -16, z: -4, w: 6, d: 0.6, h: 2.6 },
-  { x: 16, z: -6, w: 6, d: 0.6, h: 2.6 },
-  { x: -6, z: 18, w: 0.6, d: 6, h: 2.6 },
-  { x: 6, z: -18, w: 0.6, d: 6, h: 2.6 },
-  { x: -24, z: 10, w: 6, d: 0.6, h: 2.6 },
-  { x: 24, z: -14, w: 6, d: 0.6, h: 2.6 },
-  { x: -16, z: 16, w: 0.6, d: 6, h: 2.6 },
-  { x: 16, z: 16, w: 0.6, d: 6, h: 2.6 },
-  { x: 8, z: -24, w: 0.6, d: 6, h: 2.6 },
-  { x: -8, z: -24, w: 0.6, d: 6, h: 2.6 },
-  { x: 24, z: 10, w: 6, d: 0.6, h: 2.6 },
+  // Perimeter walls (match BOUNDARY=18)
+  { x: 0,   z: -18, w: 38, d: 1.2, h: 3.2 },
+  { x: 0,   z:  18, w: 38, d: 1.2, h: 3.2 },
+  { x: -18, z:   0, w: 1.2, d: 38, h: 3.2 },
+  { x:  18, z:   0, w: 1.2, d: 38, h: 3.2 },
+  // ── Interior corridors (trimmed to fit ~±15) ──
+  { x: -10, z:  -8, w:  8, d: 0.6, h: 2.6 },
+  { x:   8, z:  -8, w:  8, d: 0.6, h: 2.6 },
+  { x: -10, z:   8, w:  8, d: 0.6, h: 2.6 },
+  { x:   8, z:   8, w:  8, d: 0.6, h: 2.6 },
+  { x: -10, z:   0, w: 0.6, d: 16, h: 2.6 },
+  { x:  10, z:  -2, w: 0.6, d: 12, h: 2.6 },
+  { x:  -2, z:  -4, w:  6, d: 0.6, h: 2.6 },
+  { x:   2, z:   4, w:  6, d: 0.6, h: 2.6 },
 ];
 
 /* ── Helpers ─────────────────────────────────────────── */
@@ -309,56 +326,45 @@ function buildStickman(color = 0x00ffd0) {
   });
 
   // Head
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.25, 16, 16), mat);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.25, 8, 8), mat);
   head.position.y = 1.9;
-  head.castShadow = true;
   group.add(head);
 
   // Body
   const body = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.05, 0.05, 0.8, 8),
+    new THREE.CylinderGeometry(0.05, 0.05, 0.8, 6),
     mat,
   );
   body.position.y = 1.25;
-  body.castShadow = true;
   group.add(body);
 
   // Arms — geometry translated so pivot is at shoulder
   const makeArm = () => {
-    const g = new THREE.CylinderGeometry(0.035, 0.035, 0.6, 8);
+    const g = new THREE.CylinderGeometry(0.035, 0.035, 0.6, 5);
     g.translate(0, -0.3, 0);
     return new THREE.Mesh(g, mat);
   };
   const leftArm = makeArm();
   leftArm.position.set(-0.2, 1.6, 0);
-  leftArm.castShadow = true;
   group.add(leftArm);
 
   const rightArm = makeArm();
   rightArm.position.set(0.2, 1.6, 0);
-  rightArm.castShadow = true;
   group.add(rightArm);
 
   // Legs — geometry translated so pivot is at hip
   const makeLeg = () => {
-    const g = new THREE.CylinderGeometry(0.045, 0.045, 0.75, 8);
+    const g = new THREE.CylinderGeometry(0.045, 0.045, 0.75, 5);
     g.translate(0, -0.375, 0);
     return new THREE.Mesh(g, mat);
   };
   const leftLeg = makeLeg();
   leftLeg.position.set(-0.12, 0.85, 0);
-  leftLeg.castShadow = true;
   group.add(leftLeg);
 
   const rightLeg = makeLeg();
   rightLeg.position.set(0.12, 0.85, 0);
-  rightLeg.castShadow = true;
   group.add(rightLeg);
-
-  // Small glow under stickman
-  const glow = new THREE.PointLight(color, 0.6, 4);
-  glow.position.y = 0.5;
-  group.add(glow);
 
   return { group, head, body, leftArm, rightArm, leftLeg, rightLeg };
 }
@@ -374,12 +380,10 @@ function buildObjectMesh(objData, index) {
     metalness: 0.15,
   });
   const pedestal = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.5, 0.7, 0.4, 8),
+    new THREE.CylinderGeometry(0.5, 0.7, 0.4, 6),
     pedMat,
   );
   pedestal.position.y = 0.2;
-  pedestal.castShadow = true;
-  pedestal.receiveShadow = true;
   group.add(pedestal);
 
   // Main shape — unique per object
@@ -392,79 +396,39 @@ function buildObjectMesh(objData, index) {
   });
 
   let mainMesh;
-  switch (index) {
-    case 0: // Chest — box
-      mainMesh = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.6, 0.7), mainMat);
-      mainMesh.position.y = 0.72;
-      break;
-    case 1: {
-      // Orb — sphere
-      const orbMat = mainMat.clone();
-      orbMat.transparent = true;
-      orbMat.opacity = 0.82;
-      mainMesh = new THREE.Mesh(new THREE.SphereGeometry(0.4, 24, 24), orbMat);
-      mainMesh.position.y = 0.85;
-      break;
-    }
-    case 2: // Tome — flat box
-      mainMesh = new THREE.Mesh(
-        new THREE.BoxGeometry(0.7, 0.14, 0.95),
-        mainMat,
-      );
-      mainMesh.position.y = 0.52;
-      mainMesh.rotation.y = 0.3;
-      break;
-    case 3: // Lantern — octahedron
-      mainMesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.35), mainMat);
-      mainMesh.position.y = 0.9;
-      break;
-    case 4: // Mirror — tall thin box
-      mainMesh = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.6, 1.0), mainMat);
-      mainMesh.position.y = 1.22;
-      break;
-    default:
-      mainMesh = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.7), mainMat);
-      mainMesh.position.y = 0.75;
-  }
-  mainMesh.castShadow = true;
+  mainMesh = resolveObjectShape(objData.objectShape || "chest", mainMat);
+  mainMesh.castShadow = false;
   group.add(mainMesh);
 
   // Floating beacon (pulsing sphere)
-  const beaconMat = new THREE.MeshStandardMaterial({
+  const beaconMat = new THREE.MeshBasicMaterial({
     color: objData.beaconColor,
-    emissive: objData.beaconColor,
-    emissiveIntensity: 1.5,
     transparent: true,
     opacity: 0.9,
   });
   const beacon = new THREE.Mesh(
-    new THREE.SphereGeometry(0.14, 12, 12),
+    new THREE.SphereGeometry(0.14, 6, 6),
     beaconMat,
   );
   beacon.position.y = 2.5;
   group.add(beacon);
 
   // Proximity ring on the ground
-  const ringMat = new THREE.MeshStandardMaterial({
+  const ringMat = new THREE.MeshBasicMaterial({
     color: objData.beaconColor,
-    emissive: objData.beaconColor,
-    emissiveIntensity: 0.6,
     transparent: true,
-    opacity: 0.25,
+    opacity: 0.2,
     side: THREE.DoubleSide,
   });
   const ring = new THREE.Mesh(
-    new THREE.RingGeometry(INTERACT_DIST - 0.3, INTERACT_DIST, 48),
+    new THREE.RingGeometry(INTERACT_DIST - 0.3, INTERACT_DIST, 16),
     ringMat,
   );
   ring.rotation.x = -Math.PI / 2;
-  ring.position.y = 0.02;
+  ring.position.y = 0.03;
   group.add(ring);
 
-  // Point light
-  const light = new THREE.PointLight(objData.beaconColor, 2, 12);
-  light.position.y = 2.0;
-  group.add(light);
+  // No per-object point light — emissive material provides the glow
 
   // Name label
   const label = createTextSprite(objData.name, objData.labelColor || "#ffffff");
@@ -474,7 +438,7 @@ function buildObjectMesh(objData, index) {
   // World position
   group.position.set(objData.pos[0], objData.pos[1], objData.pos[2]);
 
-  return { group, mesh: mainMesh, beacon, ring, light, label };
+  return { group, mesh: mainMesh, beacon, ring, light: null, label };
 }
 
 /** Build the answer cart — the player must come here to submit their answer */
@@ -516,7 +480,7 @@ function buildCartMesh() {
     roughness: 0.75,
     metalness: 0.4,
   });
-  const wheelGeo = new THREE.TorusGeometry(0.25, 0.06, 8, 16);
+  const wheelGeo = new THREE.TorusGeometry(0.25, 0.06, 5, 10);
   [
     [-0.7, 0.25, 0.6],
     [0.7, 0.25, 0.6],
@@ -538,7 +502,7 @@ function buildCartMesh() {
     roughness: 0.4,
   });
   const scroll = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.12, 0.12, 0.7, 12),
+    new THREE.CylinderGeometry(0.12, 0.12, 0.7, 7),
     scrollMat,
   );
   scroll.position.y = 1.35;
@@ -555,7 +519,7 @@ function buildCartMesh() {
     opacity: 0.9,
   });
   const beacon = new THREE.Mesh(
-    new THREE.SphereGeometry(0.18, 12, 12),
+    new THREE.SphereGeometry(0.18, 6, 6),
     beaconMat,
   );
   beacon.position.y = 2.8;
@@ -571,7 +535,7 @@ function buildCartMesh() {
     side: THREE.DoubleSide,
   });
   const ring = new THREE.Mesh(
-    new THREE.RingGeometry(CART_INTERACT_DIST - 0.3, CART_INTERACT_DIST, 48),
+    new THREE.RingGeometry(CART_INTERACT_DIST - 0.3, CART_INTERACT_DIST, 16),
     ringMat,
   );
   ring.rotation.x = -Math.PI / 2;
@@ -629,34 +593,18 @@ function buildWallMesh(w) {
 /** Build a wall-mounted torch (returns group with animated flame ref) */
 function buildTorch(x, y, z) {
   const group = new THREE.Group();
-  // Bracket
-  const bracketMat = new THREE.MeshStandardMaterial({
-    color: 0x4a3a2a,
-    roughness: 0.9,
-    metalness: 0.3,
-  });
-  const bracket = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.035, 0.035, 0.45, 6),
-    bracketMat,
-  );
-  bracket.position.set(x, y, z);
-  bracket.castShadow = true;
-  group.add(bracket);
-
-  // Flame (will be animated)
-  const flameMat = new THREE.MeshStandardMaterial({
+  // Flame only — skip heavy bracket mesh
+  const flameMat = new THREE.MeshBasicMaterial({
     color: 0xff8833,
-    emissive: 0xff5500,
-    emissiveIntensity: 2.0,
     transparent: true,
-    opacity: 0.9,
+    opacity: 0.85,
   });
-  const flame = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), flameMat);
+  const flame = new THREE.Mesh(new THREE.SphereGeometry(0.1, 5, 5), flameMat);
   flame.position.set(x, y + 0.3, z);
   group.add(flame);
 
-  // Warm light
-  const torchLight = new THREE.PointLight(0xff6633, 0.8, 10);
+  // Warm light — low intensity, short range
+  const torchLight = new THREE.PointLight(0xff6633, 0.5, 6);
   torchLight.position.set(x, y + 0.35, z);
   torchLight.castShadow = false;
   group.add(torchLight);
@@ -675,12 +623,10 @@ function buildTrashMesh(trashData, shapeIdx) {
     metalness: 0.15,
   });
   const pedestal = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.5, 0.7, 0.4, 8),
+    new THREE.CylinderGeometry(0.5, 0.7, 0.4, 6),
     pedMat,
   );
   pedestal.position.y = 0.2;
-  pedestal.castShadow = true;
-  pedestal.receiveShadow = true;
   group.add(pedestal);
 
   // Main shape (similar to clue shapes to blend in)
@@ -704,7 +650,7 @@ function buildTrashMesh(trashData, shapeIdx) {
       const orbMat = mainMat.clone();
       orbMat.transparent = true;
       orbMat.opacity = 0.82;
-      mainMesh = new THREE.Mesh(new THREE.SphereGeometry(0.38, 24, 24), orbMat);
+      mainMesh = new THREE.Mesh(new THREE.SphereGeometry(0.38, 8, 8), orbMat);
       mainMesh.position.y = 0.85;
       break;
     }
@@ -724,19 +670,17 @@ function buildTrashMesh(trashData, shapeIdx) {
       mainMesh = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.7), mainMat);
       mainMesh.position.y = 0.75;
   }
-  mainMesh.castShadow = true;
+  mainMesh.castShadow = false;
   group.add(mainMesh);
 
   // Beacon (similar to clues — but animated differently in the loop)
-  const beaconMat = new THREE.MeshStandardMaterial({
+  const beaconMat = new THREE.MeshBasicMaterial({
     color: trashData.beaconColor,
-    emissive: trashData.beaconColor,
-    emissiveIntensity: 1.5,
     transparent: true,
     opacity: 0.9,
   });
   const beacon = new THREE.Mesh(
-    new THREE.SphereGeometry(0.14, 12, 12),
+    new THREE.SphereGeometry(0.14, 6, 6),
     beaconMat,
   );
   beacon.position.y = 2.5;
@@ -747,26 +691,21 @@ function buildTrashMesh(trashData, shapeIdx) {
     new THREE.Color(0xff4444),
     0.25,
   );
-  const ringMat = new THREE.MeshStandardMaterial({
+  const ringMat = new THREE.MeshBasicMaterial({
     color: ringColor,
-    emissive: ringColor,
-    emissiveIntensity: 0.6,
     transparent: true,
-    opacity: 0.2,
+    opacity: 0.15,
     side: THREE.DoubleSide,
   });
   const ring = new THREE.Mesh(
-    new THREE.RingGeometry(INTERACT_DIST - 0.3, INTERACT_DIST, 48),
+    new THREE.RingGeometry(INTERACT_DIST - 0.3, INTERACT_DIST, 16),
     ringMat,
   );
   ring.rotation.x = -Math.PI / 2;
   ring.position.y = 0.02;
   group.add(ring);
 
-  // Point light
-  const light = new THREE.PointLight(trashData.beaconColor, 2, 12);
-  light.position.y = 2.0;
-  group.add(light);
+  // No per-object point light
 
   // Name label
   const label = createTextSprite(
@@ -777,18 +716,16 @@ function buildTrashMesh(trashData, shapeIdx) {
   group.add(label);
 
   // ★ Warning indicator — small orbiting red dot (subtle hint)
-  const warnMat = new THREE.MeshStandardMaterial({
+  const warnMat = new THREE.MeshBasicMaterial({
     color: 0xff3333,
-    emissive: 0xff0000,
-    emissiveIntensity: 2.0,
     transparent: true,
-    opacity: 0.7,
+    opacity: 0.8,
   });
-  const warnDot = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), warnMat);
+  const warnDot = new THREE.Mesh(new THREE.SphereGeometry(0.06, 5, 5), warnMat);
   warnDot.position.set(0.8, 1.5, 0);
   group.add(warnDot);
 
-  return { group, mesh: mainMesh, beacon, ring, light, label, warnDot };
+  return { group, mesh: mainMesh, beacon, ring, light: null, label, warnDot };
 }
 
 // (decorative builder removed — replaced by trash system)
@@ -851,6 +788,49 @@ const StickmanMysteryGame = () => {
   const { submitAnswer, currentPlayer, gameState, currentRoom, players } =
     useGame();
 
+  // ── Reload persistence: load any saved progress for this session ──
+  const _smKey =
+    currentRoom?._id && currentPlayer?._id
+      ? `sm-progress-${currentRoom._id}-${currentPlayer._id}`
+      : null;
+  const _saved = (() => {
+    if (!_smKey) return null;
+    try {
+      const raw = sessionStorage.getItem(_smKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (parsed.startedAt !== gameState?.startedAt) return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  })();
+
+  // Resolve active stages: admin config → localStorage saved config → built-in defaults
+  const adminConfig = gameState?.stickmanConfig;
+  const STAGES = adminConfig?.stages || (() => {
+    try {
+      const saved = localStorage.getItem("stickman_custom_config");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.stages && Array.isArray(parsed.stages) && parsed.stages.length > 0) {
+          // Re-attach themes if missing
+          return parsed.stages.map((s, i) => ({
+            ...s,
+            theme: s.theme || [
+              { color: 0x00e5ff, emissive: 0x006b80, beacon: 0x00e5ff, label: "#00e5ff" },
+              { color: 0xbb86fc, emissive: 0x5d4380, beacon: 0xbb86fc, label: "#bb86fc" },
+              { color: 0xff5252, emissive: 0x802929, beacon: 0xff5252, label: "#ff5252" },
+              { color: 0xffab00, emissive: 0x805500, beacon: 0xffab00, label: "#ffab00" },
+              { color: 0x00e676, emissive: 0x00733b, beacon: 0x00e676, label: "#00e676" },
+            ][i] || { color: 0x00e5ff, emissive: 0x006b80, beacon: 0x00e5ff, label: "#00e5ff" },
+          }));
+        }
+      }
+    } catch { /* ignore */ }
+    return DEFAULT_STAGES;
+  })();
+
   /* ── Three.js refs ─────────────────────────────────── */
   const containerRef = useRef(null);
   const rendererRef = useRef(null);
@@ -869,23 +849,46 @@ const StickmanMysteryGame = () => {
   const interactCoolRef = useRef(false);
 
   /* ── State↔ref bridges (read from animation loop) ─── */
-  const stageCluesFoundRef = useRef([]);
-  const stageTrashTriggeredRef = useRef([]);
+  const stageCluesFoundRef = useRef(_saved?.stageCluesFound ?? []);
+  const stageTrashTriggeredRef = useRef(_saved?.stageTrashTriggered ?? []);
   const nearClueRef = useRef(null);
   const nearTrashRef = useRef(null);
   const showingModalRef = useRef(false);
-  const gameCompleteRef = useRef(false);
+  const gameCompleteRef = useRef(_saved?.gameComplete ?? false);
   const gameOverRef = useRef(false);
   const isPausedRef = useRef(false);
   const nearCartRef = useRef(false);
   const cartMeshRef = useRef(null);
   const wallBoxesRef = useRef([]);
   const torchFlamesRef = useRef([]);
-  const currentStageRef = useRef(0);
-  const stageStartTimeRef = useRef(GAME_DURATION);
+  const currentStageRef = useRef(_saved?.stage ?? 0);
+  const stageStartTimeRef = useRef(_saved?.stageStartTime ?? GAME_DURATION);
   const slowTimeRef = useRef(0);
   const shakeTimeRef = useRef(0);
   const isSlowedRef = useRef(false);
+
+  /* ── Jump refs ───────────────────────────────────────── */
+  const isJumpingRef = useRef(false);
+  const jumpCoolRef = useRef(false);
+  const jumpTimerRef = useRef(0);
+
+  /* ── Key & Door refs ─────────────────────────────────── */
+  const hasKeyRef = useRef(_saved?.hasKey ?? false);
+  const doorMeshRef = useRef(null);
+  const nearDoorRef = useRef(false);
+
+  /* ── Mouse hover refs ────────────────────────────────── */
+  const mouseRef = useRef(new THREE.Vector2(-9999, -9999));
+  const hoveredObjectRef = useRef(null);
+
+  /* ── Camera orbit refs ──────────────────────────────── */
+  // yaw=0 → camera sits directly behind (+Z offset), pitch=atan2(5,8) → ~32° elevation
+  const cameraYawRef = useRef(0);
+  const cameraPitchRef = useRef(Math.atan2(5, 8)); // ≈0.559 rad
+  const cameraYawTargetRef = useRef(0);
+  const cameraPitchTargetRef = useRef(Math.atan2(5, 8));
+  const isDragRef = useRef(false);
+  const lastDragRef = useRef({ x: 0, y: 0 });
 
   /* ── Multiplayer refs ──────────────────────────────── */
   const otherPlayersRef = useRef(new Map());
@@ -895,12 +898,22 @@ const StickmanMysteryGame = () => {
   const dashTimerRef = useRef(0);
   const syncIntervalRef = useRef(null);
   const roomIdRef = useRef(currentRoom?._id);
+  const accumulatedScoreRef = useRef(
+    (_saved?.stageScores ?? []).reduce((s, x) => s + (x.score ?? 0), 0),
+  );
 
   /* ── React state ───────────────────────────────────── */
-  const [timeLeft, setTimeLeft] = useState(GAME_DURATION);
-  const [currentStage, setCurrentStage] = useState(0);
-  const [stageCluesFound, setStageCluesFound] = useState([]);
-  const [stageTrashTriggered, setStageTrashTriggered] = useState([]);
+  const [timeLeft, setTimeLeft] = useState(() => {
+    // Initialize from server time if game is already running
+    if (gameState?.startedAt && gameState?.status === 'playing') {
+      const elapsed = Date.now() - new Date(gameState.startedAt).getTime() - (gameState.totalPausedMs || 0);
+      return Math.max(0, GAME_DURATION - Math.floor(elapsed / 1000));
+    }
+    return GAME_DURATION;
+  });
+  const [currentStage, setCurrentStage] = useState(_saved?.stage ?? 0);
+  const [stageCluesFound, setStageCluesFound] = useState(_saved?.stageCluesFound ?? []);
+  const [stageTrashTriggered, setStageTrashTriggered] = useState(_saved?.stageTrashTriggered ?? []);
   const [nearClue, setNearClue] = useState(null);
   const [nearTrash, setNearTrash] = useState(null);
   const [showClue, setShowClue] = useState(null);
@@ -909,21 +922,66 @@ const StickmanMysteryGame = () => {
   const [stageAnswer, setStageAnswer] = useState("");
   const [stageWrongAttempts, setStageWrongAttempts] = useState(0);
   const [error, setError] = useState("");
-  const [gameComplete, setGameComplete] = useState(false);
-  const [finalScore, setFinalScore] = useState(0);
+  const [gameComplete, setGameComplete] = useState(_saved?.gameComplete ?? false);
+  const [finalScore, setFinalScore] = useState(_saved?.finalScore ?? 0);
   const [gameOver, setGameOver] = useState(false);
   const [nearCart, setNearCart] = useState(false);
   const [isDashing, setIsDashing] = useState(false);
   const [dashReady, setDashReady] = useState(true);
   const [isSlowed, setIsSlowed] = useState(false);
   const [showStageSummary, setShowStageSummary] = useState(null);
-  const [stageScores, setStageScores] = useState([]);
+  const [stageScores, setStageScores] = useState(_saved?.stageScores ?? []);
   const [showFinalSummary, setShowFinalSummary] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
+  const [cartAnswerBlocked, setCartAnswerBlocked] = useState(false);
+  const [isJumping, setIsJumping] = useState(false);
+  const [jumpReady, setJumpReady] = useState(true);
+  const [hasKey, setHasKey] = useState(_saved?.hasKey ?? false);
+  const [nearDoor, setNearDoor] = useState(false);
+  const [showStoryline, setShowStoryline] = useState(_saved ? false : true);
+  const [showKeyObtained, setShowKeyObtained] = useState(false);
 
   useEffect(() => {
     roomIdRef.current = currentRoom?._id;
   }, [currentRoom?._id]);
+
+  // ── Persist progress to sessionStorage on key state changes ────
+  useEffect(() => {
+    if (!_smKey || !gameState?.startedAt) return;
+    if (gameOver) {
+      try { sessionStorage.removeItem(_smKey); } catch {}
+      return;
+    }
+    const pos = stickmanRef.current?.group?.position;
+    try {
+      sessionStorage.setItem(
+        _smKey,
+        JSON.stringify({
+          startedAt: gameState.startedAt,
+          stage: currentStage,
+          stageCluesFound,
+          stageTrashTriggered,
+          stageScores,
+          posX: pos?.x ?? 0,
+          posZ: pos?.z ?? 0,
+          posAngle: stickmanAngleRef.current,
+          stageStartTime: stageStartTimeRef.current,
+          hasKey,
+          gameComplete,
+          finalScore,
+        }),
+      );
+    } catch {}
+  }, [
+    currentStage,
+    stageCluesFound,
+    stageTrashTriggered,
+    stageScores,
+    hasKey,
+    gameComplete,
+    gameOver,
+    finalScore,
+  ]);
 
   const prevStartedAtRef = useRef(gameState?.startedAt);
   const isPaused = gameState?.status === "paused";
@@ -955,6 +1013,8 @@ const StickmanMysteryGame = () => {
       showStageSummary !== null ||
       showFinalSummary ||
       showDashboard ||
+      showStoryline ||
+      showKeyObtained ||
       (gameComplete && !showFinalSummary && !showDashboard);
   }, [
     showClue,
@@ -963,6 +1023,8 @@ const StickmanMysteryGame = () => {
     showStageSummary,
     showFinalSummary,
     showDashboard,
+    showStoryline,
+    showKeyObtained,
     gameComplete,
   ]);
 
@@ -970,7 +1032,11 @@ const StickmanMysteryGame = () => {
   useEffect(() => {
     const newStarted = gameState?.startedAt;
     if (newStarted && newStarted !== prevStartedAtRef.current) {
-      setTimeLeft(GAME_DURATION);
+      // Clear saved progress so the fresh game starts clean
+      if (_smKey) try { sessionStorage.removeItem(_smKey); } catch {}
+      // Compute time from server clock
+      const elapsed = Date.now() - new Date(newStarted).getTime() - (gameState?.totalPausedMs || 0);
+      setTimeLeft(Math.max(0, GAME_DURATION - Math.floor(elapsed / 1000)));
       setCurrentStage(0);
       setStageCluesFound([]);
       setStageTrashTriggered([]);
@@ -990,6 +1056,13 @@ const StickmanMysteryGame = () => {
       setStageScores([]);
       setShowFinalSummary(false);
       setShowDashboard(false);
+      setCartAnswerBlocked(false);
+      setIsJumping(false);
+      setJumpReady(true);
+      setHasKey(false);
+      setNearDoor(false);
+      setShowStoryline(true);
+      setShowKeyObtained(false);
       // Reset refs
       stageCluesFoundRef.current = [];
       stageTrashTriggeredRef.current = [];
@@ -1002,6 +1075,10 @@ const StickmanMysteryGame = () => {
       isDashingRef.current = false;
       dashCoolRef.current = false;
       dashTimerRef.current = 0;
+      isJumpingRef.current = false;
+      jumpCoolRef.current = false;
+      jumpTimerRef.current = 0;
+      hasKeyRef.current = false;
       pushVelocityRef.current = { x: 0, z: 0 };
       // reset stickman position
       if (stickmanRef.current) {
@@ -1037,16 +1114,26 @@ const StickmanMysteryGame = () => {
     if (gameComplete || gameOver || isPaused || gameState?.status !== "playing")
       return;
     timerRef.current = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
+      // Re-sync from server clock each tick to stay accurate
+      if (gameState?.startedAt) {
+        const elapsed = Date.now() - new Date(gameState.startedAt).getTime() - (gameState?.totalPausedMs || 0);
+        const remaining = Math.max(0, GAME_DURATION - Math.floor(elapsed / 1000));
+        setTimeLeft(remaining);
+        if (remaining <= 0) {
           setGameOver(true);
-          return 0;
         }
-        return prev - 1;
-      });
+      } else {
+        setTimeLeft((prev) => {
+          if (prev <= 1) {
+            setGameOver(true);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }
     }, 1000);
     return () => clearInterval(timerRef.current);
-  }, [gameComplete, gameOver, isPaused, gameState?.status]);
+  }, [gameComplete, gameOver, isPaused, gameState?.status, gameState?.startedAt, gameState?.totalPausedMs]);
 
   /* ════════════════════════════════════════════════════
      Three.js scene — runs once on mount
@@ -1065,24 +1152,26 @@ const StickmanMysteryGame = () => {
     // ── Scene ─────────────────────────────────────────
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0a0a1a);
-    scene.fog = new THREE.FogExp2(0x0a0a1a, 0.022);
+    scene.fog = new THREE.FogExp2(0x0a0a1a, 0.04);
     sceneRef.current = scene;
+
+    // ── Raycaster for mouse hover ─────────────────────
+    const raycaster = new THREE.Raycaster();
 
     // ── Camera ────────────────────────────────────────
     const aspect =
       container.clientWidth && container.clientHeight
         ? container.clientWidth / container.clientHeight
         : 16 / 9;
-    const camera = new THREE.PerspectiveCamera(60, aspect, 0.1, 200);
+    const camera = new THREE.PerspectiveCamera(60, aspect, 0.1, 80);
     camera.position.set(0, 6, 10);
     cameraRef.current = camera;
 
     // ── Renderer (setPixelRatio must come before setSize) ─────
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    const renderer = new THREE.WebGLRenderer({ antialias: false });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
     renderer.setSize(container.clientWidth || 1, container.clientHeight || 1);
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.enabled = false;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 0.9;
     container.appendChild(renderer.domElement);
@@ -1092,13 +1181,13 @@ const StickmanMysteryGame = () => {
     scene.add(new THREE.AmbientLight(0x222244, 0.7));
 
     const dirLight = new THREE.DirectionalLight(0x8888cc, 0.4);
-    dirLight.position.set(15, 25, 10);
+    dirLight.position.set(10, 20, 8);
     dirLight.castShadow = true;
-    dirLight.shadow.mapSize.set(2048, 2048);
-    dirLight.shadow.camera.left = -35;
-    dirLight.shadow.camera.right = 35;
-    dirLight.shadow.camera.top = 35;
-    dirLight.shadow.camera.bottom = -35;
+    dirLight.shadow.mapSize.set(1024, 1024);
+    dirLight.shadow.camera.left = -22;
+    dirLight.shadow.camera.right = 22;
+    dirLight.shadow.camera.top = 22;
+    dirLight.shadow.camera.bottom = -22;
     scene.add(dirLight);
 
     // hemisphere fill
@@ -1110,17 +1199,17 @@ const StickmanMysteryGame = () => {
       roughness: 0.95,
       metalness: 0.05,
     });
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), groundMat);
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     scene.add(ground);
 
-    const grid = new THREE.GridHelper(80, 40, 0x2a2a50, 0x1e1e3e);
+    const grid = new THREE.GridHelper(50, 25, 0x2a2a50, 0x1e1e3e);
     grid.position.y = 0.01;
     scene.add(grid);
 
     // ── Stars ─────────────────────────────────────────
-    const starCount = 700;
+    const starCount = 250;
     const starPositions = new Float32Array(starCount * 3);
     for (let i = 0; i < starCount; i++) {
       starPositions[i * 3] = (Math.random() - 0.5) * 160;
@@ -1151,8 +1240,8 @@ const StickmanMysteryGame = () => {
       if (!isPerimeter) {
         const isHorizontal = w.w > w.d;
         const len = isHorizontal ? w.w : w.d;
-        const torchCount = Math.max(1, Math.floor(len / 5));
-        for (let t = 0; t < torchCount; t++) {
+        const torchCount = Math.max(1, Math.floor(len / 12));
+        for (let t = 0; t < Math.min(torchCount, 2); t++) {
           const frac = torchCount === 1 ? 0.5 : t / (torchCount - 1);
           let tx, tz;
           if (isHorizontal) {
@@ -1238,6 +1327,32 @@ const StickmanMysteryGame = () => {
     });
     trashMeshesRef.current = trashMeshes;
 
+    // ── Restore saved progress (if reloading mid-game) ───────────
+    if (_saved) {
+      // Restore stickman position
+      stickman.group.position.set(_saved.posX ?? 0, 0, _saved.posZ ?? 0);
+      stickmanAngleRef.current = _saved.posAngle ?? 0;
+      // Hide beacons for clues/trash already interacted in restored stage
+      const rStage = _saved.stage ?? 0;
+      const rClues = _saved.stageCluesFound ?? [];
+      const rTrash = _saved.stageTrashTriggered ?? [];
+      clueMeshes.forEach((o) => {
+        if (o.stage === rStage && rClues.includes(o.clueIdx)) {
+          if (o.beacon) o.beacon.visible = false;
+          if (o.ring) o.ring.material.opacity = 0.08;
+          if (o.light) o.light.intensity = 0.35;
+        }
+      });
+      trashMeshes.forEach((t) => {
+        if (t.stage === rStage && rTrash.includes(t.trashIdx)) {
+          if (t.beacon) t.beacon.visible = false;
+          if (t.ring) t.ring.material.opacity = 0.06;
+          if (t.light) t.light.intensity = 0.2;
+          if (t.warnDot) t.warnDot.visible = false;
+        }
+      });
+    }
+
     // ── Animation loop ────────────────────────────────
     const clock = clockRef.current;
     clock.start();
@@ -1276,10 +1391,15 @@ const StickmanMysteryGame = () => {
       /* —— Movement —— */
       let isMoving = false;
       if (canMove) {
-        if (keys["a"] || keys["arrowleft"])
+        // A/D rotate both the stickman and the camera yaw together
+        if (keys["a"] || keys["arrowleft"]) {
           stickmanAngleRef.current += TURN_SPEED * delta;
-        if (keys["d"] || keys["arrowright"])
+          cameraYawTargetRef.current += TURN_SPEED * delta;
+        }
+        if (keys["d"] || keys["arrowright"]) {
           stickmanAngleRef.current -= TURN_SPEED * delta;
+          cameraYawTargetRef.current -= TURN_SPEED * delta;
+        }
 
         const dir = new THREE.Vector3();
         if (keys["w"] || keys["arrowup"]) {
@@ -1292,12 +1412,15 @@ const StickmanMysteryGame = () => {
         }
 
         if (isMoving) {
+          // Move relative to camera yaw so W always goes where camera faces
           dir
             .normalize()
             .applyAxisAngle(
               new THREE.Vector3(0, 1, 0),
-              stickmanAngleRef.current,
+              cameraYawRef.current,
             );
+          // Face the character in the movement direction
+          stickmanAngleRef.current = Math.atan2(dir.x, dir.z) + Math.PI;
           stickman.group.position.addScaledVector(dir, effectiveSpeed * delta);
           stickman.group.position.x = THREE.MathUtils.clamp(
             stickman.group.position.x,
@@ -1314,12 +1437,13 @@ const StickmanMysteryGame = () => {
       }
       stickman.group.rotation.y = stickmanAngleRef.current;
 
-      /* —— Dash (Space) —— */
+      /* —— Dash (Shift) — disabled during slow-mo —— */
       if (
-        keys[" "] &&
+        keys["shift"] &&
         !dashCoolRef.current &&
         canMove &&
-        !isDashingRef.current
+        !isDashingRef.current &&
+        !isSlowedRef.current
       ) {
         dashCoolRef.current = true;
         isDashingRef.current = true;
@@ -1339,7 +1463,7 @@ const StickmanMysteryGame = () => {
         } else {
           const dashDir = new THREE.Vector3(0, 0, -1).applyAxisAngle(
             new THREE.Vector3(0, 1, 0),
-            stickmanAngleRef.current,
+            cameraYawRef.current,
           );
           stickman.group.position.addScaledVector(dashDir, DASH_SPEED * delta);
           stickman.group.position.x = THREE.MathUtils.clamp(
@@ -1425,14 +1549,51 @@ const StickmanMysteryGame = () => {
         stickman.rightArm.rotation.x *= 0.85;
       }
 
-      /* —— Camera follow —— */
-      const camOff = new THREE.Vector3(0, 5, 8).applyAxisAngle(
-        new THREE.Vector3(0, 1, 0),
-        stickmanAngleRef.current,
+      /* —— Jump (Space) —— */
+      if (
+        keys[" "] &&
+        !jumpCoolRef.current &&
+        canMove &&
+        !isJumpingRef.current
+      ) {
+        jumpCoolRef.current = true;
+        isJumpingRef.current = true;
+        jumpTimerRef.current = 0;
+        setIsJumping(true);
+        setJumpReady(false);
+        setTimeout(() => {
+          jumpCoolRef.current = false;
+          setJumpReady(true);
+        }, JUMP_COOLDOWN * 1000);
+      }
+      if (isJumpingRef.current) {
+        jumpTimerRef.current += delta;
+        const t = jumpTimerRef.current / JUMP_DURATION;
+        if (t >= 1) {
+          isJumpingRef.current = false;
+          stickman.group.position.y = 0;
+          setIsJumping(false);
+        } else {
+          // parabolic arc
+          stickman.group.position.y = JUMP_HEIGHT * 4 * t * (1 - t);
+        }
+      }
+
+      /* —— Camera follow (mouse-drag orbit) —— */
+      const CAM_DIST = 9.43; // sqrt(5² + 8²)
+      // Smooth lerp actual yaw/pitch toward targets
+      cameraYawRef.current += (cameraYawTargetRef.current - cameraYawRef.current) * Math.min(1, 12 * delta);
+      cameraPitchRef.current += (cameraPitchTargetRef.current - cameraPitchRef.current) * Math.min(1, 12 * delta);
+      const yaw = cameraYawRef.current;
+      const pitch = cameraPitchRef.current;
+      const camOff = new THREE.Vector3(
+        Math.sin(yaw) * Math.cos(pitch) * CAM_DIST,
+        Math.sin(pitch) * CAM_DIST,
+        Math.cos(yaw) * Math.cos(pitch) * CAM_DIST,
       );
       camera.position.lerp(
         stickman.group.position.clone().add(camOff),
-        4 * delta,
+        8 * delta,
       );
       camera.lookAt(
         stickman.group.position.x,
@@ -1531,7 +1692,6 @@ const StickmanMysteryGame = () => {
               stageCluesFoundRef.current = next;
               return next;
             });
-            setTimeLeft((prev) => Math.max(0, prev - CLUE_PENALTY));
             if (entry.beacon) entry.beacon.visible = false;
             if (entry.ring) entry.ring.material.opacity = 0.08;
             if (entry.light) entry.light.intensity = 0.35;
@@ -1551,8 +1711,7 @@ const StickmanMysteryGame = () => {
               stageTrashTriggeredRef.current = next;
               return next;
             });
-            setTimeLeft((prev) => Math.max(0, prev - TRASH_PENALTY));
-            // Extra consequences: slow + camera shake
+            // Consequences: slow-mo + camera shake (no time penalty)
             slowTimeRef.current = TRASH_SLOW_DURATION;
             shakeTimeRef.current = TRASH_SHAKE_DURATION;
             if (entry.beacon) entry.beacon.visible = false;
@@ -1568,8 +1727,8 @@ const StickmanMysteryGame = () => {
         if (!o.group.visible) return;
         if (o.beacon && o.beacon.visible) {
           o.beacon.position.y = 2.5 + Math.sin(time * 1.5 + i * 1.3) * 0.2;
-          o.beacon.material.emissiveIntensity =
-            1.2 + Math.sin(time * 2 + i * 0.9) * 0.3;
+          o.beacon.material.opacity =
+            0.6 + Math.sin(time * 2 + i * 0.9) * 0.3;
         }
         if (o.mesh && o.clueIdx !== 4) o.mesh.rotation.y += delta * 0.3;
       });
@@ -1582,10 +1741,10 @@ const StickmanMysteryGame = () => {
             2.5 +
             Math.sin(time * 4.0 + i * 1.7) * 0.15 +
             Math.sin(time * 11 + i * 3.1) * 0.06;
-          t.beacon.material.emissiveIntensity =
-            0.8 +
-            Math.sin(time * 5.5 + i * 1.2) * 0.8 +
-            Math.sin(time * 14 + i * 2.5) * 0.3;
+          t.beacon.material.opacity = Math.max(
+            0.1,
+            0.5 + Math.sin(time * 5.5 + i * 1.2) * 0.45,
+          );
         }
         if (t.mesh) t.mesh.rotation.y += delta * 0.3;
         // Orbiting red warning dot
@@ -1612,10 +1771,49 @@ const StickmanMysteryGame = () => {
           Math.sin(time * 8 + i * 2.7) * 0.15 +
           Math.sin(time * 13 + i * 1.3) * 0.05;
         t.flame.scale.setScalar(flicker);
-        t.flame.material.emissiveIntensity =
-          1.5 + Math.sin(time * 10 + i * 3) * 0.5;
-        t.light.intensity = 0.6 + Math.sin(time * 7 + i * 2) * 0.2;
+        t.flame.material.opacity =
+          0.7 + Math.sin(time * 10 + i * 3) * 0.2;
+        t.light.intensity = 0.4 + Math.sin(time * 7 + i * 2) * 0.15;
       });
+
+      /* —— Mouse hover raycasting —— */
+      if (!showingModalRef.current) {
+        const hoverTargets = [];
+        const curSt = currentStageRef.current;
+        clueMeshes.forEach((o) => {
+          if (o.group.visible && o.stage === curSt && o.mesh)
+            hoverTargets.push(o.mesh);
+        });
+        trashMeshes.forEach((t) => {
+          if (t.group.visible && t.stage === curSt && t.mesh)
+            hoverTargets.push(t.mesh);
+        });
+        raycaster.setFromCamera(mouseRef.current, camera);
+        const intersects = raycaster.intersectObjects(hoverTargets, false);
+        const hitMesh = intersects.length > 0 ? intersects[0].object : null;
+        const prevMesh = hoveredObjectRef.current;
+        if (hitMesh !== prevMesh) {
+          // Restore previous
+          if (prevMesh && prevMesh.material) {
+            prevMesh.material.emissiveIntensity =
+              prevMesh.userData._baseEmissive ?? prevMesh.material.emissiveIntensity;
+            prevMesh.scale.setScalar(1);
+          }
+          // Highlight new
+          if (hitMesh && hitMesh.material) {
+            hitMesh.userData._baseEmissive = hitMesh.material.emissiveIntensity;
+            hitMesh.material.emissiveIntensity = Math.min(
+              hitMesh.material.emissiveIntensity + 2.5,
+              5,
+            );
+            hitMesh.scale.setScalar(1.13);
+            renderer.domElement.style.cursor = "pointer";
+          } else {
+            renderer.domElement.style.cursor = "";
+          }
+          hoveredObjectRef.current = hitMesh;
+        }
+      }
 
       /* —— Interpolate other players —— */
       otherPlayersRef.current.forEach((data) => {
@@ -1658,6 +1856,8 @@ const StickmanMysteryGame = () => {
 
     /* ── Input handlers ─────────────────────────────── */
     const onKeyDown = (e) => {
+      const tag = e.target?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea") return;
       keysRef.current[e.key.toLowerCase()] = true;
       if (
         [
@@ -1670,12 +1870,15 @@ const StickmanMysteryGame = () => {
           "arrowleft",
           "arrowright",
           " ",
+          "shift",
         ].includes(e.key.toLowerCase())
       ) {
         e.preventDefault();
       }
     };
     const onKeyUp = (e) => {
+      const tag = e.target?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea") return;
       keysRef.current[e.key.toLowerCase()] = false;
     };
     window.addEventListener("keydown", onKeyDown);
@@ -1691,6 +1894,46 @@ const StickmanMysteryGame = () => {
       renderer.setSize(w, h);
     });
     resizeObserver.observe(container);
+
+    /* ── Mouse orbit + hover handlers ──────────────────────── */
+    const onMouseDown = (e) => {
+      if (e.button === 0) {
+        e.preventDefault();
+        isDragRef.current = true;
+        lastDragRef.current = { x: e.clientX, y: e.clientY };
+        renderer.domElement.style.cursor = "grabbing";
+      }
+    };
+    const onMouseUp = () => {
+      isDragRef.current = false;
+      renderer.domElement.style.cursor = "";
+    };
+    const onMouseMove = (e) => {
+      const rect = renderer.domElement.getBoundingClientRect();
+      // Update hover NDC coords
+      mouseRef.current.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mouseRef.current.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      // Drag-to-orbit
+      if (isDragRef.current) {
+        const dx = e.clientX - lastDragRef.current.x;
+        const dy = e.clientY - lastDragRef.current.y;
+        lastDragRef.current = { x: e.clientX, y: e.clientY };
+        cameraYawTargetRef.current -= dx * 0.004;
+        cameraPitchTargetRef.current = THREE.MathUtils.clamp(
+          cameraPitchTargetRef.current + dy * 0.004,
+          0.1,  // ~6° — keeps camera above ground
+          1.35, // ~77° — near top-down
+        );
+      }
+    };
+    renderer.domElement.addEventListener("mousedown", onMouseDown);
+    renderer.domElement.addEventListener("mousemove", onMouseMove);
+    renderer.domElement.addEventListener("mouseleave", () => {
+      mouseRef.current.set(-9999, -9999);
+      isDragRef.current = false;
+      renderer.domElement.style.cursor = "";
+    });
+    window.addEventListener("mouseup", onMouseUp);
 
     // Force a resize on the next frame to guarantee correct dimensions
     requestAnimationFrame(() => {
@@ -1710,6 +1953,9 @@ const StickmanMysteryGame = () => {
       resizeObserver.disconnect();
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("mouseup", onMouseUp);
+      renderer.domElement.removeEventListener("mousedown", onMouseDown);
+      renderer.domElement.removeEventListener("mousemove", onMouseMove);
       renderer.dispose();
       if (container.contains(renderer.domElement))
         container.removeChild(renderer.domElement);
@@ -1744,6 +1990,15 @@ const StickmanMysteryGame = () => {
               x: Math.round(pos.x * 100) / 100,
               z: Math.round(pos.z * 100) / 100,
               angle: Math.round(stickmanAngleRef.current * 100) / 100,
+              stage: currentStageRef.current,
+              progress: {
+                stage: currentStageRef.current + 1,
+                totalStages: TOTAL_STAGES,
+                cluesFound: stageCluesFoundRef.current?.length ?? 0,
+                hasKey: hasKeyRef.current,
+                solved: gameCompleteRef.current,
+                score: accumulatedScoreRef.current,
+              },
             }),
           },
         );
@@ -1845,9 +2100,9 @@ const StickmanMysteryGame = () => {
     const score = Math.max(
       0,
       STAGE_MAX_SCORE -
-        Math.floor(timeSpent) -
+        Math.floor(timeSpent / 5) -
         trashHit * 20 -
-        stageWrongAttempts * 15,
+        stageWrongAttempts * WRONG_ANSWER_PENALTY,
     );
     const summary = {
       stage: currentStage,
@@ -1858,12 +2113,22 @@ const StickmanMysteryGame = () => {
       wrongAttempts: stageWrongAttempts,
     };
     setStageScores((prev) => [...prev, summary]);
+    accumulatedScoreRef.current += score;
     setShowStageQuestion(false);
     setStageAnswer("");
     setError("");
     setStageWrongAttempts(0);
 
     if (currentStage < TOTAL_STAGES - 1) {
+      // Grant the player a key — they must find the door to proceed
+      setHasKey(true);
+      hasKeyRef.current = true;
+      setShowKeyObtained(true);
+      setShowStageQuestion(false);
+      setStageAnswer("");
+      setError("");
+      setStageWrongAttempts(0);
+      // Store the summary so we show it after they use the key
       setShowStageSummary(summary);
     } else {
       /* ── Final stage — submit to server ── */
@@ -1876,8 +2141,8 @@ const StickmanMysteryGame = () => {
         stageScores: [...stageScores, summary],
         totalScore,
       });
-      if (result.success) {
-        setFinalScore(result.score || totalScore);
+      if (result.success && result.isCorrect) {
+        setFinalScore(result.score != null ? result.score : totalScore);
       } else {
         setFinalScore(totalScore);
       }
@@ -1900,6 +2165,8 @@ const StickmanMysteryGame = () => {
     showTrash !== null ||
     showStageQuestion ||
     showStageSummary !== null ||
+    showStoryline ||
+    showKeyObtained ||
     gameComplete ||
     gameOver;
 
@@ -1917,7 +2184,7 @@ const StickmanMysteryGame = () => {
             ⏱ {fmt(timeLeft)}
           </div>
           <div className="sm-hud-pill sm-clue-count">
-            🔑 {stageCluesFound.length}/5
+            🔑 {stageCluesFound.length}/{stg.clues.length}
           </div>
           <div
             className="sm-hud-pill sm-stage-pill"
@@ -1934,6 +2201,14 @@ const StickmanMysteryGame = () => {
           >
             💨 {isDashing ? "DASH!" : dashReady ? "Ready" : "Cooldown"}
           </div>
+          <div
+            className={`sm-hud-pill sm-jump-pill${isJumping ? " jumping" : ""}${!jumpReady ? " cooldown" : ""}`}
+          >
+            🦘 {isJumping ? "JUMP!" : jumpReady ? "Ready" : "Cooldown"}
+          </div>
+          {hasKey && (
+            <div className="sm-hud-pill sm-key-pill">🗝️ KEY</div>
+          )}
           {isSlowed && (
             <div className="sm-hud-pill sm-slowed-pill">🐌 SLOWED</div>
           )}
@@ -1944,7 +2219,7 @@ const StickmanMysteryGame = () => {
             <kbd>A</kbd>
             <kbd>S</kbd>
             <kbd>D</kbd> Move &nbsp;· <kbd>E</kbd> Interact &nbsp;·{" "}
-            <kbd>Space</kbd> Dash
+            <kbd>Space</kbd> Jump &nbsp;· <kbd>Shift</kbd> Dash
           </div>
         </div>
       </div>
@@ -1959,27 +2234,68 @@ const StickmanMysteryGame = () => {
         </div>
       )}
 
+      {/* ── Storyline intro modal ────────────────── */}
+      {showStoryline && !gameOver && !gameComplete && !isPaused && gameState?.status === "playing" && (
+        <div className="sm-overlay">
+          <div className="sm-modal sm-storyline-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="sm-modal-icon">📜</div>
+            <h3>Stage {currentStage + 1}: {stg.name}</h3>
+            <p className="sm-storyline-text">{stg.storyline}</p>
+            <p className="sm-objective-text"><strong>📌 Objective:</strong> {stg.objective}</p>
+            <div className="sm-storyline-info">
+              <span>🔑 Clues to find: {stg.clues.length}</span>
+              <span>💀 Traps hidden: {stg.trash.length}</span>
+              {currentStage > 0 && <span>⚠️ Difficulty increased!</span>}
+            </div>
+            <button className="sm-btn sm-btn-primary" onClick={() => { setShowStoryline(false); keysRef.current = {}; }}>
+              ⚔️ Begin Exploration
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Key obtained modal ───────────────────── */}
+      {showKeyObtained && hasKey && !showStageSummary && (
+        <div className="sm-overlay">
+          <div className="sm-modal sm-key-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="sm-big-icon">🗝️</div>
+            <h2>Key Obtained!</h2>
+            <p className="sm-key-text">
+              You solved the riddle of <strong>{stg.name}</strong>!
+              A mysterious key materializes in your hand. Use it to unlock the door to the next stage.
+            </p>
+            <button className="sm-btn sm-btn-primary" onClick={() => setShowKeyObtained(false)}>
+              🚪 Open the Door →
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Collected clue pills (current stage) ── */}
       {stageCluesFound.length > 0 && !anyModal && (
         <div className="sm-collected-pills">
-          {stageCluesFound.map((idx) => (
-            <span
-              key={idx}
-              className="sm-collected-pill"
-              title={stg.clues[idx].clue}
-              style={{
-                borderColor: stg.theme.label,
-                color: stg.theme.label,
-              }}
-            >
-              ✅ {stg.clues[idx].name}
-            </span>
-          ))}
+          {stageCluesFound.map((idx) => {
+            const clue = stg.clues[idx];
+            if (!clue) return null;
+            return (
+              <span
+                key={idx}
+                className="sm-collected-pill"
+                title={clue.clue}
+                style={{
+                  borderColor: stg.theme.label,
+                  color: stg.theme.label,
+                }}
+              >
+                ✅ {clue.name}
+              </span>
+            );
+          })}
         </div>
       )}
 
       {/* ── Proximity prompt — clue object ────────── */}
-      {nearClue !== null && nearTrash === null && !anyModal && !isPaused && (
+      {nearClue !== null && nearTrash === null && !anyModal && !isPaused && stg.clues[nearClue] && (
         <div
           className={`sm-prompt ${stageCluesFound.includes(nearClue) ? "collected" : ""}`}
         >
@@ -2021,6 +2337,7 @@ const StickmanMysteryGame = () => {
         stageCluesFound.length >= 1 &&
         !showStageQuestion &&
         !anyModal &&
+        !cartAnswerBlocked &&
         !isPaused && (
           <div className="sm-answer-ready">
             <button onClick={() => setShowStageQuestion(true)}>
@@ -2034,19 +2351,19 @@ const StickmanMysteryGame = () => {
 
       {/* ── Clue modal ────────────────────────────── */}
       {showClue !== null && (
-        <div className="sm-overlay" onClick={() => setShowClue(null)}>
+        <div className="sm-overlay" onClick={() => { setShowClue(null); keysRef.current = {}; }}>
           <div
             className="sm-modal sm-clue-modal"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="sm-modal-icon">🔍</div>
-            <h3>{stg.clues[showClue].name}</h3>
-            <p className="sm-clue-text">{stg.clues[showClue].clue}</p>
+            <h3>{stg.clues[showClue]?.name ?? 'Clue'}</h3>
+            <p className="sm-clue-text">{stg.clues[showClue]?.clue ?? ''}</p>
             <div className="sm-penalty-badge">
               ⏱ −{CLUE_PENALTY}s time penalty
             </div>
-            <button className="sm-btn" onClick={() => setShowClue(null)}>
-              Got it ({stageCluesFound.length}/5 clues)
+            <button className="sm-btn" onClick={() => { setShowClue(null); keysRef.current = {}; }}>
+              Got it ({stageCluesFound.length}/{stg.clues.length} clues)
             </button>
           </div>
         </div>
@@ -2054,7 +2371,7 @@ const StickmanMysteryGame = () => {
 
       {/* ── Trash modal ───────────────────────────── */}
       {showTrash !== null && (
-        <div className="sm-overlay" onClick={() => setShowTrash(null)}>
+        <div className="sm-overlay" onClick={() => { setShowTrash(null); keysRef.current = {}; }}>
           <div
             className="sm-modal sm-trap-modal"
             onClick={(e) => e.stopPropagation()}
@@ -2071,7 +2388,7 @@ const StickmanMysteryGame = () => {
               </span>
               <span className="sm-trap-effect-badge">📳 Camera shake</span>
             </div>
-            <button className="sm-btn" onClick={() => setShowTrash(null)}>
+            <button className="sm-btn" onClick={() => { setShowTrash(null); keysRef.current = {}; }}>
               Ouch! Continue
             </button>
           </div>
@@ -2092,14 +2409,18 @@ const StickmanMysteryGame = () => {
             <p className="sm-question-text">{stg.question}</p>
 
             <div className="sm-review">
-              <h4>Your Collected Clues ({stageCluesFound.length}/5)</h4>
-              {stageCluesFound.map((idx, i) => (
-                <div key={idx} className="sm-review-row">
-                  <span className="sm-review-num">#{i + 1}</span>
-                  <span className="sm-review-name">{stg.clues[idx].name}:</span>
-                  <span className="sm-review-clue">{stg.clues[idx].clue}</span>
-                </div>
-              ))}
+              <h4>Your Collected Clues ({stageCluesFound.length}/{stg.clues.length})</h4>
+              {stageCluesFound.map((idx, i) => {
+                const clue = stg.clues[idx];
+                if (!clue) return null;
+                return (
+                  <div key={idx} className="sm-review-row">
+                    <span className="sm-review-num">#{i + 1}</span>
+                    <span className="sm-review-name">{clue.name}:</span>
+                    <span className="sm-review-clue">{clue.clue}</span>
+                  </div>
+                );
+              })}
             </div>
 
             <form className="sm-answer-form" onSubmit={handleStageAnswer}>
@@ -2128,6 +2449,14 @@ const StickmanMysteryGame = () => {
               onClick={() => {
                 setShowStageQuestion(false);
                 setError("");
+                setCartAnswerBlocked(true);
+                interactCoolRef.current = true;
+                // Clear all held keys — keyup events are missed while modal was open
+                keysRef.current = {};
+                setTimeout(() => {
+                  setCartAnswerBlocked(false);
+                  interactCoolRef.current = false;
+                }, 600);
               }}
             >
               Back to Exploring
@@ -2178,6 +2507,7 @@ const StickmanMysteryGame = () => {
               className="sm-btn sm-btn-primary"
               onClick={() => {
                 setShowStageSummary(null);
+                setShowKeyObtained(false);
                 const next = showStageSummary.stage + 1;
                 setCurrentStage(next);
                 currentStageRef.current = next;
@@ -2187,10 +2517,18 @@ const StickmanMysteryGame = () => {
                 setStageWrongAttempts(0);
                 setStageAnswer("");
                 setError("");
+                setHasKey(false);
+                hasKeyRef.current = false;
+                setShowStoryline(true);
+                // Teleport player to a new random spot for the new stage
+                if (stickmanRef.current) {
+                  stickmanRef.current.group.position.set(0, 0, 0);
+                  stickmanAngleRef.current = 0;
+                }
               }}
             >
               {showStageSummary.stage < TOTAL_STAGES - 1
-                ? `Continue to Stage ${showStageSummary.stage + 2}: ${STAGES[showStageSummary.stage + 1].name} →`
+                ? `🗝️ Use Key → Enter Stage ${showStageSummary.stage + 2}: ${STAGES[showStageSummary.stage + 1].name}`
                 : "🏆 View Final Results"}
             </button>
           </div>
@@ -2439,7 +2777,7 @@ const StickmanMysteryGame = () => {
               </div>
             )}
             <div className="sm-solve-stats">
-              <span>🔑 Clues: {stageCluesFound.length}/5 (current stage)</span>
+              <span>🔑 Clues: {stageCluesFound.length}/{stg.clues.length} (current stage)</span>
               <span>
                 📊 Total: {stageScores.reduce((sum, s) => sum + s.score, 0)}
               </span>
@@ -2452,6 +2790,26 @@ const StickmanMysteryGame = () => {
               🏅 View Dashboard
             </button>
           </div>
+        </div>
+      )}
+
+      {/* ── In-game player cards (bottom-right) ──── */}
+      {!anyModal && !gameComplete && !gameOver && players.length > 1 && (
+        <div className="sm-players-panel">
+          <div className="sm-players-panel-title">Players</div>
+          {players.map((p) => (
+            <div
+              key={p._id}
+              className={`sm-player-row${p._id === currentPlayer?._id ? ' sm-player-me' : ''}`}
+            >
+              <span className="sm-player-name">
+                {p._id === currentPlayer?._id ? '🙋' : '👤'} {p.name}
+              </span>
+              <span className="sm-player-stage">
+                {`Stage ${p.progress.stage || '?'}/${p.progress.totalStages || '?'}`}
+              </span>
+            </div>
+          ))}
         </div>
       )}
 

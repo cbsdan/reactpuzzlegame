@@ -20,10 +20,16 @@
   inset: 0;
   width: 100%;
   height: 100%;
+  user-select: none;
 }
 
 .sm-canvas canvas {
   display: block;
+  cursor: grab;
+}
+
+.sm-canvas canvas:active {
+  cursor: grabbing;
 }
 
 /* ── HUD bar ────────────────────────────────────── */
@@ -314,12 +320,14 @@
   display: inline-block;
   background: rgba(231, 76, 60, 0.18);
   border: 1px solid rgba(231, 76, 60, 0.4);
-  padding: 5px 14px;
-  border-radius: 20px;
+    padding: 9px 21px;
+    border-radius: 10px;
   color: #e74c3c;
   font-size: 0.82rem;
   font-weight: 600;
   margin-bottom: 16px;
+  margin-right: 8px;
+  opacity: 0.7
 }
 
 /* ── Question modal ─────────────────────────────── */
@@ -748,4 +756,169 @@
   border-radius: 14px;
   font-size: 0.78rem;
   font-weight: 600;
+}
+
+/* ── Jump & Key HUD pills ───────────────────────── */
+.sm-jump-pill {
+  color: #60a5fa;
+  border-color: rgba(96, 165, 250, 0.3);
+}
+
+.sm-jump-pill.cooldown {
+  opacity: 0.55;
+}
+
+.sm-key-pill {
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.35);
+  animation: sm-key-glow 1.5s ease-in-out infinite;
+}
+
+@keyframes sm-key-glow {
+  0%, 100% { box-shadow: 0 0 4px rgba(251, 191, 36, 0.2); }
+  50% { box-shadow: 0 0 12px rgba(251, 191, 36, 0.45); }
+}
+
+/* ── Storyline intro modal ──────────────────────── */
+.sm-storyline-modal {
+  background: linear-gradient(145deg, #1a1a2e, #16213e);
+  border: 1px solid rgba(124, 58, 237, 0.35);
+  box-shadow: 0 0 40px rgba(124, 58, 237, 0.15);
+}
+
+.sm-storyline-modal h3 {
+  color: #c4b5fd;
+}
+
+.sm-storyline-text {
+  color: #d1d5db;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  margin: 0.8rem 0;
+  font-style: italic;
+}
+
+.sm-objective-text {
+  color: #a78bfa;
+  font-weight: 600;
+  font-size: 0.88rem;
+  margin: 0.7rem 0;
+}
+
+.sm-storyline-info {
+  display: flex;
+  gap: 1.2rem;
+  justify-content: center;
+  margin: 1rem 0 1.5rem;
+  flex-wrap: wrap;
+}
+
+.sm-storyline-info span {
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.3rem 0.7rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  color: #8b949e;
+  font-weight: 600;
+}
+
+/* ── Key obtained modal ─────────────────────────── */
+.sm-key-modal {
+  background: linear-gradient(145deg, #1a1a2e, #2d1f0e);
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  box-shadow: 0 0 30px rgba(251, 191, 36, 0.12);
+}
+
+.sm-key-modal h2 {
+  margin: 0 0 0.6rem;
+  font-size: 1.25rem;
+  color: #fbbf24;
+}
+
+.sm-key-text {
+  color: #d1d5db;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  margin-bottom: 1.2rem;
+}
+
+.sm-key-icon {
+  font-size: 3rem;
+  display: block;
+  margin-bottom: 0.8rem;
+  animation: sm-key-bounce 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes sm-key-bounce {
+  from { transform: translateY(0) rotate(-5deg); }
+  to   { transform: translateY(-8px) rotate(5deg); }
+}
+
+/* ── In-game players panel (bottom-right) ───────── */
+.sm-players-panel {
+  position: absolute;
+  bottom: 14px;
+  right: 14px;
+  z-index: 10;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 8px 10px;
+  min-width: 180px;
+  max-width: 240px;
+  pointer-events: none;
+  animation: sm-fadeIn 0.25s ease;
+}
+
+.sm-players-panel-title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: rgba(255, 255, 255, 0.45);
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sm-player-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  font-size: 0.78rem;
+}
+
+.sm-player-row.sm-player-me {
+  color: #a78bfa;
+}
+
+.sm-player-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #d1d5db;
+}
+
+.sm-player-me .sm-player-name {
+  color: #c4b5fd;
+  font-weight: 600;
+}
+
+.sm-player-stage {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #8b949e;
+  min-width: 38px;
+  text-align: center;
+}
+
+.sm-player-pts {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #00ffd0;
+  min-width: 28px;
+  text-align: right;
 }

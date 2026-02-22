@@ -1,10 +1,8 @@
-import { useState } from 'react';
 import { useGame } from '../../context/GameContext';
 import './AdminDashboard.css';
 
 const NumberMysteryAdminDashboard = () => {
   const { players, gameState } = useGame();
-  const [answerRevealed, setAnswerRevealed] = useState(false);
 
   const targetNumber = gameState?.targetNumber;
 
@@ -36,10 +34,10 @@ const NumberMysteryAdminDashboard = () => {
         </div>
         <div className="nm-dashboard-pills">
           {targetNumber && (
-            <div className="nm-answer-pill" onClick={() => setAnswerRevealed(v => !v)} title="Click to reveal/hide the answer">
+            <div className="nm-answer-pill">
               <span className="nm-pill-label">🔑 Answer</span>
               <span className="nm-pill-val nm-answer-val">
-                {answerRevealed ? targetNumber : '••••'}
+                {targetNumber}
               </span>
             </div>
           )}

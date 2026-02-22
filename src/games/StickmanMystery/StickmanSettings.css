@@ -1,0 +1,998 @@
+/* ════════════════════════════════════════════════════
+   Stickman Settings — Admin Configuration Panel
+   ════════════════════════════════════════════════════ */
+
+.sms-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 0.5rem;
+}
+
+.sms-header {
+  margin-bottom: 1.25rem;
+}
+
+.sms-header h2 {
+  margin: 0 0 0.4rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #e6edf3;
+}
+
+.sms-header p {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #8b949e;
+}
+
+/* ── Stage cards ──────────────────────────────────── */
+.sms-stages {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.sms-stage-card {
+  background: #161b22;
+  border: 1px solid #21262d;
+  border-radius: 10px;
+  overflow: hidden;
+  border-left: 3px solid;
+}
+
+.sms-stage-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid #21262d;
+}
+
+.sms-stage-header h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.sms-difficulty-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.06);
+  color: #8b949e;
+}
+
+/* ── Mode selector ────────────────────────────────── */
+.sms-mode-selector {
+  display: flex;
+  gap: 0.35rem;
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid #21262d;
+}
+
+.sms-mode-btn {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  background: #0d1117;
+  color: #8b949e;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sms-mode-btn:hover {
+  border-color: rgba(124, 58, 237, 0.4);
+  color: #c4b5fd;
+}
+
+.sms-mode-btn.active {
+  background: rgba(124, 58, 237, 0.15);
+  border-color: rgba(124, 58, 237, 0.5);
+  color: #c4b5fd;
+}
+
+/* ── Mode content ─────────────────────────────────── */
+.sms-mode-content {
+  padding: 0.75rem 1rem;
+}
+
+.sms-answer-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.6rem;
+}
+
+.sms-label {
+  font-size: 0.78rem;
+  color: #8b949e;
+  font-weight: 600;
+}
+
+.sms-answer-value {
+  font-weight: 700;
+  color: #a78bfa;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+  letter-spacing: 1px;
+}
+
+/* ── Clue rows ────────────────────────────────────── */
+.sms-clues-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.sms-clue-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.4rem 0.6rem;
+  background: rgba(0,0,0,0.2);
+  border-radius: 5px;
+  font-size: 0.82rem;
+}
+
+.sms-clue-row-sm {
+  padding: 0.3rem 0.5rem;
+  font-size: 0.78rem;
+}
+
+.sms-clue-shape {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.sms-clue-name {
+  font-weight: 600;
+  color: #c9d1d9;
+  min-width: 100px;
+  flex-shrink: 0;
+}
+
+.sms-clue-text {
+  color: #8b949e;
+  flex: 1;
+}
+
+/* ── Alternative option cards ─────────────────────── */
+.sms-alt-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sms-alt-card {
+  border: 1px solid #30363d;
+  border-radius: 7px;
+  padding: 0.6rem 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #0d1117;
+}
+
+.sms-alt-card:hover {
+  border-color: rgba(124, 58, 237, 0.4);
+}
+
+.sms-alt-card.selected {
+  border-color: rgba(124, 58, 237, 0.6);
+  background: rgba(124, 58, 237, 0.08);
+}
+
+.sms-alt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+}
+
+.sms-alt-answer {
+  font-weight: 700;
+  color: #a78bfa;
+  font-size: 0.85rem;
+}
+
+.sms-alt-check {
+  width: 20px;
+  height: 20px;
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+/* ── Custom mode ──────────────────────────────────── */
+.sms-custom-answer {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
+.sms-custom-answer label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #8b949e;
+  white-space: nowrap;
+}
+
+.sms-custom-answer input {
+  flex: 1;
+  padding: 0.4rem 0.65rem;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 5px;
+  color: #e6edf3;
+  font-family: 'Courier New', monospace;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.sms-custom-answer input:focus {
+  outline: none;
+  border-color: rgba(124, 58, 237, 0.5);
+}
+
+.sms-custom-clues h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  color: #8b949e;
+  font-weight: 600;
+}
+
+.sms-custom-clue-row {
+  display: flex;
+  gap: 0.35rem;
+  margin-bottom: 0.35rem;
+  align-items: center;
+}
+
+.sms-custom-name {
+  width: 120px;
+  padding: 0.35rem 0.5rem;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  color: #e6edf3;
+  font-size: 0.78rem;
+}
+
+.sms-custom-text {
+  flex: 1;
+  padding: 0.35rem 0.5rem;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  color: #e6edf3;
+  font-size: 0.78rem;
+}
+
+.sms-custom-shape {
+  width: 140px;
+  padding: 0.35rem 0.4rem;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  color: #e6edf3;
+  font-size: 0.75rem;
+}
+
+.sms-custom-name:focus,
+.sms-custom-text:focus,
+.sms-custom-shape:focus {
+  outline: none;
+  border-color: rgba(124, 58, 237, 0.5);
+}
+
+.sms-remove-clue {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  background: rgba(220, 38, 38, 0.1);
+  color: #fca5a5;
+  font-size: 0.7rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.sms-remove-clue:hover {
+  background: rgba(220, 38, 38, 0.25);
+  color: white;
+}
+
+.sms-add-clue {
+  margin-top: 0.4rem;
+  padding: 0.35rem 0.75rem;
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  border-radius: 5px;
+  color: #86efac;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sms-add-clue:hover {
+  background: rgba(34, 197, 94, 0.2);
+  color: white;
+}
+
+/* ── Actions ──────────────────────────────────────── */
+.sms-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.75rem 1.25rem;
+  /* border-top and margin are now owned by sms-fs-footer */
+}
+
+.sms-save-btn {
+  padding: 0.55rem 1.2rem;
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  border: none;
+  border-radius: 7px;
+  color: white;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.sms-save-btn:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.15);
+}
+
+.sms-cancel-btn {
+  padding: 0.55rem 1.2rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid #30363d;
+  border-radius: 7px;
+  color: #8b949e;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sms-cancel-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e6edf3;
+}
+
+/* ── Responsive ───────────────────────────────────── */
+@media (max-width: 640px) {
+  .sms-custom-clue-row {
+    flex-wrap: wrap;
+  }
+
+  .sms-custom-name {
+    width: 100%;
+  }
+
+  .sms-custom-shape {
+    width: 100%;
+  }
+
+  .sms-mode-selector {
+    flex-wrap: wrap;
+  }
+}
+
+/* ════════════════════════════════════════════════════
+   New UI additions — JSON editor + storage badge
+   ════════════════════════════════════════════════════ */
+
+/* ── Header top row (title + storage badge) ────────── */
+.sms-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.3rem;
+}
+
+.sms-storage-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  border-radius: 20px;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #fbbf24;
+  white-space: nowrap;
+}
+
+.sms-storage-badge.badge-default {
+  background: rgba(107, 114, 128, 0.12);
+  border-color: rgba(107, 114, 128, 0.3);
+  color: #6b7280;
+}
+
+/* ── Editor tabs (Structured / JSON) ──────────────── */
+.sms-editor-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid #21262d;
+  margin-bottom: 1rem;
+}
+
+.sms-tab-btn {
+  padding: 0.38rem 0.9rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  background: #0d1117;
+  color: #8b949e;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sms-tab-btn:hover {
+  border-color: rgba(124, 58, 237, 0.4);
+  color: #c4b5fd;
+}
+
+.sms-tab-btn.active {
+  background: rgba(124, 58, 237, 0.18);
+  border-color: rgba(124, 58, 237, 0.55);
+  color: #c4b5fd;
+}
+
+.sms-tab-spacer {
+  flex: 1;
+}
+
+.sms-reset-btn {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  background: rgba(239, 68, 68, 0.08);
+  color: #fca5a5;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sms-reset-btn:hover {
+  background: rgba(239, 68, 68, 0.18);
+  color: white;
+}
+
+/* ── JSON editor panel ────────────────────────────── */
+.sms-json-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.sms-json-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.sms-json-desc {
+  font-size: 0.77rem;
+  color: #8b949e;
+  flex: 1;
+}
+
+.sms-json-apply-btn {
+  padding: 0.38rem 0.85rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  border-radius: 6px;
+  background: rgba(34, 197, 94, 0.1);
+  color: #86efac;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.sms-json-apply-btn:hover {
+  background: rgba(34, 197, 94, 0.2);
+  color: white;
+}
+
+.sms-json-textarea {
+  width: 100%;
+  min-height: 320px;
+  padding: 0.8rem;
+  font-family: 'Courier New', Consolas, monospace;
+  font-size: 0.77rem;
+  line-height: 1.5;
+  background: #0d1117;
+  color: #c9d1d9;
+  border: 1px solid #30363d;
+  border-radius: 7px;
+  resize: vertical;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+
+.sms-json-textarea:focus {
+  outline: none;
+  border-color: rgba(124, 58, 237, 0.5);
+}
+
+.sms-json-textarea.has-error {
+  border-color: #f85149;
+}
+
+.sms-json-error {
+  font-size: 0.77rem;
+  color: #f85149;
+  background: rgba(248, 81, 73, 0.08);
+  border: 1px solid rgba(248, 81, 73, 0.25);
+  border-radius: 5px;
+  padding: 0.4rem 0.7rem;
+}
+
+.sms-json-schema-hint {
+  font-size: 0.72rem;
+  color: #6b7280;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid #21262d;
+  border-radius: 5px;
+  padding: 0.5rem 0.75rem;
+  font-family: 'Courier New', monospace;
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+
+/* ── Puzzle type info in structured view ──────────── */
+.sms-stage-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.sms-clue-count-badge {
+  font-size: 0.68rem;
+  color: #6b7280;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid #21262d;
+  padding: 0.15rem 0.45rem;
+  border-radius: 10px;
+}
+
+.sms-puzzle-type-row {
+  padding: 0.35rem 1rem;
+  border-bottom: 1px solid #21262d;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sms-puzzle-type {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #a78bfa;
+  background: rgba(124, 58, 237, 0.1);
+  padding: 0.15rem 0.5rem;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.sms-puzzle-meta {
+  font-size: 0.72rem;
+  color: #6b7280;
+  display:flex;
+  flex-direction: column;
+  margin-left: 5px;
+}
+
+/* ── Question preview ─────────────────────────────── */
+.sms-question-preview {
+  padding: 0.5rem 0.7rem;
+  background: rgba(124, 58, 237, 0.06);
+  border: 1px solid rgba(124, 58, 237, 0.2);
+  border-radius: 6px;
+  margin-bottom: 0.6rem;
+}
+
+.sms-question-text {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #c4b5fd;
+  font-style: italic;
+}
+
+/* ── Details accordion ────────────────────────────── */
+.sms-details {
+  margin-top: 0.4rem;
+}
+
+.sms-details-summary {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #8b949e;
+  cursor: pointer;
+  user-select: none;
+  padding: 0.3rem 0;
+  list-style: none;
+}
+
+.sms-details-summary::-webkit-details-marker { display: none; }
+
+.sms-details-summary::before {
+  content: "▶ ";
+  font-size: 0.65rem;
+  transition: transform 0.2s;
+}
+
+details[open] > .sms-details-summary::before {
+  content: "▼ ";
+}
+
+.sms-details-body {
+  padding: 0.5rem 0 0.2rem;
+}
+
+/* ── Storyline/objective/hint text ────────────────── */
+.sms-story-text,
+.sms-objective-text {
+  font-size: 0.78rem;
+  color: #8b949e;
+  margin: 0.15rem 0 0.5rem;
+  font-style: italic;
+}
+
+.sms-hint-text {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.sms-hint-inline {
+  font-size: 0.72rem;
+  color: #6b7280;
+  font-style: italic;
+  margin-top: 0.25rem;
+}
+
+/* ── Alt answer question line ─────────────────────── */
+.sms-alt-intro {
+  font-size: 0.75rem;
+  color: #a78bfa;
+  font-style: italic;
+  margin-bottom: 0.35rem;
+}
+
+.sms-alt-question {
+  font-size: 0.72rem;
+  color: #6b7280;
+  font-style: italic;
+  margin-top: 0.2rem;
+}
+
+/* ── Custom mode grid ─────────────────────────────── */
+.sms-custom-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.sms-custom-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.sms-custom-field-wide {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.sms-custom-field label,
+.sms-custom-field-wide label {
+  font-size: 0.73rem;
+  font-weight: 600;
+  color: #8b949e;
+}
+
+.sms-custom-field input,
+.sms-custom-field-wide input,
+.sms-custom-field textarea,
+.sms-custom-field-wide textarea {
+  padding: 0.38rem 0.55rem;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 5px;
+  color: #e6edf3;
+  font-size: 0.8rem;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.sms-custom-field input:focus,
+.sms-custom-field-wide input:focus,
+.sms-custom-field textarea:focus,
+.sms-custom-field-wide textarea:focus {
+  outline: none;
+  border-color: rgba(124, 58, 237, 0.5);
+}
+
+/* ── Custom clues header row ──────────────────────── */
+.sms-custom-clues-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+}
+
+.sms-clue-num {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #6b7280;
+  min-width: 1.5rem;
+  flex-shrink: 0;
+}
+
+.sms-json-switch-btn {
+  font-size: 0.72rem;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  background: #0d1117;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.sms-json-switch-btn:hover {
+  color: #c4b5fd;
+  border-color: rgba(124, 58, 237, 0.4);
+}
+
+/* ── Actions row (left / right split) ─────────────── */
+.sms-actions-left {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.sms-actions-right {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+/* ── Responsive additions ─────────────────────────── */
+@media (max-width: 640px) {
+  .sms-custom-grid {
+    grid-template-columns: 1fr;
+  }
+  .sms-custom-field-wide {
+    grid-column: unset;
+  }
+  .sms-editor-tabs {
+    flex-wrap: wrap;
+  }
+  .sms-tab-spacer {
+    display: none;
+  }
+  .sms-json-textarea {
+    min-height: 220px;
+  }
+  .sms-actions-left,
+  .sms-actions-right {
+    flex-wrap: wrap;
+  }
+}
+
+/* ════════════════════════════════════════════════════
+   Full-screen layout shell
+   ════════════════════════════════════════════════════ */
+
+.sms-fs-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  width: 100%;
+  background: #0d1117;
+  overflow: hidden;
+  color: #e6edf3;
+}
+
+/* ── Sticky top bar ───────────────────────────────── */
+.sms-fs-topbar {
+  flex-shrink: 0;
+  padding: 0.75rem 1.25rem 0;
+  border-bottom: 1px solid #21262d;
+  background: #0d1117;
+}
+
+.sms-fs-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.sms-fs-title-row .sms-header-top {
+  margin-bottom: 0.15rem;
+}
+
+.sms-header-sub {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #6b7280;
+}
+
+.sms-fs-close-btn {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 6px;
+  color: #fca5a5;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 0.1rem;
+}
+
+.sms-fs-close-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #fff;
+}
+
+/* move tabs inside topbar — remove their own bottom border since topbar handles it */
+.sms-fs-topbar .sms-editor-tabs {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0.5rem;
+}
+
+/* ── Scrollable body ──────────────────────────────── */
+.sms-fs-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem 1.25rem;
+  scroll-behavior: smooth;
+}
+
+.sms-fs-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sms-fs-body::-webkit-scrollbar-thumb {
+  background: rgba(124, 58, 237, 0.3);
+  border-radius: 3px;
+}
+
+/* make JSON textarea grow to fill the body height */
+.sms-fs-body .sms-json-textarea {
+  min-height: calc(100dvh - 280px);
+}
+
+/* ── Sticky footer ────────────────────────────────── */
+.sms-fs-footer {
+  flex-shrink: 0;
+  border-top: 1px solid #21262d;
+  background: #0d1117;
+}
+
+/* ════════════════════════════════════════════════════
+   Validation panel
+   ════════════════════════════════════════════════════ */
+
+.sms-validation-panel {
+  padding: 0.6rem 1.25rem;
+  border-bottom: 1px solid #21262d;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.sms-validation-panel.has-errors {
+  background: rgba(248, 81, 73, 0.06);
+  border-left: 3px solid #f85149;
+}
+
+.sms-validation-panel.has-warnings {
+  background: rgba(245, 158, 11, 0.06);
+  border-left: 3px solid #fbbf24;
+}
+
+.sms-validation-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.35rem;
+}
+
+.sms-val-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.sms-val-error-title { color: #f85149; }
+.sms-val-warn-title  { color: #fbbf24; }
+
+.sms-val-dismiss {
+  padding: 0.1rem 0.45rem;
+  background: transparent;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 0.72rem;
+  line-height: 1;
+  transition: all 0.15s;
+}
+
+.sms-val-dismiss:hover {
+  color: #e6edf3;
+  border-color: #8b949e;
+}
+
+.sms-validation-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.sms-val-item {
+  font-size: 0.77rem;
+  line-height: 1.4;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+}
+
+.sms-val-error {
+  color: #fca5a5;
+  background: rgba(248, 81, 73, 0.08);
+}
+
+.sms-val-warning {
+  color: #fde68a;
+  background: rgba(245, 158, 11, 0.07);
+}
+
+/* ── Save-anyway button (warnings only) ───────────── */
+.sms-save-warn-btn {
+  background: linear-gradient(135deg, #d97706, #b45309) !important;
+  border-color: rgba(251, 191, 36, 0.5) !important;
+}
+
+.sms-save-warn-btn:hover {
+  background: linear-gradient(135deg, #f59e0b, #d97706) !important;
+}

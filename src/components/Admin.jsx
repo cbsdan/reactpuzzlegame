@@ -1,12 +1,16 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Fragment } from 'react';
 import { useGame } from '../context/GameContext';
 import { GAMES, getGame } from '../games/index';
+import StickmanSettings from '../games/StickmanMystery/StickmanSettings';
 import './Admin.css';
 
 const Admin = () => {
   const { gameState, players, adminAction, removePlayer, currentRoom, exitGame } = useGame();
   const [selectedGame, setSelectedGame] = useState('number-mystery');
   const [dashboardFullscreen, setDashboardFullscreen] = useState(false);
+  const [showStickmanSettings, setShowStickmanSettings] = useState(false);
+  const [stickmanConfig, setStickmanConfig] = useState(null);
+  const [viewingPlayer, setViewingPlayer] = useState(null);
   const prevStatusRef = useRef(gameState?.status);
 
   // Auto-fullscreen dashboard when a new game starts; collapse when idle
@@ -26,7 +30,11 @@ const Admin = () => {
       alert('Please select a game first.');
       return;
     }
-    await adminAction(action, action === 'start' ? selectedGame : undefined);
+    const gameType = action === 'start' ? selectedGame : undefined;
+    const config = action === 'start' && selectedGame === 'stickman-mystery' && stickmanConfig
+      ? { stickmanConfig }
+      : undefined;
+    await adminAction(action, gameType, config);
   };
 
   const handleRemovePlayer = async (playerId) => {
@@ -46,6 +54,11 @@ const Admin = () => {
   const handleClearSessions = async () => {
     if (!window.confirm('Clear all session history? This cannot be undone.')) return;
     await adminAction('clear-sessions');
+  };
+
+  const handleDeleteSession = async (sessionNumber) => {
+    if (!window.confirm(`Delete Session #${sessionNumber}? This cannot be undone.`)) return;
+    await adminAction('delete-session', null, { sessionNumber });
   };
 
   const getStatusBadge = (status) => {
@@ -128,8 +141,32 @@ const Admin = () => {
                     <div className="game-card-desc">{game.description}</div>
                   </div>
                   {selectedGame === game.id && <div className="game-card-check">✓</div>}
+                  {game.id === 'stickman-mystery' && selectedGame === 'stickman-mystery' && (
+                    <button
+                      className="game-card-settings-btn"
+                      onClick={(e) => { e.stopPropagation(); setShowStickmanSettings(true); }}
+                      title="Configure Stickman Mystery stages"
+                    >
+                      ⚙️
+                    </button>
+                  )}
                 </div>
               ))}
+            </div>
+            {stickmanConfig && selectedGame === 'stickman-mystery' && (
+              <div className="stickman-config-badge">✅ Custom configuration applied</div>
+            )}
+          </div>
+        )}
+
+        {/* Stickman Settings Modal */}
+        {showStickmanSettings && (
+          <div className="stickman-settings-overlay">
+            <div className="stickman-settings-modal">
+              <StickmanSettings
+                onSave={(cfg) => { setStickmanConfig(cfg); setShowStickmanSettings(false); }}
+                onCancel={() => setShowStickmanSettings(false)}
+              />
             </div>
           </div>
         )}
@@ -334,7 +371,8 @@ const Admin = () => {
               </thead>
               <tbody>
                 {players.map((player, index) => (
-                  <tr key={player._id}>
+                  <Fragment key={player._id}>
+                  <tr>
                     <td>{index + 1}</td>
                     <td className="player-name-cell">
                       <span className="player-icon">👤</span>
@@ -360,6 +398,54 @@ const Admin = () => {
                       </button>
                     </td>
                   </tr>
+                  {viewingPlayer === player._id && (
+                    <tr className="player-live-row">
+                      <td colSpan="7">
+                        <div className="player-live-panel">
+                          <div className="live-badge">🔴 LIVE</div>
+                          <div className="live-info-grid">
+                            <div className="live-stat">
+                              <span className="live-stat-label">Stage</span>
+                              <span className="live-stat-value">
+                                {player.progress?.stage || '—'} / {player.progress?.totalStages || '—'}
+                              </span>
+                            </div>
+                            <div className="live-stat">
+                              <span className="live-stat-label">Clues Found</span>
+                              <span className="live-stat-value">
+                                {player.progress?.cluesFound ?? '—'}
+                              </span>
+                            </div>
+                            <div className="live-stat">
+                              <span className="live-stat-label">Has Key</span>
+                              <span className="live-stat-value">
+                                {player.progress?.hasKey ? '🔑 Yes' : '❌ No'}
+                              </span>
+                            </div>
+                            <div className="live-stat">
+                              <span className="live-stat-label">Score</span>
+                              <span className="live-stat-value">{player.score || 0}</span>
+                            </div>
+                            <div className="live-stat">
+                              <span className="live-stat-label">Status</span>
+                              <span className="live-stat-value">
+                                {player.progress?.solved ? '✅ Solved' : player.solved ? '✅ Solved' : '🔍 Playing'}
+                              </span>
+                            </div>
+                          </div>
+                          {player.progress?.stage && player.progress?.totalStages && (
+                            <div className="live-progress-bar-wrap">
+                              <div
+                                className="live-progress-bar"
+                                style={{ width: `${(player.progress.stage / player.progress.totalStages) * 100}%` }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>
@@ -389,6 +475,13 @@ const Admin = () => {
                       🏆 {session.winner.name} — {session.winner.score} pts
                     </span>
                   )}
+                  <button
+                    className="delete-session-btn"
+                    onClick={() => handleDeleteSession(session.sessionNumber)}
+                    title="Delete this session"
+                  >
+                    🗑
+                  </button>
                 </div>
                 <div className="session-scores">
                   {[...(session.scores || [])]
