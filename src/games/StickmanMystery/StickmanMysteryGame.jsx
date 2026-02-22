@@ -3119,7 +3119,7 @@ const StickmanMysteryGame = () => {
                 {p._id === currentPlayer?._id ? '🙋' : '👤'} {p.name}
               </span>
               <span className="sm-player-stage">
-                {`Stage ${p.progress.stage || '?'}/${p.progress.totalStages || '?'}`}
+                {`Stage ${p.progress?.stage ?? '?'}/${p.progress?.totalStages ?? '?'}`}
               </span>
             </div>
           ))}

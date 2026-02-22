@@ -4,12 +4,40 @@ import PlayerSpectatorView from "./PlayerSpectatorView";
 import { DEFAULT_STAGES, GAME_DURATION } from "./StickmanMysteryGame";
 import "./AdminDashboard.css";
 
+const STICKMAN_STORAGE_KEY = "stickman_custom_config";
+const THEME_FOR_STAGE = [
+  { color: 0x00e5ff, emissive: 0x006b80, beacon: 0x00e5ff, label: "#00e5ff" },
+  { color: 0xbb86fc, emissive: 0x5d4380, beacon: 0xbb86fc, label: "#bb86fc" },
+  { color: 0xff5252, emissive: 0x802929, beacon: 0xff5252, label: "#ff5252" },
+  { color: 0xffab00, emissive: 0x805500, beacon: 0xffab00, label: "#ffab00" },
+  { color: 0x00e676, emissive: 0x00733b, beacon: 0x00e676, label: "#00e676" },
+];
+
+function loadActiveStages(stickmanConfig) {
+  if (stickmanConfig?.stages?.length > 0) return stickmanConfig.stages;
+  try {
+    const saved = localStorage.getItem(STICKMAN_STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed?.stages?.length > 0) {
+        return parsed.stages.map((s, i) => ({
+          ...s,
+          theme: s.theme || THEME_FOR_STAGE[i] || THEME_FOR_STAGE[0],
+        }));
+      }
+    }
+  } catch { /* ignore */ }
+  return DEFAULT_STAGES;
+}
+
 const StickmanMysteryAdminDashboard = () => {
   const { players, gameState, adminAction } = useGame();
   const [answerRevealed, setAnswerRevealed] = useState(false);
   const [watchedPlayerId, setWatchedPlayerId] = useState(null);
   const [refOpen, setRefOpen] = useState(false);
   const [expandedStage, setExpandedStage] = useState(null);
+
+  const activeStages = loadActiveStages(gameState?.stickmanConfig);
   const [timeLeft, setTimeLeft] = useState(GAME_DURATION);
   const [overtime, setOvertime] = useState(0);
   const autoStopRef = useRef(null);
@@ -135,6 +163,7 @@ const StickmanMysteryAdminDashboard = () => {
               <PlayerSpectatorView
                 watchedPlayer={watchedPlayer}
                 allPlayers={players}
+                stages={activeStages}
               />
             </div>
           </div>
@@ -191,7 +220,7 @@ const StickmanMysteryAdminDashboard = () => {
               <button className="sma-ref-close" onClick={() => setRefOpen(false)}>✕ Close</button>
             </div>
             <div className="sma-ref-modal-body">
-              {DEFAULT_STAGES.map((stageDef, si) => {
+              {activeStages.map((stageDef, si) => {
                 const themeColor = stageDef.theme?.label ?? "#00ffd0";
                 const isOpen = expandedStage === si;
                 /* Which players are currently on this stage */

@@ -2,6 +2,31 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { DEFAULT_STAGES } from "./StickmanMysteryGame";
 
+const STICKMAN_STORAGE_KEY = "stickman_custom_config";
+const THEME_FOR_STAGE = [
+  { color: 0x00e5ff, emissive: 0x006b80, beacon: 0x00e5ff, label: "#00e5ff" },
+  { color: 0xbb86fc, emissive: 0x5d4380, beacon: 0xbb86fc, label: "#bb86fc" },
+  { color: 0xff5252, emissive: 0x802929, beacon: 0xff5252, label: "#ff5252" },
+  { color: 0xffab00, emissive: 0x805500, beacon: 0xffab00, label: "#ffab00" },
+  { color: 0x00e676, emissive: 0x00733b, beacon: 0x00e676, label: "#00e676" },
+];
+
+function loadActiveStagesLocal() {
+  try {
+    const saved = localStorage.getItem(STICKMAN_STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed?.stages?.length > 0) {
+        return parsed.stages.map((s, i) => ({
+          ...s,
+          theme: s.theme || THEME_FOR_STAGE[i] || THEME_FOR_STAGE[0],
+        }));
+      }
+    }
+  } catch { /* ignore */ }
+  return DEFAULT_STAGES;
+}
+
 /* ── Maze layout — identical to StickmanMysteryGame ─── */
 const WALL_SEGMENTS = [
   { x: 0,   z: -18, w: 38,  d: 1.2, h: 3.2 },
@@ -109,13 +134,15 @@ function makeLabel(text, colorHex) {
    The watched player's own stickman is rendered in-scene.
    Only players on the same stage are shown.
 ───────────────────────────────────────────────────── */
-const PlayerSpectatorView = ({ watchedPlayer, allPlayers }) => {
+const PlayerSpectatorView = ({ watchedPlayer, allPlayers, stages }) => {
   const containerRef = useRef(null);
   const watchedRef   = useRef(watchedPlayer);
   const allRef       = useRef(allPlayers);
+  const stagesRef    = useRef(stages || loadActiveStagesLocal());
 
   useEffect(() => { watchedRef.current = watchedPlayer; }, [watchedPlayer]);
   useEffect(() => { allRef.current    = allPlayers;    }, [allPlayers]);
+  useEffect(() => { stagesRef.current = stages?.length > 0 ? stages : loadActiveStagesLocal(); }, [stages]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -312,7 +339,9 @@ const PlayerSpectatorView = ({ watchedPlayer, allPlayers }) => {
           lastStage = newStage;
           stageObjs.forEach((g) => scene.remove(g));
           stageObjs = [];
-          const def = DEFAULT_STAGES[(newStage - 1) % DEFAULT_STAGES.length];
+          const activeStages = stagesRef.current;
+          const def = activeStages[(newStage - 1) % activeStages.length]
+            ?? DEFAULT_STAGES[(newStage - 1) % DEFAULT_STAGES.length];
           if (def) stageObjs = buildStageObjects(def);
         }
       }
