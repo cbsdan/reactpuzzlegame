@@ -693,47 +693,50 @@ function buildCartMesh() {
 function buildWallMesh(w) {
   const group = new THREE.Group();
   const isPerimeter = w.w >= 50 || w.d >= 50;
-  // Dark, weathered granite stone
+
+  // White stone wall
   const mat = new THREE.MeshStandardMaterial({
-    color: isPerimeter ? 0x18182c : 0x141428,
-    emissive: 0x07070e,
-    emissiveIntensity: 0.2,
-    roughness: 0.96,
-    metalness: 0.03,
+    color: 0xffffff,            // Wall is now white
+    emissive: 0xf0f0f0,         // subtle light gray glow
+    emissiveIntensity: 0.1,
+    roughness: 0.9,
+    metalness: 0.05,
   });
+
   const wall = new THREE.Mesh(new THREE.BoxGeometry(w.w, w.h, w.d), mat);
   wall.position.set(w.x, w.h / 2, w.z);
   wall.castShadow = true;
   wall.receiveShadow = true;
   group.add(wall);
 
-  // Slightly lighter stone coping on top
+  // Light gray coping on top
   const capMat = new THREE.MeshStandardMaterial({
-    color: isPerimeter ? 0x22223a : 0x1c1c32,
-    emissive: 0x0a0a15,
-    emissiveIntensity: 0.1,
-    roughness: 0.9,
-    metalness: 0.05,
+    color: 0xdcdcdc,           // light gray accent
+    emissive: 0xeaeaea,
+    emissiveIntensity: 0.05,
+    roughness: 0.85,
+    metalness: 0.03,
   });
+
   const cap = new THREE.Mesh(
     new THREE.BoxGeometry(w.w + 0.1, 0.14, w.d + 0.1),
-    capMat,
+    capMat
   );
   cap.position.set(w.x, w.h + 0.07, w.z);
   cap.receiveShadow = true;
   group.add(cap);
 
-  // Horizontal mortar groove lines on perimeter walls — two dark strips
+  // Horizontal groove lines — subtle gray lines for accent
   if (isPerimeter && w.h >= 3) {
     const grooveMat = new THREE.MeshStandardMaterial({
-      color: 0x0d0d1a,
+      color: 0xc0c0c0,    // light gray grooves
       roughness: 1.0,
       metalness: 0.0,
     });
     [1.0, 2.0].forEach((gy) => {
       const groove = new THREE.Mesh(
         new THREE.BoxGeometry(w.w + 0.05, 0.06, w.d + 0.05),
-        grooveMat,
+        grooveMat
       );
       groove.position.set(w.x, gy, w.z);
       group.add(groove);
