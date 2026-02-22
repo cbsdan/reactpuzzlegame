@@ -6,15 +6,20 @@ const NumberMysteryAdminDashboard = () => {
 
   const targetNumber = gameState?.targetNumber;
 
+  // Accessor: prefer namespaced sub-doc, fall back to flat root fields for old data
+  const nm = (player) => player.numberMystery ?? player;
+
   // Sort: solved first (by score desc), then unsolved (by guessCount asc)
   const sorted = [...players].sort((a, b) => {
-    if (a.solved && !b.solved) return -1;
-    if (!a.solved && b.solved) return 1;
-    if (a.solved && b.solved) return (b.score || 0) - (a.score || 0);
-    return (a.guessCount || 0) - (b.guessCount || 0);
+    const aSolved = a.numberMystery?.solved ?? a.solved;
+    const bSolved = b.numberMystery?.solved ?? b.solved;
+    if (aSolved && !bSolved) return -1;
+    if (!aSolved && bSolved) return 1;
+    if (aSolved && bSolved) return (nm(b).score || 0) - (nm(a).score || 0);
+    return (nm(a).guessCount || 0) - (nm(b).guessCount || 0);
   });
 
-  const solvedCount = players.filter((p) => p.solved).length;
+  const solvedCount = players.filter((p) => p.numberMystery?.solved ?? p.solved).length;
   const clues = gameState?.clues || [];
 
   const formatTime = (iso) => {
@@ -84,20 +89,20 @@ const NumberMysteryAdminDashboard = () => {
             {sorted.map((player, i) => (
               <div
                 key={player._id}
-                className={`nm-lb-row ${player.solved ? 'nm-row-solved' : 'nm-row-playing'}`}
+                className={`nm-lb-row ${nm(player).solved ? 'nm-row-solved' : 'nm-row-playing'}`}
               >
                 <span className="nm-lb-rank">
-                  {i === 0 && player.solved ? '🥇' : i === 1 && player.solved ? '🥈' : i === 2 && player.solved ? '🥉' : `#${i + 1}`}
+                  {i === 0 && nm(player).solved ? '🥇' : i === 1 && nm(player).solved ? '🥈' : i === 2 && nm(player).solved ? '🥉' : `#${i + 1}`}
                 </span>
                 <span className="nm-lb-name">{player.name}</span>
                 <span className="nm-lb-guesses">
-                  {player.guessCount != null ? player.guessCount : '—'}
+                  {nm(player).guessCount != null ? nm(player).guessCount : '—'}
                 </span>
                 <span className="nm-lb-status">
-                  {player.solved ? '✅ Solved' : '🔄 Playing'}
+                  {nm(player).solved ? '✅ Solved' : '🔄 Playing'}
                 </span>
-                <span className="nm-lb-time">{formatTime(player.solvedAt)}</span>
-                <span className="nm-lb-score">{player.score || 0}</span>
+                <span className="nm-lb-time">{formatTime(nm(player).solvedAt)}</span>
+                <span className="nm-lb-score">{nm(player).score || 0}</span>
               </div>
             ))}
           </>

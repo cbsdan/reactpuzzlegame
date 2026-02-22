@@ -288,11 +288,14 @@ const Player = () => {
                       {player.name}
                       {player._id === currentPlayer._id ? " (You)" : ""}
                     </span>
-                    {gameState?.gameType === 'stickman-mystery' && isGameRunning && player.progress && (
-                      <span className="player-stage-tag">
-                        {player.solved ? '✅ Solved' : `Stage ${player.progress.stage || '?'}/${player.progress.totalStages || '?'}`}
-                      </span>
-                    )}
+                    {gameState?.gameType === 'stickman-mystery' && isGameRunning && (() => {
+                      const prog = player.stickmanMystery?.progress ?? player.progress;
+                      return prog ? (
+                        <span className="player-stage-tag">
+                          {player.solved ? '✅ Solved' : `Stage ${prog.stage || '?'}/${prog.totalStages || '?'}`}
+                        </span>
+                      ) : null;
+                    })()}
                   </div>
                   <span className="player-score">{player.score || 0}</span>
                 </div>

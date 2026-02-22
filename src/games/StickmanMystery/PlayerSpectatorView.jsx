@@ -167,7 +167,7 @@ const PlayerSpectatorView = ({ watchedPlayer, allPlayers, stages }) => {
 
     /* ── Floor ────────────────────────────────────────── */
     const floor = new THREE.Mesh(
-      new THREE.PlaneGeometry(42, 42),
+      new THREE.PlaneGeometry(40, 40),
       new THREE.MeshStandardMaterial({ map: makeFloorTex(), roughness: 0.95 }),
     );
     floor.rotation.x = -Math.PI / 2;
@@ -175,7 +175,7 @@ const PlayerSpectatorView = ({ watchedPlayer, allPlayers, stages }) => {
 
     /* ── Ceiling ──────────────────────────────────────── */
     const ceil = new THREE.Mesh(
-      new THREE.PlaneGeometry(42, 42),
+      new THREE.PlaneGeometry(40, 40),
       new THREE.MeshStandardMaterial({ color: 0x080c18, roughness: 1 }),
     );
     ceil.rotation.x = Math.PI / 2;

@@ -363,8 +363,10 @@ def room_admin_action(room_id):
             additional_updates['startedAt'] = datetime.utcnow()
             additional_updates['pausedAt'] = None
             additional_updates['totalPausedMs'] = 0
-            additional_updates['sessionNumber'] = 1
-            additional_updates['sessions'] = []  # fresh start clears history
+            # Preserve existing sessions; only set sessionNumber to 1 if no prior sessions exist
+            current_sessions = existing_state.get('sessions', []) if existing_state else []
+            next_session_num = (max((s.get('sessionNumber', 0) for s in current_sessions), default=0) + 1) if current_sessions else 1
+            additional_updates['sessionNumber'] = next_session_num
             if game_type:
                 additional_updates['gameType'] = game_type
                 if game_type == 'number-mystery':
@@ -384,8 +386,14 @@ def room_admin_action(room_id):
             # Reset all player progress for the new game
             players_collection.update_many(
                 {'roomId': room_oid},
-                {'$set': {'score': 0, 'solved': False, 'guessCount': 0,
-                          'progress': None, 'posX': None, 'posZ': None, 'posAngle': None}}
+                {'$set': {
+                    'score': 0, 'solved': False,
+                    'numberMystery': {'score': 0, 'solved': False, 'guessCount': 0, 'solvedAt': None},
+                    'stickmanMystery': {
+                        'score': 0, 'solved': False, 'wrongAttempts': 0, 'stageScores': [],
+                        'solvedAt': None, 'progress': None, 'posX': None, 'posZ': None, 'posAngle': None
+                    }
+                }}
             )
         elif action == 'pause':
             new_status = 'paused'
@@ -406,16 +414,31 @@ def room_admin_action(room_id):
 
             # Snapshot current session scores before resetting
             current_players = list(players_collection.find({'roomId': room_oid}))
-            session_scores = [
-                {
+            game_type_snap = existing_state.get('gameType', '') if existing_state else ''
+            session_scores = []
+            for p in current_players:
+                entry = {
                     'playerId': str(p['_id']),
                     'name': p.get('name', ''),
                     'score': p.get('score', 0),
                     'solved': p.get('solved', False),
-                    'guessCount': p.get('guessCount', 0)
                 }
-                for p in current_players
-            ]
+                if game_type_snap == 'number-mystery':
+                    nm = p.get('numberMystery') or {}
+                    entry['numberMystery'] = {
+                        'score': nm.get('score', p.get('score', 0)),
+                        'solved': nm.get('solved', p.get('solved', False)),
+                        'guessCount': nm.get('guessCount', 0),
+                    }
+                elif game_type_snap == 'stickman-mystery':
+                    sm = p.get('stickmanMystery') or {}
+                    entry['stickmanMystery'] = {
+                        'score': sm.get('score', p.get('score', 0)),
+                        'solved': sm.get('solved', p.get('solved', False)),
+                        'wrongAttempts': sm.get('wrongAttempts', 0),
+                        'stageScores': sm.get('stageScores', []),
+                    }
+                session_scores.append(entry)
             winner = max(session_scores, key=lambda x: x['score'], default=None) if session_scores else None
             session_snapshot = {
                 'sessionNumber': current_session_num,
@@ -432,8 +455,14 @@ def room_admin_action(room_id):
             additional_updates['sessionNumber'] = current_session_num + 1
             players_collection.update_many(
                 {'roomId': room_oid},
-                {'$set': {'score': 0, 'solved': False, 'guessCount': 0,
-                          'progress': None, 'posX': None, 'posZ': None, 'posAngle': None}}
+                {'$set': {
+                    'score': 0, 'solved': False,
+                    'numberMystery': {'score': 0, 'solved': False, 'guessCount': 0, 'solvedAt': None},
+                    'stickmanMystery': {
+                        'score': 0, 'solved': False, 'wrongAttempts': 0, 'stageScores': [],
+                        'solvedAt': None, 'progress': None, 'posX': None, 'posZ': None, 'posAngle': None
+                    }
+                }}
             )
             # Generate new target if game type exists
             gt = existing_state.get('gameType') if existing_state else None
@@ -475,16 +504,31 @@ def room_admin_action(room_id):
             if existing_state and existing_state.get('status') != 'idle':
                 current_session_num = existing_state.get('sessionNumber', 1)
                 current_players = list(players_collection.find({'roomId': room_oid}))
-                session_scores = [
-                    {
+                game_type_snap = existing_state.get('gameType', '') if existing_state else ''
+                session_scores = []
+                for p in current_players:
+                    entry = {
                         'playerId': str(p['_id']),
                         'name': p.get('name', ''),
                         'score': p.get('score', 0),
                         'solved': p.get('solved', False),
-                        'guessCount': p.get('guessCount', 0)
                     }
-                    for p in current_players
-                ]
+                    if game_type_snap == 'number-mystery':
+                        nm = p.get('numberMystery') or {}
+                        entry['numberMystery'] = {
+                            'score': nm.get('score', p.get('score', 0)),
+                            'solved': nm.get('solved', p.get('solved', False)),
+                            'guessCount': nm.get('guessCount', 0),
+                        }
+                    elif game_type_snap == 'stickman-mystery':
+                        sm = p.get('stickmanMystery') or {}
+                        entry['stickmanMystery'] = {
+                            'score': sm.get('score', p.get('score', 0)),
+                            'solved': sm.get('solved', p.get('solved', False)),
+                            'wrongAttempts': sm.get('wrongAttempts', 0),
+                            'stageScores': sm.get('stageScores', []),
+                        }
+                    session_scores.append(entry)
                 winner = max(session_scores, key=lambda x: x['score'], default=None) if session_scores else None
                 session_snapshot = {
                     'sessionNumber': current_session_num,
@@ -504,6 +548,18 @@ def room_admin_action(room_id):
             additional_updates['mysteryAnswer'] = None
             additional_updates['mysteryQuestion'] = None
             additional_updates['stickmanConfig'] = None
+            # Reset player scores so they aren't double-counted (session snapshot already captured them)
+            players_collection.update_many(
+                {'roomId': room_oid},
+                {'$set': {
+                    'score': 0, 'solved': False,
+                    'numberMystery': {'score': 0, 'solved': False, 'guessCount': 0, 'solvedAt': None},
+                    'stickmanMystery': {
+                        'score': 0, 'solved': False, 'wrongAttempts': 0, 'stageScores': [],
+                        'solvedAt': None, 'progress': None, 'posX': None, 'posZ': None, 'posAngle': None
+                    }
+                }}
+            )
         
         update_data = {
             'status': new_status,
@@ -615,11 +671,20 @@ def submit_guess(room_id):
             guess_count = int(data.get('guessCount', 1))
             score = max(0, int(1000 - elapsed * 3 - guess_count * 50))
             
-            # Update player score and guessCount
+            # Update player — root fields (denorm) + numberMystery sub-doc
             players_collection = db['players']
             players_collection.update_one(
                 {'_id': ObjectId(player_id)},
-                {'$set': {'score': score, 'solved': True, 'solvedAt': datetime.utcnow(), 'guessCount': guess_count}}
+                {'$set': {
+                    'score': score,
+                    'solved': True,
+                    'numberMystery': {
+                        'score': score,
+                        'solved': True,
+                        'guessCount': guess_count,
+                        'solvedAt': datetime.utcnow(),
+                    }
+                }}
             )
             
             # Increment version so all clients get update
@@ -677,9 +742,13 @@ def submit_answer(room_id):
                 {'$set': {
                     'score': score,
                     'solved': True,
-                    'solvedAt': datetime.utcnow(),
-                    'guessCount': wrong_attempts + 1,
-                    'stageScores': data.get('stageScores', [])
+                    'stickmanMystery': {
+                        'score': score,
+                        'solved': True,
+                        'wrongAttempts': wrong_attempts,
+                        'stageScores': data.get('stageScores', []),
+                        'solvedAt': datetime.utcnow(),
+                    }
                 }}
             )
             game_states.update_one({'roomId': room_oid}, {'$inc': {'version': 1}})
@@ -697,8 +766,12 @@ def submit_answer(room_id):
                     {'$set': {
                         'score': score,
                         'solved': True,
-                        'solvedAt': datetime.utcnow(),
-                        'guessCount': wrong_attempts + 1
+                        'numberMystery': {
+                            'score': score,
+                            'solved': True,
+                            'guessCount': wrong_attempts + 1,
+                            'solvedAt': datetime.utcnow(),
+                        }
                     }}
                 )
                 game_states.update_one({'roomId': room_oid}, {'$inc': {'version': 1}})
@@ -810,19 +883,26 @@ def sync_position(room_id):
 
         players_collection = db['players']
 
-        # Build update - position + optional progress data
+        # Build update — position + optional Stickman-specific progress data
         update_fields = {
+            # Keep top-level pos fields for stage-filter queries
             'posX': x, 'posZ': z, 'posAngle': angle,
+            # Also write into namespaced sub-doc
+            'stickmanMystery.posX': x,
+            'stickmanMystery.posZ': z,
+            'stickmanMystery.posAngle': angle,
             'posUpdatedAt': datetime.utcnow()
         }
         if current_stage is not None:
             update_fields['currentStage'] = int(current_stage)
         progress = data.get('progress')
         if progress and isinstance(progress, dict):
-            update_fields['progress'] = progress
-            # Mirror live accumulated score to top-level so admin dashboard shows it
+            update_fields['progress'] = progress                    # legacy top-level
+            update_fields['stickmanMystery.progress'] = progress    # namespaced
+            # Mirror live accumulated score to both root and sub-doc
             if 'score' in progress:
                 update_fields['score'] = int(progress['score'])
+                update_fields['stickmanMystery.score'] = int(progress['score'])
 
         # Update this player's position
         players_collection.update_one(

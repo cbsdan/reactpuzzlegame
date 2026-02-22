@@ -1351,8 +1351,8 @@ const StickmanMysteryGame = () => {
 
     // ── Scene ─────────────────────────────────────────
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x05050e);
-    scene.fog = new THREE.FogExp2(0x05050e, 0.030);
+    scene.background = new THREE.Color(0x1a1a2e);
+    scene.fog = new THREE.FogExp2(0x1a1a2e, 0.030);
     sceneRef.current = scene;
 
     // ── Raycaster for mouse hover ─────────────────────
@@ -1408,17 +1408,17 @@ const StickmanMysteryGame = () => {
       roughness: 0.98,
       metalness: 0.0,
     });
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), groundMat);
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     scene.add(ground);
 
     // Coarse stone-slab grid (spacing ~2 m)
-    const grid = new THREE.GridHelper(50, 25, 0x18182e, 0x101020);
+    const grid = new THREE.GridHelper(40, 20, 0x18182e, 0x101020);
     grid.position.y = 0.011;
     scene.add(grid);
     // Fine mortar joints between slabs
-    const fineGrid = new THREE.GridHelper(50, 100, 0x0e0e1c, 0x0c0c1a);
+    const fineGrid = new THREE.GridHelper(40, 80, 0x0e0e1c, 0x0c0c1a);
     fineGrid.position.y = 0.013;
     scene.add(fineGrid);
 

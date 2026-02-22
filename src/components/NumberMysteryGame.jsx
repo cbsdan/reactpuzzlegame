@@ -17,6 +17,7 @@ const NumberMysteryGame = () => {
   const pauseStartRef = useRef(null);
   const prevStartedAtRef = useRef(gameState?.startedAt);
   const inputRef = useRef(null);
+  const initializedFromServerRef = useRef(false);
 
   const clues = gameState?.clues || [];
   const isPaused = gameState?.status === 'paused';
@@ -38,8 +39,30 @@ const NumberMysteryGame = () => {
       startTimeRef.current = Date.now();
       pauseStartRef.current = null;
       prevStartedAtRef.current = newStartedAt;
+      // Allow re-initialization from server for the new session
+      initializedFromServerRef.current = false;
     }
   }, [gameState?.startedAt]);
+
+  // Restore solved state from server after a page reload
+  useEffect(() => {
+    if (initializedFromServerRef.current) return;
+    if (!currentPlayer || !gameState || gameState.status !== 'playing') return;
+    initializedFromServerRef.current = true;
+    const nmSolved = currentPlayer.numberMystery?.solved ?? currentPlayer.solved;
+    const nmScore  = currentPlayer.numberMystery?.score  ?? currentPlayer.score;
+    if (nmSolved) {
+      // Compute approximate elapsed time (game start → now minus any paused time)
+      const serverElapsed = gameState.startedAt
+        ? Math.max(0, Math.floor(
+            (Date.now() - new Date(gameState.startedAt).getTime() - (gameState.totalPausedMs || 0)) / 1000
+          ))
+        : 0;
+      setSolved(true);
+      setFinalScore(nmScore || 0);
+      setElapsed(serverElapsed);
+    }
+  }, [currentPlayer, gameState]);
 
   // Pause / resume: keep elapsed time continuous across pauses
   useEffect(() => {
@@ -148,10 +171,6 @@ const NumberMysteryGame = () => {
             <span className="stat-label">🎲 Guesses</span>
             <span className="stat-val">{guesses.length}</span>
           </div>
-          <div className="stat-pill score-pill">
-            <span className="stat-label">⭐ Score</span>
-            <span className="stat-val">{liveScore}</span>
-          </div>
         </div>
       </div>
 
@@ -218,7 +237,7 @@ const NumberMysteryGame = () => {
           <div className="solved-banner">
             <div className="solved-icon">🎉</div>
             <h2>Code Cracked!</h2>
-            <p>You solved it in <strong>{guesses.length} guess{guesses.length !== 1 ? 'es' : ''}</strong> and <strong>{formatTime(elapsed)}</strong></p>
+            <p>You solved it in <strong>{(guesses.length || currentPlayer?.guessCount || 0)} guess{(guesses.length || currentPlayer?.guessCount || 0) !== 1 ? 'es' : ''}</strong> and <strong>{formatTime(elapsed)}</strong></p>
             <div className="final-score">Final Score: {finalScore}</div>
           </div>
         )}

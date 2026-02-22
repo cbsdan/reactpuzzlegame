@@ -38,6 +38,9 @@ const StickmanMysteryAdminDashboard = () => {
   const [expandedStage, setExpandedStage] = useState(null);
 
   const activeStages = loadActiveStages(gameState?.stickmanConfig);
+
+  // Accessor: prefer namespaced sub-doc, fall back to flat root progress for old data
+  const getProgress = (p) => p.stickmanMystery?.progress ?? p.progress ?? null;
   const [timeLeft, setTimeLeft] = useState(GAME_DURATION);
   const [overtime, setOvertime] = useState(0);
   const autoStopRef = useRef(null);
@@ -82,17 +85,18 @@ const StickmanMysteryAdminDashboard = () => {
   }, [gameState?.status, gameState?.startedAt, gameState?.totalPausedMs]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sorted = [...players].sort((a, b) => {
-    if (a.progress?.solved && !b.progress?.solved) return -1;
-    if (!a.progress?.solved && b.progress?.solved) return 1;
-    if (a.progress?.solved && b.progress?.solved) return (b.score || 0) - (a.score || 0);
-    // Compare by stage progress
-    const stageA = a.progress?.stage || 0;
-    const stageB = b.progress?.stage || 0;
+    const aProg = getProgress(a);
+    const bProg = getProgress(b);
+    if (aProg?.solved && !bProg?.solved) return -1;
+    if (!aProg?.solved && bProg?.solved) return 1;
+    if (aProg?.solved && bProg?.solved) return (b.score || 0) - (a.score || 0);
+    const stageA = aProg?.stage || 0;
+    const stageB = bProg?.stage || 0;
     if (stageA !== stageB) return stageB - stageA;
     return 0;
   });
 
-  const solvedCount = players.filter((p) => p.progress?.solved).length;
+  const solvedCount = players.filter((p) => getProgress(p)?.solved).length;
 
   /* ── Spectator helpers ── */
   const watchedPlayer = watchedPlayerId
@@ -118,12 +122,12 @@ const StickmanMysteryAdminDashboard = () => {
                 <span className="sma-spectator-watching-label">👁 Watching</span>
                 <strong className="sma-spectator-name">{watchedPlayer.name}</strong>
                 <span className="sma-spectator-stage">
-                  Stage {watchedPlayer.progress?.stage ?? "?"}/{watchedPlayer.progress?.totalStages ?? "?"}
+                  Stage {getProgress(watchedPlayer)?.stage ?? "?"}/{getProgress(watchedPlayer)?.totalStages ?? "?"}
                 </span>
-                {watchedPlayer.progress?.hasKey && (
+                {getProgress(watchedPlayer)?.hasKey && (
                   <span className="sma-spectator-badge">🔑 Has Key</span>
                 )}
-                {watchedPlayer.progress?.solved && (
+                {getProgress(watchedPlayer)?.solved && (
                   <span className="sma-spectator-badge sma-badge-solved">✅ Solved</span>
                 )}
                 <span className="sma-spectator-score">
@@ -224,7 +228,7 @@ const StickmanMysteryAdminDashboard = () => {
                 const themeColor = stageDef.theme?.label ?? "#00ffd0";
                 const isOpen = expandedStage === si;
                 /* Which players are currently on this stage */
-                const here = players.filter((p) => (p.progress?.stage ?? 1) === si + 1);
+                const here = players.filter((p) => (getProgress(p)?.stage ?? 1) === si + 1);
                 return (
                   <div key={si} className="sma-ref-stage">
                     <button
@@ -309,36 +313,38 @@ const StickmanMysteryAdminDashboard = () => {
               <span>Score</span>
               <span>View</span>
             </div>
-            {sorted.map((player, i) => (
+            {sorted.map((player, i) => {
+              const prog = getProgress(player);
+              return (
               <div
                 key={player._id}
-                className={`sma-lb-row ${player.progress?.solved ? "sma-row-solved" : "sma-row-playing"}`}
+                className={`sma-lb-row ${prog?.solved ? "sma-row-solved" : "sma-row-playing"}`}
               >
                 <span className="sma-lb-rank">
-                  {i === 0 && player.progress?.solved
+                  {i === 0 && prog?.solved
                     ? "🥇"
-                    : i === 1 && player.progress?.solved
+                    : i === 1 && prog?.solved
                       ? "🥈"
-                      : i === 2 && player.progress?.solved
+                      : i === 2 && prog?.solved
                         ? "🥉"
                         : `#${i + 1}`}
                 </span>
                 <span className="sma-lb-name">
                   {player.name}
-                  {player.progress?.hasKey && <span className="sma-key-badge">🔑</span>}
+                  {prog?.hasKey && <span className="sma-key-badge">🔑</span>}
                 </span>
                 <span className="sma-lb-stage">
-                  {player.progress
-                    ? `${player.progress.stage || '?'}/${player.progress.totalStages || '?'}`
+                  {prog
+                    ? `${prog.stage || '?'}/${prog.totalStages || '?'}`
                     : '—'}
                 </span>
                 <span className="sma-lb-clues">
-                  {player.progress?.cluesFound ?? '—'}
+                  {prog?.cluesFound ?? '—'}
                 </span>
                 <span className="sma-lb-status">
-                  {player.progress?.solved
+                  {prog?.solved
                     ? "✅ Solved"
-                    : player.progress?.hasKey
+                    : prog?.hasKey
                       ? "🔑 Has Key"
                       : "🏃 Exploring"}
                 </span>
@@ -353,7 +359,8 @@ const StickmanMysteryAdminDashboard = () => {
                   </button>
                 </span>
               </div>
-            ))}
+              );
+            })}
           </>
         )}
       </div>

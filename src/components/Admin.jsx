@@ -380,7 +380,7 @@ const Admin = () => {
                     </td>
                     <td className="score-cell">{player.score || 0}</td>
                     <td className="score-cell total-score-cell">
-                      {getTotalScore(player._id) + (player.score || 0)}
+                      {getTotalScore(player._id)}
                     </td>
                     <td>{new Date(player.joinedAt).toLocaleString()}</td>
                     <td>
@@ -398,53 +398,72 @@ const Admin = () => {
                       </button>
                     </td>
                   </tr>
-                  {viewingPlayer === player._id && (
-                    <tr className="player-live-row">
-                      <td colSpan="7">
-                        <div className="player-live-panel">
-                          <div className="live-badge">🔴 LIVE</div>
-                          <div className="live-info-grid">
-                            <div className="live-stat">
-                              <span className="live-stat-label">Stage</span>
-                              <span className="live-stat-value">
-                                {player.progress?.stage || '—'} / {player.progress?.totalStages || '—'}
-                              </span>
+                  {viewingPlayer === player._id && (() => {
+                    const isStickman = gameState?.gameType === 'stickman-mystery';
+                    const isNM = gameState?.gameType === 'number-mystery';
+                    const prog = player.stickmanMystery?.progress ?? player.progress;
+                    const nm = player.numberMystery ?? player;
+                    return (
+                      <tr className="player-live-row">
+                        <td colSpan="7">
+                          <div className="player-live-panel">
+                            <div className="live-badge">🔴 LIVE</div>
+                            <div className="live-info-grid">
+                              {isStickman && (
+                                <>
+                                  <div className="live-stat">
+                                    <span className="live-stat-label">Stage</span>
+                                    <span className="live-stat-value">
+                                      {prog?.stage || '—'} / {prog?.totalStages || '—'}
+                                    </span>
+                                  </div>
+                                  <div className="live-stat">
+                                    <span className="live-stat-label">Clues Found</span>
+                                    <span className="live-stat-value">
+                                      {prog?.cluesFound ?? '—'}
+                                    </span>
+                                  </div>
+                                  <div className="live-stat">
+                                    <span className="live-stat-label">Has Key</span>
+                                    <span className="live-stat-value">
+                                      {prog?.hasKey ? '🔑 Yes' : '❌ No'}
+                                    </span>
+                                  </div>
+                                </>
+                              )}
+                              {isNM && (
+                                <div className="live-stat">
+                                  <span className="live-stat-label">Guesses</span>
+                                  <span className="live-stat-value">
+                                    {nm.guessCount ?? '—'}
+                                  </span>
+                                </div>
+                              )}
+                              <div className="live-stat">
+                                <span className="live-stat-label">Score</span>
+                                <span className="live-stat-value">{player.score || 0}</span>
+                              </div>
+                              <div className="live-stat">
+                                <span className="live-stat-label">Status</span>
+                                <span className="live-stat-value">
+                                  {(isStickman ? prog?.solved : nm.solved) || player.solved
+                                    ? '✅ Solved' : '🔍 Playing'}
+                                </span>
+                              </div>
                             </div>
-                            <div className="live-stat">
-                              <span className="live-stat-label">Clues Found</span>
-                              <span className="live-stat-value">
-                                {player.progress?.cluesFound ?? '—'}
-                              </span>
-                            </div>
-                            <div className="live-stat">
-                              <span className="live-stat-label">Has Key</span>
-                              <span className="live-stat-value">
-                                {player.progress?.hasKey ? '🔑 Yes' : '❌ No'}
-                              </span>
-                            </div>
-                            <div className="live-stat">
-                              <span className="live-stat-label">Score</span>
-                              <span className="live-stat-value">{player.score || 0}</span>
-                            </div>
-                            <div className="live-stat">
-                              <span className="live-stat-label">Status</span>
-                              <span className="live-stat-value">
-                                {player.progress?.solved ? '✅ Solved' : player.solved ? '✅ Solved' : '🔍 Playing'}
-                              </span>
-                            </div>
+                            {isStickman && prog?.stage && prog?.totalStages && (
+                              <div className="live-progress-bar-wrap">
+                                <div
+                                  className="live-progress-bar"
+                                  style={{ width: `${(prog.stage / prog.totalStages) * 100}%` }}
+                                />
+                              </div>
+                            )}
                           </div>
-                          {player.progress?.stage && player.progress?.totalStages && (
-                            <div className="live-progress-bar-wrap">
-                              <div
-                                className="live-progress-bar"
-                                style={{ width: `${(player.progress.stage / player.progress.totalStages) * 100}%` }}
-                              />
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )}
+                        </td>
+                      </tr>
+                    );
+                  })()}
                   </Fragment>
                 ))}
               </tbody>
@@ -491,7 +510,15 @@ const Admin = () => {
                         <span className="session-rank">{i === 0 && s.score > 0 ? '🦹' : `${i + 1}.`}</span>
                         <span className="session-player-name">{s.name}</span>
                         <span className="session-player-score">{s.score || 0} pts</span>
-                        {s.solved && <span className="session-solved-badge">✅ {s.guessCount} guess{s.guessCount !== 1 ? 'es' : ''}</span>}
+                        {s.solved && s.numberMystery && (
+                          <span className="session-solved-badge">✅ {s.numberMystery.guessCount} guess{s.numberMystery.guessCount !== 1 ? 'es' : ''}</span>
+                        )}
+                        {s.solved && s.stickmanMystery && (
+                          <span className="session-solved-badge">✅ {s.stickmanMystery.stageScores?.length ?? 0} stage{(s.stickmanMystery.stageScores?.length ?? 0) !== 1 ? 's' : ''} cleared</span>
+                        )}
+                        {s.solved && !s.numberMystery && !s.stickmanMystery && (
+                          <span className="session-solved-badge">✅ {s.guessCount ?? 1} guess{(s.guessCount ?? 1) !== 1 ? 'es' : ''}</span>
+                        )}
                         {!s.solved && <span className="session-unsolved-badge">❌ Not solved</span>}
                       </div>
                     ))
