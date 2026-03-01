@@ -469,6 +469,26 @@
   margin: 4px 0;
 }
 
+/* Wrong-answer penalty warning shown in the question modal */
+.sm-wrong-penalty-warning {
+  font-size: 0.8rem;
+  color: #ffab00;
+  background: rgba(255, 171, 0, 0.1);
+  border: 1px solid rgba(255, 171, 0, 0.3);
+  border-radius: 8px;
+  padding: 6px 12px;
+  margin: 6px 0 10px;
+  text-align: center;
+}
+
+/* Time penalty badge inside the trash modal */
+.sm-trap-time-penalty {
+  color: #ff5252 !important;
+  background: rgba(255, 82, 82, 0.15) !important;
+  border-color: rgba(255, 82, 82, 0.4) !important;
+  font-weight: 700;
+}
+
 /* ── Solved modal ───────────────────────────────── */
 .sm-score-box {
   display: flex;

@@ -8,7 +8,9 @@ const STICKMAN_STORAGE_KEY = "stickman_custom_config";
 const THEME_FOR_STAGE = [
   { color: 0x00e5ff, emissive: 0x006b80, beacon: 0x00e5ff, label: "#00e5ff" },
   { color: 0xbb86fc, emissive: 0x5d4380, beacon: 0xbb86fc, label: "#bb86fc" },
-  { color: 0xff5252, emissive: 0x802929, beacon: 0xff5252, label: "#ff5252" },
+  { color: 0xff7043, emissive: 0x802020, beacon: 0xff7043, label: "#ff7043" },
+  { color: 0x448aff, emissive: 0x1a3680, beacon: 0x448aff, label: "#448aff" },
+  { color: 0x69f0ae, emissive: 0x1a5c35, beacon: 0x69f0ae, label: "#69f0ae" },
   { color: 0xffab00, emissive: 0x805500, beacon: 0xffab00, label: "#ffab00" },
   { color: 0x00e676, emissive: 0x00733b, beacon: 0x00e676, label: "#00e676" },
 ];
@@ -224,52 +226,54 @@ const StickmanMysteryAdminDashboard = () => {
               <button className="sma-ref-close" onClick={() => setRefOpen(false)}>✕ Close</button>
             </div>
             <div className="sma-ref-modal-body">
-              {activeStages.map((stageDef, si) => {
-                const themeColor = stageDef.theme?.label ?? "#00ffd0";
-                const isOpen = expandedStage === si;
-                /* Which players are currently on this stage */
-                const here = players.filter((p) => (getProgress(p)?.stage ?? 1) === si + 1);
-                return (
-                  <div key={si} className="sma-ref-stage">
-                    <button
-                      className={`sma-ref-stage-header ${isOpen ? "sma-ref-open" : ""}`}
-                      style={{ "--stage-color": themeColor }}
-                      onClick={() => setExpandedStage(isOpen ? null : si)}
-                    >
-                      <span className="sma-ref-stage-num">Stage {si + 1}</span>
-                      <span className="sma-ref-stage-name">{stageDef.name}</span>
-                      <span className="sma-ref-stage-meta">
-                        {stageDef.clueCount} clues · {stageDef.trashCount} trash
-                        {here.length > 0 && ` · 👥 ${here.map((p) => p.name).join(", ")}`}
-                      </span>
-                      <span className="sma-ref-chevron">{isOpen ? "▲" : "▼"}</span>
-                    </button>
-                    {isOpen && (
-                      <div className="sma-ref-body">
-                        <div className="sma-ref-question">❓ {stageDef.question}</div>
-                        <div style={{ margin: "0.3rem 0" }}>
-                          <span className="sma-ref-answer">✅ Answer: <strong>{stageDef.answer}</strong></span>
+              <div className="sma-ref-stages">
+                {activeStages.map((stageDef, si) => {
+                  const themeColor = stageDef.theme?.label ?? "#00ffd0";
+                  const isOpen = expandedStage === si;
+                  /* Which players are currently on this stage */
+                  const here = players.filter((p) => (getProgress(p)?.stage ?? 1) === si + 1);
+                  return (
+                    <div key={si} className="sma-ref-stage">
+                      <button
+                        className={`sma-ref-stage-header ${isOpen ? "sma-ref-open" : ""}`}
+                        style={{ "--stage-color": themeColor }}
+                        onClick={() => setExpandedStage(isOpen ? null : si)}
+                      >
+                        <span className="sma-ref-stage-num">Stage {si + 1}</span>
+                        <span className="sma-ref-stage-name">{stageDef.name}</span>
+                        <span className="sma-ref-stage-meta">
+                          {stageDef.clueCount} clues · {stageDef.trashCount} trash
+                          {here.length > 0 && ` · 👥 ${here.map((p) => p.name).join(", ")}`}
+                        </span>
+                        <span className="sma-ref-chevron">{isOpen ? "▲" : "▼"}</span>
+                      </button>
+                      {isOpen && (
+                        <div className="sma-ref-body">
+                          <div className="sma-ref-question">❓ {stageDef.question}</div>
+                          <div style={{ margin: "0.3rem 0" }}>
+                            <span className="sma-ref-answer">✅ Answer: <strong>{stageDef.answer}</strong></span>
+                          </div>
+                          <div className="sma-ref-hint">💡 <b>Hint:</b> {stageDef.hint}</div>
+                          <div className="sma-ref-clues">
+                            {stageDef.clues.map((clue, ci) => (
+                              <div key={ci} className="sma-ref-clue">
+                                <span className="sma-ref-clue-name">📦 {clue.name}</span>
+                                <span className="sma-ref-clue-text">{clue.clue}</span>
+                              </div>
+                            ))}
+                            {(stageDef.trash ?? []).map((t, ti) => (
+                              <div key={`t${ti}`} className="sma-ref-clue" style={{ opacity: 0.5 }}>
+                                <span className="sma-ref-clue-name">🗑 {t.name}</span>
+                                <span className="sma-ref-clue-text" style={{ color: "#64748b" }}>Trash — {t.msg}</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                        <div className="sma-ref-hint">💡 <b>Hint:</b> {stageDef.hint}</div>
-                        <div className="sma-ref-clues">
-                          {stageDef.clues.map((clue, ci) => (
-                            <div key={ci} className="sma-ref-clue">
-                              <span className="sma-ref-clue-name">📦 {clue.name}</span>
-                              <span className="sma-ref-clue-text">{clue.clue}</span>
-                            </div>
-                          ))}
-                          {(stageDef.trash ?? []).map((t, ti) => (
-                            <div key={`t${ti}`} className="sma-ref-clue" style={{ opacity: 0.5 }}>
-                              <span className="sma-ref-clue-name">🗑 {t.name}</span>
-                              <span className="sma-ref-clue-text" style={{ color: "#64748b" }}>Trash — {t.msg}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
@@ -281,19 +285,19 @@ const StickmanMysteryAdminDashboard = () => {
         <div className="sma-info-grid">
           <div className="sma-info-item">
             <span className="sma-info-label">⏱ Timer</span>
-            <span className="sma-info-val">45 min countdown</span>
+            <span className="sma-info-val">45 min — individual per player</span>
           </div>
           <div className="sma-info-item">
             <span className="sma-info-label">🔑 Objects</span>
-            <span className="sma-info-val">5 interactive objects</span>
+            <span className="sma-info-val">7 riddle-based stages</span>
           </div>
           <div className="sma-info-item">
-            <span className="sma-info-label">⏳ Penalty</span>
-            <span className="sma-info-val">−7s slow-mo (trash clues)</span>
+            <span className="sma-info-label">⏳ Trash penalty</span>
+            <span className="sma-info-val">−5s / −8s / −12s / −15s / −20s / −25s / −30s (by stage)</span>
           </div>
           <div className="sma-info-item">
             <span className="sma-info-label">❌ Wrong answer</span>
-            <span className="sma-info-val">−10 score pts</span>
+            <span className="sma-info-val">−15s / −20s / −25s / −30s / −35s / −40s / −45s (by stage)</span>
           </div>
         </div>
       </div>
@@ -309,6 +313,7 @@ const StickmanMysteryAdminDashboard = () => {
               <span>Player</span>
               <span>Stage</span>
               <span>Clues</span>
+              <span>Time Left</span>
               <span>Status</span>
               <span>Score</span>
               <span>View</span>
@@ -340,6 +345,13 @@ const StickmanMysteryAdminDashboard = () => {
                 </span>
                 <span className="sma-lb-clues">
                   {prog?.cluesFound ?? '—'}
+                </span>
+                <span className={`sma-lb-timeleft${prog?.timeLeft != null && prog.timeLeft <= 60 ? ' sma-timeleft--danger' : prog?.timeLeft != null && prog.timeLeft <= 300 ? ' sma-timeleft--warn' : ''}`}>
+                  {prog?.solved
+                    ? '—'
+                    : prog?.timeLeft != null
+                      ? `${String(Math.floor(prog.timeLeft / 60)).padStart(2, '0')}:${String(prog.timeLeft % 60).padStart(2, '0')}`
+                      : '—'}
                 </span>
                 <span className="sma-lb-status">
                   {prog?.solved

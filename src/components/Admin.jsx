@@ -6,7 +6,7 @@ import './Admin.css';
 
 const Admin = () => {
   const { gameState, players, adminAction, removePlayer, currentRoom, exitGame } = useGame();
-  const [selectedGame, setSelectedGame] = useState('number-mystery');
+  const [selectedGame, setSelectedGame] = useState('stickman-mystery');
   const [dashboardFullscreen, setDashboardFullscreen] = useState(false);
   const [showStickmanSettings, setShowStickmanSettings] = useState(false);
   const [stickmanConfig, setStickmanConfig] = useState(null);

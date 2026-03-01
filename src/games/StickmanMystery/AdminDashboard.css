@@ -164,7 +164,7 @@
 
 .sma-lb-header {
   display: grid;
-  grid-template-columns: 48px 1fr 70px 60px 100px 70px 52px;
+  grid-template-columns: 48px 1fr 70px 60px 80px 100px 70px 52px;
   background: #161b22;
   padding: 0.5rem 1rem;
   font-size: 0.72rem;
@@ -177,7 +177,7 @@
 
 .sma-lb-row {
   display: grid;
-  grid-template-columns: 48px 1fr 70px 60px 100px 70px 52px;
+  grid-template-columns: 48px 1fr 70px 60px 80px 100px 70px 52px;
   padding: 0.65rem 1rem;
   border-bottom: 1px solid #161b22;
   align-items: center;
@@ -246,6 +246,29 @@
   text-align: center;
   font-family: "Courier New", monospace;
   color: #fbbf24;
+}
+
+/* ── Per-player time left ───────────────────────── */
+.sma-lb-timeleft {
+  text-align: center;
+  font-family: "Courier New", monospace;
+  font-size: 0.85rem;
+  color: #00ffd0;
+  font-weight: 600;
+}
+
+.sma-timeleft--warn {
+  color: #ffab00;
+}
+
+.sma-timeleft--danger {
+  color: #ff5252;
+  animation: sma-timeleft-blink 1s ease-in-out infinite;
+}
+
+@keyframes sma-timeleft-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
 }
 
 .sma-key-badge {
@@ -516,7 +539,7 @@
   border: 1px solid #30363d;
   border-radius: 12px;
   width: min(900px, 100%);
-  max-height: 88vh;
+  height: 88vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -553,10 +576,10 @@
 
 .sma-ref-modal-body {
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 0.85rem 1.1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  flex: 1;
+  min-height: 0;
 }
 
 .sma-ref-stages {
@@ -570,6 +593,8 @@
   border-radius: 8px;
   overflow: hidden;
   background: #0e1421;
+  flex-shrink: 0;
+  margin-bottom: 0.5rem;
 }
 
 .sma-ref-stage-header {
@@ -724,7 +749,7 @@
   }
   .sma-lb-header,
   .sma-lb-row {
-    grid-template-columns: 36px 1fr 55px 45px 80px 55px 40px;
+    grid-template-columns: 36px 1fr 55px 45px 65px 80px 55px 40px;
     font-size: 0.78rem;
   }
   .sma-info-grid {

@@ -2,991 +2,53 @@ import { useState, useEffect, useRef } from "react";
 import * as THREE from "three";
 import { useGame } from "../../context/GameContext";
 import "./StickmanMysteryGame.css";
+import {
+  GAME_DURATION,
+  TRASH_SLOW_DURATION,
+  TRASH_SHAKE_DURATION,
+  SLOW_FACTOR,
+  STAGE_WRONG_TIME_PENALTY,
+  STAGE_TRASH_TIME_PENALTY,
+  INTERACT_DIST,
+  MOVE_SPEED,
+  TURN_SPEED,
+  BOUNDARY,
+  CART_POS,
+  CART_INTERACT_DIST,
+  DASH_SPEED,
+  DASH_DURATION,
+  DASH_COOLDOWN,
+  JUMP_COOLDOWN,
+  JUMP_HEIGHT,
+  JUMP_DURATION,
+  PUSH_DIST,
+  PUSH_FORCE,
+  POSITION_SYNC_MS,
+  TOTAL_STAGES,
+  STAGE_MAX_SCORES,
+  PLAYER_COLORS,
+  WALL_SEGMENTS,
+} from "./constants.js";
+import { DEFAULT_STAGES, AVAILABLE_OBJECTS } from "./stageData.js";
+import {
+  buildStickman,
+  buildObjectMesh,
+  buildCartMesh,
+  buildWallMesh,
+  buildTorch,
+  buildTrashMesh,
+  createTextSprite,
+} from "./threeBuilders.js";
+import { generateRandomPosSeeded, makePrng, hashStr, resolveCollisions } from "./gameUtils.js";
+import GameHUD from "./GameHUD.jsx";
+import GameModals from "./GameModals.jsx";
+
+// Re-export for consumers (AdminDashboard, StickmanSettings)
+export { DEFAULT_STAGES, AVAILABLE_OBJECTS };
+export { GAME_DURATION };
 
 const API_URL = import.meta.env.VITE_API_URL || "";
 
-/* ── Constants ──────────────────────────────────────── */
-export const GAME_DURATION = 2700; // 45 min countdown
-const CLUE_PENALTY = 15; // seconds lost per clue opened
-const TRASH_PENALTY = 30; // seconds lost per trash opened
-const TRASH_SLOW_DURATION = 7; // seconds of slowed movement after trash
-const TRASH_SHAKE_DURATION = 1; // seconds of camera shake after trash
-const SLOW_FACTOR = 0.4; // movement multiplier during slow
-const WRONG_ANSWER_PENALTY = 10; // score points deducted per wrong answer
-const INTERACT_DIST = 3.5;
-const MOVE_SPEED = 8;
-const TURN_SPEED = 3;
-const BOUNDARY = 18;
-const CART_POS = [0, 0, -10];
-const CART_INTERACT_DIST = 4;
-const DASH_SPEED = 22;
-const DASH_DURATION = 0.25; // seconds
-const DASH_COOLDOWN = 1.5; // seconds
-const JUMP_COOLDOWN = 1.5; // seconds
-const JUMP_HEIGHT = 2.5;
-const JUMP_DURATION = 0.5; // seconds
-const PUSH_DIST = 2;
-const PUSH_FORCE = 18;
-const POSITION_SYNC_MS = 150;
-const TOTAL_STAGES = 5;
-const STAGE_MAX_SCORE = 1000;
-
-const PLAYER_COLORS = [
-  0xff6b6b, 0x48dbfb, 0xfeca57, 0xff9ff3, 0x54a0ff, 0x5f27cd, 0x01a3a4,
-  0xf368e0,
-];
-
-/* ── Available 3D object shapes for clue representation ── */
-export const AVAILABLE_OBJECTS = [
-  { id: "chest", name: "Chest (Box)", icon: "📦" },
-  { id: "orb", name: "Orb (Sphere)", icon: "🔮" },
-  { id: "tome", name: "Tome (Flat Book)", icon: "📖" },
-  { id: "lantern", name: "Lantern (Octahedron)", icon: "🏮" },
-  { id: "mirror", name: "Mirror (Tall Slab)", icon: "🪞" },
-  { id: "diamond", name: "Diamond (Icosahedron)", icon: "💎" },
-  { id: "pillar", name: "Pillar (Cylinder)", icon: "🏛️" },
-  { id: "crystal", name: "Crystal (Cone)", icon: "🔷" },
-];
-
-/* ── 5 Stages — varied puzzle types inspired by escape room classics ── */
-/* Puzzle types: Stage1=Addition, Stage2=Letter Values(A=1), Stage3=Multiply-Subtract, Stage4=Direction Turns, Stage5=Caesar Cipher */
-export const DEFAULT_STAGES = [
-  {
-    name: "The Awakening",
-    answer: "23",
-    question: "You found two numbers hidden in the chamber. Solve: First Number + Second Number = ?",
-    hint: "Simply add the two values you collected from the clues.",
-    storyline: "You awaken in an ancient dungeon. The air is damp and cold. Two glowing ledgers catch your eye. Each holds a secret number — add them together to break the first seal!",
-    objective: "Collect both number clues, then walk to the Answer Cart. Add the two values together and type the total.",
-    clueCount: 2,
-    trashCount: 1,
-    theme: {
-      color: 0x00e5ff,
-      emissive: 0x006b80,
-      beacon: 0x00e5ff,
-      label: "#00e5ff",
-    },
-    clues: [
-      { name: "Worn Ledger", clue: "First Number = 14", objectShape: "tome" },
-      { name: "Crystal Flask", clue: "Second Number = 9", objectShape: "orb" },
-    ],
-    trash: [
-      { name: "Cracked Urn", msg: "The urn crumbles to dust… worthless trash!" },
-    ],
-    altAnswers: [
-      { answer: "12", question: "You found two numbers hidden in the chamber. Solve: First Number + Second Number = ?", clues: [
-        { name: "Stone Tablet", clue: "First Number = 7", objectShape: "pillar" },
-        { name: "Rune Orb", clue: "Second Number = 5", objectShape: "chest" },
-      ]},
-      { answer: "30", question: "You found two numbers hidden in the chamber. Solve: First Number + Second Number = ?", clues: [
-        { name: "Ancient Chest", clue: "First Number = 18", objectShape: "chest" },
-        { name: "Jade Bowl", clue: "Second Number = 12", objectShape: "lantern" },
-      ]},
-    ],
-  },
-  {
-    name: "The Shadows",
-    answer: "13",
-    question: "Three rune tablets each reveal an input→output pair. Crack the hidden rule, then apply it: what is the output when the input is 6?",
-    hint: "Look at each pair: multiply the input by 2, then add 1. Try it on every pair to confirm, then apply it to 6.",
-    storyline: "Beyond the first gate, darkness swallows you whole. Three glowing tablets flicker on the walls, each engraved with a mysterious pair of numbers linked by an arrow. The shadow priests sealed this vault with a numeric rule — only those who can see the pattern will pass!",
-    objective: "Collect all 3 pattern tablets. Each shows \"input → output\". Discover the rule linking them, then calculate the missing output for input 6.",
-    clueCount: 3,
-    trashCount: 2,
-    theme: {
-      color: 0xbb86fc,
-      emissive: 0x5d4380,
-      beacon: 0xbb86fc,
-      label: "#bb86fc",
-    },
-    clues: [
-      { name: "Shadow Tablet I",  clue: "Pattern Pair I:  2 ➜ 5",  objectShape: "chest" },
-      { name: "Shadow Tablet II", clue: "Pattern Pair II: 4 ➜ 9",  objectShape: "orb" },
-      { name: "Shadow Tablet III",clue: "Pattern Pair III: 6 ➜ ?", objectShape: "lantern" },
-    ],
-    trash: [
-      { name: "Empty Coffer", msg: "The coffer is empty… nothing but a waste of time!" },
-      { name: "Dead Compass", msg: "The needle spins wildly… it was cursed!" },
-    ],
-    altAnswers: [
-      { answer: "11", question: "Three rune tablets each reveal an input→output pair. Crack the hidden rule, then apply it: what is the output when the input is 5?", clues: [
-        { name: "Void Tablet I",  clue: "Pattern Pair I:  1 ➜ 3",  objectShape: "diamond" },
-        { name: "Void Tablet II", clue: "Pattern Pair II: 3 ➜ 7",  objectShape: "crystal" },
-        { name: "Void Tablet III",clue: "Pattern Pair III: 5 ➜ ?", objectShape: "tome" },
-      ]},
-      { answer: "19", question: "Three rune tablets each reveal an input→output pair. Crack the hidden rule, then apply it: what is the output when the input is 6?", clues: [
-        { name: "Night Tablet I",  clue: "Pattern Pair I:  2 ➜ 7",  objectShape: "mirror" },
-        { name: "Night Tablet II", clue: "Pattern Pair II: 4 ➜ 13", objectShape: "chest" },
-        { name: "Night Tablet III",clue: "Pattern Pair III: 6 ➜ ?", objectShape: "pillar" },
-      ]},
-    ],
-  },
-  {
-    name: "The Inferno",
-    answer: "25",
-    question: "Three scorched tablets each show a number and its secret value. Find the hidden rule — then calculate the secret value for 5.",
-    hint: "Try multiplying each number by itself (squaring it). Does the rule hold for all three tablets?",
-    storyline: "The chamber glows red-hot. Lava cracks beneath the floor. Three scorched stone tablets are mounted on the wall. Each one bears a single number and a result — but the formula connecting them has been burned away. Only the mathematician who rediscovers the rule will survive the Inferno!",
-    objective: "Collect all 3 scorched tablets. Each shows \"Number → Secret Value\". Find the mathematical rule and apply it to find the secret value of 5.",
-    clueCount: 3,
-    trashCount: 2,
-    theme: {
-      color: 0xff5252,
-      emissive: 0x802929,
-      beacon: 0xff5252,
-      label: "#ff5252",
-    },
-    clues: [
-      { name: "Scorched Tablet I",  clue: "3 ➜ 9",  objectShape: "orb" },
-      { name: "Scorched Tablet II", clue: "4 ➜ 16", objectShape: "tome" },
-      { name: "Scorched Tablet III",clue: "5 ➜ ?",  objectShape: "lantern" },
-    ],
-    trash: [
-      { name: "Ash Pile", msg: "Just a pile of ash… nothing useful here!" },
-      { name: "Burnt Scroll", msg: "The scroll is too burnt to read… total waste!" },
-    ],
-    altAnswers: [
-      { answer: "64", question: "Three scorched tablets each show a number and its secret value. Find the hidden rule — then calculate the secret value for 4.", clues: [
-        { name: "Lava Tablet I",  clue: "2 ➜ 8",  objectShape: "diamond" },
-        { name: "Lava Tablet II", clue: "3 ➜ 27", objectShape: "mirror" },
-        { name: "Lava Tablet III",clue: "4 ➜ ?",  objectShape: "chest" },
-      ]},
-      { answer: "30", question: "Three scorched tablets each show a number and its secret value. Find the hidden rule — then calculate the secret value for 5.", clues: [
-        { name: "Ember Tablet I",  clue: "3 ➜ 12", objectShape: "crystal" },
-        { name: "Ember Tablet II", clue: "4 ➜ 20", objectShape: "pillar" },
-        { name: "Ember Tablet III",clue: "5 ➜ ?",  objectShape: "orb" },
-      ]},
-    ],
-  },
-  {
-    name: "The Radiance",
-    answer: "WEST",
-    question: "Follow the compass directions listed in your clues — in order. You start NORTH. What direction are you facing at the end? (NORTH / EAST / SOUTH / WEST)",
-    hint: "Face NORTH. Each turn rotates you 90°: RIGHT = clockwise, LEFT = counter-clockwise.",
-    storyline: "Blinding golden light floods the chamber. A compass rose is carved into the floor. Four glowing stones describe a sequence of turns. Only the navigator who reaches the correct final bearing may proceed!",
-    objective: "Collect all 4 direction clues. Follow each turn from the starting direction (NORTH) and submit your final bearing.",
-    clueCount: 4,
-    trashCount: 3,
-    theme: {
-      color: 0xffab00,
-      emissive: 0x805500,
-      beacon: 0xffab00,
-      label: "#ffab00",
-    },
-    clues: [
-      { name: "Compass Rose", clue: "You start facing NORTH", objectShape: "chest" },
-      { name: "Wind Vane I", clue: "First turn: RIGHT", objectShape: "orb" },
-      { name: "Sun Dial II", clue: "Second turn: RIGHT", objectShape: "tome" },
-      { name: "Sky Chart III", clue: "Third turn: RIGHT", objectShape: "lantern" },
-    ],
-    trash: [
-      { name: "Fool's Gold", msg: "It's just fool's gold… completely worthless!" },
-      { name: "Tarnished Ring", msg: "The ring turns to rust… it was cursed!" },
-      { name: "Hollow Gem", msg: "The gem is hollow inside… just a trick!" },
-    ],
-    altAnswers: [
-      { answer: "EAST", question: "Follow the compass directions listed in your clues — in order. You start NORTH. What direction are you facing at the end? (NORTH / EAST / SOUTH / WEST)", clues: [
-        { name: "Bearing Stone", clue: "You start facing NORTH", objectShape: "diamond" },
-        { name: "Course Rune I", clue: "First turn: RIGHT", objectShape: "mirror" },
-        { name: "Course Rune II", clue: "Second turn: LEFT", objectShape: "crystal" },
-        { name: "Course Rune III", clue: "Third turn: RIGHT", objectShape: "pillar" },
-      ]},
-      { answer: "SOUTH", question: "Follow the compass directions listed in your clues — in order. You start NORTH. What direction are you facing at the end? (NORTH / EAST / SOUTH / WEST)", clues: [
-        { name: "Astrolabe", clue: "You start facing NORTH", objectShape: "chest" },
-        { name: "Heading Slab I", clue: "First turn: RIGHT", objectShape: "orb" },
-        { name: "Heading Slab II", clue: "Second turn: RIGHT", objectShape: "chest" },
-        { name: "Heading Slab III", clue: "Third turn: LEFT", objectShape: "tome" },
-      ]},
-    ],
-  },
-  {
-    name: "The Revelation",
-    answer: "VAULT",
-    question: "Five rune stones each hold one encoded letter. The ancient cipher shifts every letter FORWARD 3 positions (A→D, B→E … Z→C). Decode the 5-letter word by shifting each letter BACK 3.",
-    hint: "Reverse the shift: subtract 3 from each letter's alphabet position. Y→V, D→A, X→U, O→L, W→T.",
-    storyline: "The final chamber. Ancient runes glow green on every wall. Five encoded letters are carved into stone pillars. The cipher of the ancients shifts every letter forward by three — only by reversing the shift will the great door open!",
-    objective: "Collect all 5 rune stones. Each shows one encoded letter. Shift each letter BACK by 3 to decode, then submit the 5-letter word.",
-    clueCount: 5,
-    trashCount: 3,
-    theme: {
-      color: 0x00e676,
-      emissive: 0x00733b,
-      beacon: 0x00e676,
-      label: "#00e676",
-    },
-    clues: [
-      { name: "Verdant Rune I", clue: "Encoded letter 1: Y", objectShape: "tome" },
-      { name: "Verdant Rune II", clue: "Encoded letter 2: D", objectShape: "orb" },
-      { name: "Verdant Rune III", clue: "Encoded letter 3: X", objectShape: "lantern" },
-      { name: "Verdant Rune IV", clue: "Encoded letter 4: O", objectShape: "chest" },
-      { name: "Verdant Rune V", clue: "Encoded letter 5: W", objectShape: "diamond" },
-    ],
-    trash: [
-      { name: "Dead Root", msg: "The root withers in your hands… cursed garbage!" },
-      { name: "Withered Leaf", msg: "The leaf crumbles to nothing… a trap!" },
-      { name: "Hollow Bark", msg: "The bark is hollow and rotten… just junk!" },
-    ],
-    altAnswers: [
-      { answer: "FLAME", question: "Five rune stones each hold one encoded letter. The ancient cipher shifts every letter FORWARD 3 positions (A→D, B→E … Z→C). Decode the 5-letter word by shifting each letter BACK 3.", clues: [
-        { name: "Ember Glyph I", clue: "Encoded letter 1: I", objectShape: "orb" },
-        { name: "Ember Glyph II", clue: "Encoded letter 2: O", objectShape: "chest" },
-        { name: "Ember Glyph III", clue: "Encoded letter 3: D", objectShape: "pillar" },
-        { name: "Ember Glyph IV", clue: "Encoded letter 4: P", objectShape: "diamond" },
-        { name: "Ember Glyph V", clue: "Encoded letter 5: H", objectShape: "crystal" },
-      ]},
-      { answer: "STONE", question: "Five rune stones each hold one encoded letter. The ancient cipher shifts every letter FORWARD 3 positions (A→D, B→E … Z→C). Decode the 5-letter word by shifting each letter BACK 3.", clues: [
-        { name: "Rock Cipher I", clue: "Encoded letter 1: V", objectShape: "mirror" },
-        { name: "Rock Cipher II", clue: "Encoded letter 2: W", objectShape: "tome" },
-        { name: "Rock Cipher III", clue: "Encoded letter 3: R", objectShape: "orb" },
-        { name: "Rock Cipher IV", clue: "Encoded letter 4: Q", objectShape: "chest" },
-        { name: "Rock Cipher V", clue: "Encoded letter 5: H", objectShape: "lantern" },
-      ]},
-    ],
-  },
-];
-
-/** Resolve object shape id to a Three.js mesh — higher-quality geometry */
-function resolveObjectShape(shapeId, mainMat) {
-  switch (shapeId) {
-    case "chest": {
-      // Ornate chest — box body + ridge bar on top
-      const grp = new THREE.Group();
-      const body = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.62, 0.72), mainMat);
-      body.position.y = 0.72;
-      grp.add(body);
-      const ridgeMat = mainMat.clone();
-      ridgeMat.emissiveIntensity = Math.min((ridgeMat.emissiveIntensity ?? 0.5) + 0.4, 1.2);
-      const ridge = new THREE.Mesh(new THREE.BoxGeometry(1.08, 0.1, 0.74), ridgeMat);
-      ridge.position.y = 1.07;
-      grp.add(ridge);
-      grp.position.y = 0; // positioned by parent
-      // tag so animation loop can grab it
-      grp.isMeshGroup = true;
-      return grp;
-    }
-    case "orb": {
-      const mat2 = mainMat.clone();
-      mat2.transparent = true;
-      mat2.opacity = 0.84;
-      const m = new THREE.Mesh(new THREE.SphereGeometry(0.42, 16, 16), mat2);
-      m.position.y = 0.88;
-      return m;
-    }
-    case "tome": {
-      // Flat open tome — spine + pages
-      const grp = new THREE.Group();
-      const spine = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.16, 0.98), mainMat);
-      spine.position.set(-0.36, 0.53, 0);
-      grp.add(spine);
-      const page = new THREE.Mesh(new THREE.BoxGeometry(0.64, 0.12, 0.96), mainMat);
-      page.position.set(0.0, 0.52, 0);
-      grp.add(page);
-      grp.rotation.y = 0.28;
-      grp.isMeshGroup = true;
-      return grp;
-    }
-    case "lantern": {
-      // Lantern — octahedron + thin cage ring
-      const grp = new THREE.Group();
-      const body = new THREE.Mesh(new THREE.OctahedronGeometry(0.36, 0), mainMat);
-      body.position.y = 0.9;
-      grp.add(body);
-      const cageMat = mainMat.clone();
-      cageMat.wireframe = true;
-      cageMat.emissiveIntensity = 0.15;
-      const cage = new THREE.Mesh(new THREE.OctahedronGeometry(0.44, 0), cageMat);
-      cage.position.y = 0.9;
-      grp.add(cage);
-      grp.isMeshGroup = true;
-      return grp;
-    }
-    case "mirror": {
-      // Mirror — slab with inner glow face
-      const grp = new THREE.Group();
-      const slab = new THREE.Mesh(new THREE.BoxGeometry(0.09, 1.62, 1.02), mainMat);
-      slab.position.y = 1.22;
-      grp.add(slab);
-      const faceMat = mainMat.clone();
-      faceMat.emissiveIntensity = (faceMat.emissiveIntensity ?? 0.5) * 1.5;
-      faceMat.transparent = true;
-      faceMat.opacity = 0.6;
-      const face = new THREE.Mesh(new THREE.PlaneGeometry(0.88, 1.5), faceMat);
-      face.position.set(0.055, 1.22, 0);
-      face.rotation.y = Math.PI / 2;
-      grp.add(face);
-      grp.isMeshGroup = true;
-      return grp;
-    }
-    case "diamond": {
-      const m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.4, 1), mainMat);
-      m.position.y = 0.92;
-      return m;
-    }
-    case "pillar": {
-      // Column with capital and base
-      const grp = new THREE.Group();
-      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 1.15, 10), mainMat);
-      shaft.position.y = 0.82;
-      grp.add(shaft);
-      const capital = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.18, 0.14, 8), mainMat);
-      capital.position.y = 1.46;
-      grp.add(capital);
-      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.1, 8), mainMat);
-      base.position.y = 0.25;
-      grp.add(base);
-      grp.isMeshGroup = true;
-      return grp;
-    }
-    case "crystal": {
-      // Crystal cluster — two offset cones
-      const grp = new THREE.Group();
-      const main = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.95, 7), mainMat);
-      main.position.y = 0.87;
-      grp.add(main);
-      const shard = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.6, 6), mainMat);
-      shard.position.set(0.22, 0.72, 0.12);
-      shard.rotation.z = 0.22;
-      grp.add(shard);
-      grp.isMeshGroup = true;
-      return grp;
-    }
-    default: {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.72, 0.72), mainMat);
-      m.position.y = 0.76;
-      return m;
-    }
-  }
-}
-
-/* ── Wall layout — maze style ───────────────────────── */
-const WALL_SEGMENTS = [
-  // Perimeter walls (match BOUNDARY=18)
-  { x: 0,   z: -18, w: 38, d: 1.2, h: 3.2 },
-  { x: 0,   z:  18, w: 38, d: 1.2, h: 3.2 },
-  { x: -18, z:   0, w: 1.2, d: 38, h: 3.2 },
-  { x:  18, z:   0, w: 1.2, d: 38, h: 3.2 },
-  // ── Interior corridors (trimmed to fit ~±15) ──
-  { x: -10, z:  -8, w:  8, d: 0.6, h: 2.6 },
-  { x:   8, z:  -8, w:  8, d: 0.6, h: 2.6 },
-  { x: -10, z:   8, w:  8, d: 0.6, h: 2.6 },
-  { x:   8, z:   8, w:  8, d: 0.6, h: 2.6 },
-  { x: -10, z:   0, w: 0.6, d: 16, h: 2.6 },
-  { x:  10, z:  -2, w: 0.6, d: 12, h: 2.6 },
-  { x:  -2, z:  -4, w:  6, d: 0.6, h: 2.6 },
-  { x:   2, z:   4, w:  6, d: 0.6, h: 2.6 },
-];
-
-/* ── Helpers ─────────────────────────────────────────── */
-
-/** Create a billboard text sprite */
-function createTextSprite(text, color = "#ffffff") {
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
-  canvas.width = 512;
-  canvas.height = 128;
-  ctx.font = "Bold 36px Arial, sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.shadowColor = "rgba(0,0,0,0.85)";
-  ctx.shadowBlur = 10;
-  ctx.fillStyle = color;
-  ctx.fillText(text, 256, 64);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.minFilter = THREE.LinearFilter;
-  const mat = new THREE.SpriteMaterial({
-    map: tex,
-    transparent: true,
-    depthTest: false,
-  });
-  const sprite = new THREE.Sprite(mat);
-  sprite.scale.set(4, 1, 1);
-  return sprite;
-}
-
-/** Build the stickman character (returns object with group + limb refs) */
-function buildStickman(color = 0x00ffd0) {
-  const group = new THREE.Group();
-  const emissive = new THREE.Color(color).multiplyScalar(0.4);
-  const mat = new THREE.MeshStandardMaterial({
-    color,
-    emissive,
-    roughness: 0.5,
-    metalness: 0.2,
-  });
-
-  // Head
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.25, 8, 8), mat);
-  head.position.y = 1.9;
-  group.add(head);
-
-  // Body
-  const body = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.05, 0.05, 0.8, 6),
-    mat,
-  );
-  body.position.y = 1.25;
-  group.add(body);
-
-  // Arms — geometry translated so pivot is at shoulder
-  const makeArm = () => {
-    const g = new THREE.CylinderGeometry(0.035, 0.035, 0.6, 5);
-    g.translate(0, -0.3, 0);
-    return new THREE.Mesh(g, mat);
-  };
-  const leftArm = makeArm();
-  leftArm.position.set(-0.2, 1.6, 0);
-  group.add(leftArm);
-
-  const rightArm = makeArm();
-  rightArm.position.set(0.2, 1.6, 0);
-  group.add(rightArm);
-
-  // Legs — geometry translated so pivot is at hip
-  const makeLeg = () => {
-    const g = new THREE.CylinderGeometry(0.045, 0.045, 0.75, 5);
-    g.translate(0, -0.375, 0);
-    return new THREE.Mesh(g, mat);
-  };
-  const leftLeg = makeLeg();
-  leftLeg.position.set(-0.12, 0.85, 0);
-  group.add(leftLeg);
-
-  const rightLeg = makeLeg();
-  rightLeg.position.set(0.12, 0.85, 0);
-  group.add(rightLeg);
-
-  return { group, head, body, leftArm, rightArm, leftLeg, rightLeg };
-}
-
-/** Build a mystery object (pedestal + shape + beacon + rune ring + label) */
-function buildObjectMesh(objData, index) {
-  const group = new THREE.Group();
-
-  // Stone pedestal — hexagonal with inset band
-  const pedMat = new THREE.MeshStandardMaterial({
-    color: 0x252535,
-    emissive: 0x0a0a18,
-    emissiveIntensity: 0.3,
-    roughness: 0.88,
-    metalness: 0.18,
-  });
-  const pedestal = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.48, 0.68, 0.42, 7),
-    pedMat,
-  );
-  pedestal.position.y = 0.21;
-  group.add(pedestal);
-
-  // Pedestal inset band — carved groove
-  const bandMat = new THREE.MeshStandardMaterial({
-    color: objData.color,
-    emissive: objData.emissive,
-    emissiveIntensity: 0.35,
-    roughness: 0.6,
-    metalness: 0.25,
-  });
-  const band = new THREE.Mesh(
-    new THREE.TorusGeometry(0.52, 0.035, 4, 18),
-    bandMat,
-  );
-  band.rotation.x = Math.PI / 2;
-  band.position.y = 0.28;
-  group.add(band);
-
-  // Main shape — unique per object
-  const mainMat = new THREE.MeshStandardMaterial({
-    color: objData.color,
-    emissive: objData.emissive,
-    emissiveIntensity: 0.55,
-    roughness: 0.3,
-    metalness: 0.35,
-  });
-
-  const mainMesh = resolveObjectShape(objData.objectShape || "chest", mainMat);
-  group.add(mainMesh);
-
-  // Floating beacon (pulsing sphere)
-  const beaconMat = new THREE.MeshBasicMaterial({
-    color: objData.beaconColor,
-    transparent: true,
-    opacity: 0.9,
-  });
-  const beacon = new THREE.Mesh(
-    new THREE.SphereGeometry(0.13, 8, 8),
-    beaconMat,
-  );
-  beacon.position.y = 2.5;
-  group.add(beacon);
-
-  // Horizontal rune ring — slowly rotates, sits above pedestal
-  const runeRingMat = new THREE.MeshBasicMaterial({
-    color: objData.beaconColor,
-    transparent: true,
-    opacity: 0.5,
-  });
-  const runeRing = new THREE.Mesh(
-    new THREE.TorusGeometry(0.58, 0.028, 4, 28),
-    runeRingMat,
-  );
-  runeRing.rotation.x = Math.PI / 2;
-  runeRing.position.y = 0.72;
-  group.add(runeRing);
-
-  // Outer wide proximity ring on the ground
-  const ringMat = new THREE.MeshBasicMaterial({
-    color: objData.beaconColor,
-    transparent: true,
-    opacity: 0.18,
-    side: THREE.DoubleSide,
-  });
-  const ring = new THREE.Mesh(
-    new THREE.RingGeometry(INTERACT_DIST - 0.3, INTERACT_DIST, 20),
-    ringMat,
-  );
-  ring.rotation.x = -Math.PI / 2;
-  ring.position.y = 0.03;
-  group.add(ring);
-
-  // Subtle floor glow pool under object
-  const poolMat = new THREE.MeshBasicMaterial({
-    color: objData.beaconColor,
-    transparent: true,
-    opacity: 0.08,
-    side: THREE.DoubleSide,
-  });
-  const pool = new THREE.Mesh(
-    new THREE.CircleGeometry(1.0, 16),
-    poolMat,
-  );
-  pool.rotation.x = -Math.PI / 2;
-  pool.position.y = 0.02;
-  group.add(pool);
-
-  // Name label
-  const label = createTextSprite(objData.name, objData.labelColor || "#ffffff");
-  label.position.y = 3.2;
-  group.add(label);
-
-  // World position
-  group.position.set(objData.pos[0], objData.pos[1], objData.pos[2]);
-
-  return { group, mesh: mainMesh, beacon, runeRing, ring, light: null, label };
-}
-
-/** Build the answer cart — the player must come here to submit their answer */
-function buildCartMesh() {
-  const group = new THREE.Group();
-
-  // Wagon body
-  const bodyMat = new THREE.MeshStandardMaterial({
-    color: 0x8b6914,
-    emissive: 0x4a3a0a,
-    emissiveIntensity: 0.3,
-    roughness: 0.65,
-    metalness: 0.1,
-  });
-  const body = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.7, 1.1), bodyMat);
-  body.position.y = 0.75;
-  body.castShadow = true;
-  body.receiveShadow = true;
-  group.add(body);
-
-  // Side rails
-  const railMat = new THREE.MeshStandardMaterial({
-    color: 0x6b4f12,
-    roughness: 0.8,
-  });
-  [
-    [-0.85, 1.2, 0],
-    [0.85, 1.2, 0],
-  ].forEach(([rx, ry, rz]) => {
-    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.5, 1.1), railMat);
-    rail.position.set(rx, ry, rz);
-    rail.castShadow = true;
-    group.add(rail);
-  });
-
-  // Wheels
-  const wheelMat = new THREE.MeshStandardMaterial({
-    color: 0x3a3a3a,
-    roughness: 0.75,
-    metalness: 0.4,
-  });
-  const wheelGeo = new THREE.TorusGeometry(0.25, 0.06, 5, 10);
-  [
-    [-0.7, 0.25, 0.6],
-    [0.7, 0.25, 0.6],
-    [-0.7, 0.25, -0.6],
-    [0.7, 0.25, -0.6],
-  ].forEach(([wx, wy, wz]) => {
-    const wheel = new THREE.Mesh(wheelGeo, wheelMat);
-    wheel.position.set(wx, wy, wz);
-    wheel.rotation.y = Math.PI / 2;
-    wheel.castShadow = true;
-    group.add(wheel);
-  });
-
-  // Glowing scroll on top
-  const scrollMat = new THREE.MeshStandardMaterial({
-    color: 0xf5deb3,
-    emissive: 0xdaa520,
-    emissiveIntensity: 0.6,
-    roughness: 0.4,
-  });
-  const scroll = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.12, 0.12, 0.7, 7),
-    scrollMat,
-  );
-  scroll.position.y = 1.35;
-  scroll.rotation.z = Math.PI / 2;
-  scroll.castShadow = true;
-  group.add(scroll);
-
-  // Beacon
-  const beaconMat = new THREE.MeshStandardMaterial({
-    color: 0xff6b35,
-    emissive: 0xff6b35,
-    emissiveIntensity: 1.5,
-    transparent: true,
-    opacity: 0.9,
-  });
-  const beacon = new THREE.Mesh(
-    new THREE.SphereGeometry(0.18, 6, 6),
-    beaconMat,
-  );
-  beacon.position.y = 2.8;
-  group.add(beacon);
-
-  // Ground ring
-  const ringMat = new THREE.MeshStandardMaterial({
-    color: 0xff6b35,
-    emissive: 0xff6b35,
-    emissiveIntensity: 0.6,
-    transparent: true,
-    opacity: 0.25,
-    side: THREE.DoubleSide,
-  });
-  const ring = new THREE.Mesh(
-    new THREE.RingGeometry(CART_INTERACT_DIST - 0.3, CART_INTERACT_DIST, 16),
-    ringMat,
-  );
-  ring.rotation.x = -Math.PI / 2;
-  ring.position.y = 0.02;
-  group.add(ring);
-
-  // Point light
-  const light = new THREE.PointLight(0xff6b35, 2.5, 14);
-  light.position.y = 2.2;
-  group.add(light);
-
-  // Label
-  const label = createTextSprite("Answer Cart", "#ff6b35");
-  label.position.y = 3.5;
-  group.add(label);
-
-  group.position.set(CART_POS[0], CART_POS[1], CART_POS[2]);
-
-  return { group, beacon, ring, light, scroll };
-}
-
-/** Build a wall mesh from segment data — dark dungeon stone */
-function buildWallMesh(w) {
-  const group = new THREE.Group();
-  const isPerimeter = w.w >= 50 || w.d >= 50;
-
-  // White stone wall
-  const mat = new THREE.MeshStandardMaterial({
-    color: 0xffffff,            // Wall is now white
-    emissive: 0xf0f0f0,         // subtle light gray glow
-    emissiveIntensity: 0.1,
-    roughness: 0.9,
-    metalness: 0.05,
-  });
-
-  const wall = new THREE.Mesh(new THREE.BoxGeometry(w.w, w.h, w.d), mat);
-  wall.position.set(w.x, w.h / 2, w.z);
-  wall.castShadow = true;
-  wall.receiveShadow = true;
-  group.add(wall);
-
-  // Light gray coping on top
-  const capMat = new THREE.MeshStandardMaterial({
-    color: 0xdcdcdc,           // light gray accent
-    emissive: 0xeaeaea,
-    emissiveIntensity: 0.05,
-    roughness: 0.85,
-    metalness: 0.03,
-  });
-
-  const cap = new THREE.Mesh(
-    new THREE.BoxGeometry(w.w + 0.1, 0.14, w.d + 0.1),
-    capMat
-  );
-  cap.position.set(w.x, w.h + 0.07, w.z);
-  cap.receiveShadow = true;
-  group.add(cap);
-
-  // Horizontal groove lines — subtle gray lines for accent
-  if (isPerimeter && w.h >= 3) {
-    const grooveMat = new THREE.MeshStandardMaterial({
-      color: 0xc0c0c0,    // light gray grooves
-      roughness: 1.0,
-      metalness: 0.0,
-    });
-    [1.0, 2.0].forEach((gy) => {
-      const groove = new THREE.Mesh(
-        new THREE.BoxGeometry(w.w + 0.05, 0.06, w.d + 0.05),
-        grooveMat
-      );
-      groove.position.set(w.x, gy, w.z);
-      group.add(groove);
-    });
-  }
-
-  return group;
-}
-
-/** Build a wall-mounted torch (returns group with animated flame refs) */
-function buildTorch(x, y, z) {
-  const group = new THREE.Group();
-
-  // Iron wall sconce bracket
-  const bracketMat = new THREE.MeshStandardMaterial({
-    color: 0x2e1e08,
-    roughness: 0.7,
-    metalness: 0.65,
-  });
-  const bracket = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.035, 0.06, 0.32, 5),
-    bracketMat,
-  );
-  bracket.position.set(x, y - 0.04, z);
-  group.add(bracket);
-
-  // Iron cup / holder at top
-  const cupMat = new THREE.MeshStandardMaterial({
-    color: 0x4a3010,
-    roughness: 0.65,
-    metalness: 0.7,
-  });
-  const cup = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.1, 0.065, 0.14, 6),
-    cupMat,
-  );
-  cup.position.set(x, y + 0.16, z);
-  group.add(cup);
-
-  // Outer flame cone (orange, pointing up)
-  const flameMat = new THREE.MeshBasicMaterial({
-    color: 0xff5500,
-    transparent: true,
-    opacity: 0.78,
-  });
-  const flame = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.36, 7), flameMat);
-  flame.position.set(x, y + 0.41, z);
-  group.add(flame);
-
-  // Inner flame core (bright yellow-white)
-  const coreMat = new THREE.MeshBasicMaterial({
-    color: 0xffe080,
-    transparent: true,
-    opacity: 0.95,
-  });
-  const core = new THREE.Mesh(new THREE.SphereGeometry(0.065, 6, 5), coreMat);
-  core.position.set(x, y + 0.29, z);
-  group.add(core);
-
-  // Outer glow halo
-  const flareMat = new THREE.MeshBasicMaterial({
-    color: 0xff3300,
-    transparent: true,
-    opacity: 0.28,
-  });
-  const flare = new THREE.Mesh(new THREE.SphereGeometry(0.21, 6, 5), flareMat);
-  flare.position.set(x, y + 0.34, z);
-  group.add(flare);
-
-  // Warm flickering point light — wider range than before
-  const torchLight = new THREE.PointLight(0xff6622, 1.1, 11);
-  torchLight.position.set(x, y + 0.42, z);
-  torchLight.castShadow = false;
-  group.add(torchLight);
-
-  return { group, flame, core, flare, light: torchLight };
-}
-
-/** Build a trash object — looks similar to clues but with subtle warning hints */
-function buildTrashMesh(trashData, shapeIdx) {
-  const group = new THREE.Group();
-
-  // Pedestal (same as real clues)
-  const pedMat = new THREE.MeshStandardMaterial({
-    color: 0x333344,
-    roughness: 0.85,
-    metalness: 0.15,
-  });
-  const pedestal = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.5, 0.7, 0.4, 6),
-    pedMat,
-  );
-  pedestal.position.y = 0.2;
-  group.add(pedestal);
-
-  // Main shape (similar to clue shapes to blend in)
-  const mainMat = new THREE.MeshStandardMaterial({
-    color: trashData.color,
-    emissive: trashData.emissive,
-    emissiveIntensity: 0.5,
-    roughness: 0.35,
-    metalness: 0.3,
-  });
-  let mainMesh;
-  switch (shapeIdx % 4) {
-    case 0:
-      mainMesh = new THREE.Mesh(
-        new THREE.BoxGeometry(0.9, 0.55, 0.65),
-        mainMat,
-      );
-      mainMesh.position.y = 0.7;
-      break;
-    case 1: {
-      const orbMat = mainMat.clone();
-      orbMat.transparent = true;
-      orbMat.opacity = 0.82;
-      mainMesh = new THREE.Mesh(new THREE.SphereGeometry(0.38, 8, 8), orbMat);
-      mainMesh.position.y = 0.85;
-      break;
-    }
-    case 2:
-      mainMesh = new THREE.Mesh(
-        new THREE.BoxGeometry(0.65, 0.13, 0.9),
-        mainMat,
-      );
-      mainMesh.position.y = 0.52;
-      mainMesh.rotation.y = Math.random() * 0.5;
-      break;
-    case 3:
-      mainMesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.33), mainMat);
-      mainMesh.position.y = 0.9;
-      break;
-    default:
-      mainMesh = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.7), mainMat);
-      mainMesh.position.y = 0.75;
-  }
-  mainMesh.castShadow = false;
-  group.add(mainMesh);
-
-  // Beacon (similar to clues — but animated differently in the loop)
-  const beaconMat = new THREE.MeshBasicMaterial({
-    color: trashData.beaconColor,
-    transparent: true,
-    opacity: 0.9,
-  });
-  const beacon = new THREE.Mesh(
-    new THREE.SphereGeometry(0.14, 6, 6),
-    beaconMat,
-  );
-  beacon.position.y = 2.5;
-  group.add(beacon);
-
-  // Proximity ring — slightly reddish tint as a subtle warning
-  const ringColor = new THREE.Color(trashData.beaconColor).lerp(
-    new THREE.Color(0xff4444),
-    0.25,
-  );
-  const ringMat = new THREE.MeshBasicMaterial({
-    color: ringColor,
-    transparent: true,
-    opacity: 0.15,
-    side: THREE.DoubleSide,
-  });
-  const ring = new THREE.Mesh(
-    new THREE.RingGeometry(INTERACT_DIST - 0.3, INTERACT_DIST, 16),
-    ringMat,
-  );
-  ring.rotation.x = -Math.PI / 2;
-  ring.position.y = 0.02;
-  group.add(ring);
-
-  // No per-object point light
-
-  // Name label
-  const label = createTextSprite(
-    trashData.name,
-    trashData.labelColor || "#ffffff",
-  );
-  label.position.y = 3.2;
-  group.add(label);
-
-  // ★ Warning indicator — small orbiting red dot (subtle hint)
-  const warnMat = new THREE.MeshBasicMaterial({
-    color: 0xff3333,
-    transparent: true,
-    opacity: 0.8,
-  });
-  const warnDot = new THREE.Mesh(new THREE.SphereGeometry(0.06, 5, 5), warnMat);
-  warnDot.position.set(0.8, 1.5, 0);
-  group.add(warnDot);
-
-  return { group, mesh: mainMesh, beacon, ring, light: null, label, warnDot };
-}
-
-// (decorative builder removed — replaced by trash system)
-
-/** Check if a point is inside any wall (with padding radius) */
-function isInsideWall(x, z, radius, walls) {
-  for (const w of walls) {
-    const halfW = w.w / 2 + radius;
-    const halfD = w.d / 2 + radius;
-    if (Math.abs(x - w.x) < halfW && Math.abs(z - w.z) < halfD) {
-      return true;
-    }
-  }
-  return false;
-}
-
-/** Generate a random position that doesn't overlap walls or existing points */
-function generateRandomPos(existing, walls, minDist, boundary, avoidCenter) {
-  for (let attempt = 0; attempt < 200; attempt++) {
-    const x = (Math.random() - 0.5) * boundary * 2;
-    const z = (Math.random() - 0.5) * boundary * 2;
-    if (isInsideWall(x, z, 1.5, walls)) continue;
-    if (avoidCenter && Math.sqrt(x * x + z * z) < avoidCenter) continue;
-    let tooClose = false;
-    for (const [ex, ez] of existing) {
-      if (Math.sqrt((x - ex) ** 2 + (z - ez) ** 2) < minDist) {
-        tooClose = true;
-        break;
-      }
-    }
-    if (tooClose) continue;
-    return [x, z];
-  }
-  return null;
-}
-
-/** Resolve collisions against walls (AABB) */
-function resolveCollisions(pos, walls, radius) {
-  for (const w of walls) {
-    const halfW = w.w / 2 + radius;
-    const halfD = w.d / 2 + radius;
-    const dx = pos.x - w.x;
-    const dz = pos.z - w.z;
-    if (Math.abs(dx) < halfW && Math.abs(dz) < halfD) {
-      const overlapX = halfW - Math.abs(dx);
-      const overlapZ = halfD - Math.abs(dz);
-      if (overlapX < overlapZ) {
-        pos.x += dx > 0 ? overlapX : -overlapX;
-      } else {
-        pos.z += dz > 0 ? overlapZ : -overlapZ;
-      }
-    }
-  }
-}
-
-/* ═══════════════════════════════════════════════════════
-   Component
-   ═══════════════════════════════════════════════════════ */
 const StickmanMysteryGame = () => {
   const { submitAnswer, currentPlayer, gameState, currentRoom, players } =
     useGame();
@@ -1023,7 +85,9 @@ const StickmanMysteryGame = () => {
             theme: s.theme || [
               { color: 0x00e5ff, emissive: 0x006b80, beacon: 0x00e5ff, label: "#00e5ff" },
               { color: 0xbb86fc, emissive: 0x5d4380, beacon: 0xbb86fc, label: "#bb86fc" },
-              { color: 0xff5252, emissive: 0x802929, beacon: 0xff5252, label: "#ff5252" },
+              { color: 0xff7043, emissive: 0x802020, beacon: 0xff7043, label: "#ff7043" },
+              { color: 0x448aff, emissive: 0x1a3680, beacon: 0x448aff, label: "#448aff" },
+              { color: 0x69f0ae, emissive: 0x1a5c35, beacon: 0x69f0ae, label: "#69f0ae" },
               { color: 0xffab00, emissive: 0x805500, beacon: 0xffab00, label: "#ffab00" },
               { color: 0x00e676, emissive: 0x00733b, beacon: 0x00e676, label: "#00e676" },
             ][i] || { color: 0x00e5ff, emissive: 0x006b80, beacon: 0x00e5ff, label: "#00e5ff" },
@@ -1069,6 +133,8 @@ const StickmanMysteryGame = () => {
   const slowTimeRef = useRef(0);
   const shakeTimeRef = useRef(0);
   const isSlowedRef = useRef(false);
+  const timePenaltyRef = useRef(_saved?.timePenalty ?? 0);
+  const timeLeftRef = useRef(GAME_DURATION);
 
   /* ── Jump refs ───────────────────────────────────────── */
   const isJumpingRef = useRef(false);
@@ -1107,13 +173,14 @@ const StickmanMysteryGame = () => {
 
   /* ── React state ───────────────────────────────────── */
   const [timeLeft, setTimeLeft] = useState(() => {
-    // Initialize from server time if game is already running
+    // Initialize from server time if game is already running, accounting for saved penalty
     if (gameState?.startedAt && gameState?.status === 'playing') {
       const elapsed = Date.now() - new Date(gameState.startedAt).getTime() - (gameState.totalPausedMs || 0);
-      return Math.max(0, GAME_DURATION - Math.floor(elapsed / 1000));
+      return Math.max(0, GAME_DURATION - Math.floor(elapsed / 1000) - (_saved?.timePenalty ?? 0));
     }
     return GAME_DURATION;
   });
+  const [timePenalty, setTimePenalty] = useState(_saved?.timePenalty ?? 0);
   const [currentStage, setCurrentStage] = useState(_saved?.stage ?? 0);
   const [stageCluesFound, setStageCluesFound] = useState(_saved?.stageCluesFound ?? []);
   const [stageTrashTriggered, setStageTrashTriggered] = useState(_saved?.stageTrashTriggered ?? []);
@@ -1172,6 +239,7 @@ const StickmanMysteryGame = () => {
           hasKey,
           gameComplete,
           finalScore,
+          timePenalty: timePenaltyRef.current,
         }),
       );
     } catch {}
@@ -1184,6 +252,7 @@ const StickmanMysteryGame = () => {
     gameComplete,
     gameOver,
     finalScore,
+    timePenalty,
   ]);
 
   const prevStartedAtRef = useRef(gameState?.startedAt);
@@ -1205,6 +274,9 @@ const StickmanMysteryGame = () => {
   useEffect(() => {
     isPausedRef.current = isPaused;
   }, [isPaused]);
+  useEffect(() => {
+    timeLeftRef.current = timeLeft;
+  }, [timeLeft]);
   useEffect(() => {
     currentStageRef.current = currentStage;
   }, [currentStage]);
@@ -1283,6 +355,8 @@ const StickmanMysteryGame = () => {
       jumpTimerRef.current = 0;
       hasKeyRef.current = false;
       pushVelocityRef.current = { x: 0, z: 0 };
+      timePenaltyRef.current = 0;
+      setTimePenalty(0);
       // reset stickman position
       if (stickmanRef.current) {
         stickmanRef.current.group.position.set(0, 0, 0);
@@ -1317,10 +391,10 @@ const StickmanMysteryGame = () => {
     if (gameComplete || gameOver || isPaused || gameState?.status !== "playing")
       return;
     timerRef.current = setInterval(() => {
-      // Re-sync from server clock each tick to stay accurate
+      // Re-sync from server clock each tick, subtract accumulated personal penalty
       if (gameState?.startedAt) {
         const elapsed = Date.now() - new Date(gameState.startedAt).getTime() - (gameState?.totalPausedMs || 0);
-        const remaining = Math.max(0, GAME_DURATION - Math.floor(elapsed / 1000));
+        const remaining = Math.max(0, GAME_DURATION - Math.floor(elapsed / 1000) - timePenaltyRef.current);
         setTimeLeft(remaining);
         if (remaining <= 0) {
           setGameOver(true);
@@ -1549,7 +623,8 @@ const StickmanMysteryGame = () => {
       scene.add(colGroup);
     });
 
-    // ── Random position generation ────────────────────
+    // ── Random position generation (seeded per room so all clients match) ────
+    const rng = makePrng(hashStr(currentRoom?._id || "room0"));
     const occupied = [
       [0, 0],
       [CART_POS[0], CART_POS[2]],
@@ -1572,7 +647,7 @@ const StickmanMysteryGame = () => {
           beaconColor: stage.theme.beacon,
           labelColor: stage.theme.label,
         };
-        const pos = generateRandomPos(occupied, wallBoxes, 4, BOUNDARY - 2, 5);
+        const pos = generateRandomPosSeeded(rng, occupied, wallBoxes, 4, BOUNDARY - 2, 5);
         if (!pos) return;
         occupied.push(pos);
         const obj = buildObjectMesh(themedData, clueIdx);
@@ -1600,7 +675,7 @@ const StickmanMysteryGame = () => {
           beaconColor: stage.theme.beacon,
           labelColor: stage.theme.label,
         };
-        const pos = generateRandomPos(occupied, wallBoxes, 4, BOUNDARY - 2, 5);
+        const pos = generateRandomPosSeeded(rng, occupied, wallBoxes, 4, BOUNDARY - 2, 5);
         if (!pos) return;
         occupied.push(pos);
         const mesh = buildTrashMesh(themedData, trashIdx);
@@ -2001,7 +1076,11 @@ const StickmanMysteryGame = () => {
               stageTrashTriggeredRef.current = next;
               return next;
             });
-            // Consequences: slow-mo + camera shake (no time penalty)
+            // Consequences: slow-mo + camera shake + stage-scaled time penalty
+            const trashTimePenalty = STAGE_TRASH_TIME_PENALTY[curStage] ?? 5;
+            timePenaltyRef.current += trashTimePenalty;
+            setTimePenalty((prev) => prev + trashTimePenalty);
+            setTimeLeft((prev) => Math.max(0, prev - trashTimePenalty));
             slowTimeRef.current = TRASH_SLOW_DURATION;
             shakeTimeRef.current = TRASH_SHAKE_DURATION;
             if (entry.beacon) entry.beacon.visible = false;
@@ -2315,6 +1394,7 @@ const StickmanMysteryGame = () => {
                 hasKey: hasKeyRef.current,
                 solved: gameCompleteRef.current,
                 score: accumulatedScoreRef.current,
+                timeLeft: timeLeftRef.current,
               },
             }),
           },
@@ -2405,21 +1485,29 @@ const StickmanMysteryGame = () => {
       stageAnswer.trim().toLowerCase() === stg.answer.toLowerCase();
 
     if (!correct) {
+      const wrongTimePenalty = STAGE_WRONG_TIME_PENALTY[currentStage] ?? 15;
+      timePenaltyRef.current += wrongTimePenalty;
+      setTimePenalty((prev) => prev + wrongTimePenalty);
+      setTimeLeft((prev) => Math.max(0, prev - wrongTimePenalty));
       setStageWrongAttempts((p) => p + 1);
       setStageAnswer("");
-      setError("That's not correct — think again!");
+      setError(`That's not correct — think again! (−${wrongTimePenalty}s time penalty)`);
       return;
     }
 
     /* ── Correct! Compute stage score ── */
+    const stageMaxScore = STAGE_MAX_SCORES[currentStage] || 1000;
     const timeSpent = stageStartTimeRef.current - timeLeft;
     const trashHit = stageTrashTriggered.length;
+    
+    // Penalty calculations (percentage-based for balance across difficulty tiers)
+    const timePenalty = Math.floor(timeSpent / 5); // 1 point per 5 seconds
+    const trashPenalty = Math.floor(trashHit * (stageMaxScore * 0.1)); // 10% of max per trash
+    const wrongPenalty = Math.floor(stageWrongAttempts * (stageMaxScore * 0.15)); // 15% of max per wrong
+    
     const score = Math.max(
       0,
-      STAGE_MAX_SCORE -
-        Math.floor(timeSpent / 5) -
-        trashHit * 20 -
-        stageWrongAttempts * WRONG_ANSWER_PENALTY,
+      stageMaxScore - timePenalty - trashPenalty - wrongPenalty,
     );
     const summary = {
       stage: currentStage,
@@ -2473,9 +1561,10 @@ const StickmanMysteryGame = () => {
   const fmt = (s) =>
     `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
 
-  /* ═══════════════════════════════════════════════════
+
+  /* =======================================================
      JSX
-     ═══════════════════════════════════════════════════ */
+     ======================================================= */
   const stg = STAGES[Math.min(currentStage, TOTAL_STAGES - 1)];
   const anyModal =
     showClue !== null ||
@@ -2489,661 +1578,106 @@ const StickmanMysteryGame = () => {
 
   return (
     <div className="sm-game">
-      {/* Three.js canvas */}
       <div ref={containerRef} className="sm-canvas" />
 
-      {/* ── HUD ──────────────────────────────────── */}
-      <div className="sm-hud">
-        <div className="sm-hud-left">
-          <div
-            className={`sm-hud-pill sm-timer ${timeLeft <= 60 ? "warn" : ""} ${timeLeft <= 30 ? "critical" : ""}`}
-          >
-            ⏱ {fmt(timeLeft)}
-          </div>
-          <div className="sm-hud-pill sm-clue-count">
-            🔑 {stageCluesFound.length}/{stg.clues.length}
-          </div>
-          <div
-            className="sm-hud-pill sm-stage-pill"
-            style={{
-              borderColor: stg.theme.label,
-              color: stg.theme.label,
-            }}
-          >
-            🏰 Stage {Math.min(currentStage + 1, TOTAL_STAGES)}/{TOTAL_STAGES}:{" "}
-            {currentStage >= TOTAL_STAGES ? "Complete!" : stg.name}
-          </div>
-          <div
-            className={`sm-hud-pill sm-dash-pill${isDashing ? " dashing" : ""}${!dashReady ? " cooldown" : ""}`}
-          >
-            💨 {isDashing ? "DASH!" : dashReady ? "Ready" : "Cooldown"}
-          </div>
-          <div
-            className={`sm-hud-pill sm-jump-pill${isJumping ? " jumping" : ""}${!jumpReady ? " cooldown" : ""}`}
-          >
-            🦘 {isJumping ? "JUMP!" : jumpReady ? "Ready" : "Cooldown"}
-          </div>
-          {hasKey && (
-            <div className="sm-hud-pill sm-key-pill">🗝️ KEY</div>
-          )}
-          {isSlowed && (
-            <div className="sm-hud-pill sm-slowed-pill">🐌 SLOWED</div>
-          )}
-        </div>
-        <div className="sm-hud-right">
-          <div className="sm-hud-pill sm-controls-hint">
-            <kbd>W</kbd>
-            <kbd>A</kbd>
-            <kbd>S</kbd>
-            <kbd>D</kbd> Move &nbsp;· <kbd>E</kbd> Interact &nbsp;·{" "}
-            <kbd>Space</kbd> Jump &nbsp;· <kbd>Shift</kbd> Dash
-          </div>
-        </div>
-      </div>
+      <GameHUD
+        timeLeft={timeLeft}
+        fmt={fmt}
+        stageCluesFound={stageCluesFound}
+        stg={stg}
+        currentStage={currentStage}
+        isDashing={isDashing}
+        dashReady={dashReady}
+        isJumping={isJumping}
+        jumpReady={jumpReady}
+        hasKey={hasKey}
+        isSlowed={isSlowed}
+        anyModal={anyModal}
+        nearClue={nearClue}
+        nearTrash={nearTrash}
+        stageTrashTriggered={stageTrashTriggered}
+        nearCart={nearCart}
+        showStageQuestion={showStageQuestion}
+        cartAnswerBlocked={cartAnswerBlocked}
+        isPaused={isPaused}
+        setShowStageQuestion={setShowStageQuestion}
+      />
 
-      {/* ── Visual hint bar ──────────────────────── */}
-      {!anyModal && currentStage < TOTAL_STAGES && (
-        <div className="sm-hint-bar">
-          <span className="sm-hint-safe">🟢 Calm glow = Clue</span>
-          <span className="sm-hint-danger">
-            🔴 Fast pulse + red dot = Trash (avoid!)
-          </span>
-        </div>
-      )}
+      <GameModals
+        showStoryline={showStoryline}
+        showKeyObtained={showKeyObtained}
+        showClue={showClue}
+        showTrash={showTrash}
+        showStageQuestion={showStageQuestion}
+        showStageSummary={showStageSummary}
+        gameComplete={gameComplete}
+        showFinalSummary={showFinalSummary}
+        showDashboard={showDashboard}
+        gameOver={gameOver}
+        isPaused={isPaused}
+        stg={stg}
+        STAGES={STAGES}
+        currentStage={currentStage}
+        stageCluesFound={stageCluesFound}
+        stageTrashTriggered={stageTrashTriggered}
+        stageAnswer={stageAnswer}
+        stageWrongAttempts={stageWrongAttempts}
+        error={error}
+        finalScore={finalScore}
+        stageScores={stageScores}
+        timeLeft={timeLeft}
+        hasKey={hasKey}
+        cartAnswerBlocked={cartAnswerBlocked}
+        fmt={fmt}
+        players={players}
+        currentPlayer={currentPlayer}
+        gameState={gameState}
+        setShowStoryline={setShowStoryline}
+        setShowKeyObtained={setShowKeyObtained}
+        setShowClue={setShowClue}
+        setShowTrash={setShowTrash}
+        setShowStageQuestion={setShowStageQuestion}
+        setShowStageSummary={setShowStageSummary}
+        setShowFinalSummary={setShowFinalSummary}
+        setShowDashboard={setShowDashboard}
+        setStageAnswer={setStageAnswer}
+        setStageWrongAttempts={setStageWrongAttempts}
+        setError={setError}
+        setStageCluesFound={setStageCluesFound}
+        setStageTrashTriggered={setStageTrashTriggered}
+        setHasKey={setHasKey}
+        setCurrentStage={setCurrentStage}
+        setCartAnswerBlocked={setCartAnswerBlocked}
+        keysRef={keysRef}
+        interactCoolRef={interactCoolRef}
+        stickmanRef={stickmanRef}
+        stickmanAngleRef={stickmanAngleRef}
+        currentStageRef={currentStageRef}
+        stageStartTimeRef={stageStartTimeRef}
+        hasKeyRef={hasKeyRef}
+        stageCluesFoundRef={stageCluesFoundRef}
+        stageTrashTriggeredRef={stageTrashTriggeredRef}
+        handleStageAnswer={handleStageAnswer}
+      />
 
-      {/* ── Storyline intro modal ────────────────── */}
-      {showStoryline && !gameOver && !gameComplete && !isPaused && gameState?.status === "playing" && (
-        <div className="sm-overlay">
-          <div className="sm-modal sm-storyline-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="sm-modal-icon">📜</div>
-            <h3>Stage {currentStage + 1}: {stg.name}</h3>
-            <p className="sm-storyline-text">{stg.storyline}</p>
-            <p className="sm-objective-text"><strong>📌 Objective:</strong> {stg.objective}</p>
-            <div className="sm-storyline-info">
-              <span>🔑 Clues to find: {stg.clues.length}</span>
-              <span>💀 Traps hidden: {stg.trash.length}</span>
-              {currentStage > 0 && <span>⚠️ Difficulty increased!</span>}
-            </div>
-            <button className="sm-btn sm-btn-primary" onClick={() => { setShowStoryline(false); keysRef.current = {}; }}>
-              ⚔️ Begin Exploration
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Key obtained modal ───────────────────── */}
-      {showKeyObtained && hasKey && !showStageSummary && (
-        <div className="sm-overlay">
-          <div className="sm-modal sm-key-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="sm-big-icon">🗝️</div>
-            <h2>Key Obtained!</h2>
-            <p className="sm-key-text">
-              You solved the riddle of <strong>{stg.name}</strong>!
-              A mysterious key materializes in your hand. Use it to unlock the door to the next stage.
-            </p>
-            <button className="sm-btn sm-btn-primary" onClick={() => setShowKeyObtained(false)}>
-              🚪 Open the Door →
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Collected clue pills (current stage) ── */}
-      {stageCluesFound.length > 0 && !anyModal && (
-        <div className="sm-collected-pills">
-          {stageCluesFound.map((idx) => {
-            const clue = stg.clues[idx];
-            if (!clue) return null;
-            return (
-              <span
-                key={idx}
-                className="sm-collected-pill"
-                title={clue.clue}
-                style={{
-                  borderColor: stg.theme.label,
-                  color: stg.theme.label,
-                }}
-              >
-                ✅ {clue.name}
-              </span>
-            );
-          })}
-        </div>
-      )}
-
-      {/* ── Proximity prompt — clue object ────────── */}
-      {nearClue !== null && nearTrash === null && !anyModal && !isPaused && stg.clues[nearClue] && (
-        <div
-          className={`sm-prompt ${stageCluesFound.includes(nearClue) ? "collected" : ""}`}
-        >
-          {stageCluesFound.includes(nearClue) ? (
-            `✅ ${stg.clues[nearClue].name} — already inspected`
-          ) : (
-            <span>
-              Press <kbd>E</kbd> to inspect{" "}
-              <strong>{stg.clues[nearClue].name}</strong>
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* ── Proximity prompt — trash object ────────── */}
-      {nearTrash !== null && nearClue === null && !anyModal && !isPaused && (
-        <div
-          className={`sm-prompt ${stageTrashTriggered.includes(nearTrash) ? "collected" : ""}`}
-        >
-          {stageTrashTriggered.includes(nearTrash) ? (
-            `💀 Already triggered — it was trash!`
-          ) : (
-            <span>
-              Press <kbd>E</kbd> to inspect <strong>Mysterious Object</strong>
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* ── Cart prompt — no clues yet ──────────── */}
-      {nearCart && stageCluesFound.length < 1 && !anyModal && !isPaused && (
-        <div className="sm-prompt collected">
-          🔒 Find at least one clue before answering!
-        </div>
-      )}
-
-      {/* ── Cart prompt — ready to answer ─────────── */}
-      {nearCart &&
-        stageCluesFound.length >= 1 &&
-        !showStageQuestion &&
-        !anyModal &&
-        !cartAnswerBlocked &&
-        !isPaused && (
-          <div className="sm-answer-ready">
-            <button onClick={() => setShowStageQuestion(true)}>
-              🧩 Answer Stage {currentStage + 1} Question
-            </button>
-            <div className="sm-answer-hint">
-              or press <kbd>E</kbd>
-            </div>
-          </div>
-        )}
-
-      {/* ── Clue modal ────────────────────────────── */}
-      {showClue !== null && (
-        <div className="sm-overlay" onClick={() => { setShowClue(null); keysRef.current = {}; }}>
-          <div
-            className="sm-modal sm-clue-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="sm-modal-icon">🔍</div>
-            <h3>{stg.clues[showClue]?.name ?? 'Clue'}</h3>
-            <p className="sm-clue-text">{stg.clues[showClue]?.clue ?? ''}</p>
-            <div className="sm-penalty-badge">
-              ⏱ −{CLUE_PENALTY}s time penalty
-            </div>
-            <button className="sm-btn" onClick={() => { setShowClue(null); keysRef.current = {}; }}>
-              Got it ({stageCluesFound.length}/{stg.clues.length} clues)
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Trash modal ───────────────────────────── */}
-      {showTrash !== null && (
-        <div className="sm-overlay" onClick={() => { setShowTrash(null); keysRef.current = {}; }}>
-          <div
-            className="sm-modal sm-trap-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="sm-modal-icon">💀</div>
-            <h3>It&rsquo;s Trash!</h3>
-            <p className="sm-clue-text" style={{ borderLeftColor: "#e74c3c" }}>
-              {stg.trash[showTrash]?.msg || "This was trash!"}
-            </p>
-            <div className="sm-trap-effects">
-              <span className="sm-trap-effect-badge">
-                🐌 Slowed {TRASH_SLOW_DURATION}s
-              </span>
-              <span className="sm-trap-effect-badge">📳 Camera shake</span>
-            </div>
-            <button className="sm-btn" onClick={() => { setShowTrash(null); keysRef.current = {}; }}>
-              Ouch! Continue
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Stage question modal ──────────────────── */}
-      {showStageQuestion && !gameComplete && (
-        <div className="sm-overlay">
-          <div
-            className="sm-modal sm-question-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="sm-modal-icon">🧩</div>
-            <h3>
-              Stage {currentStage + 1}: {stg.name}
-            </h3>
-            <p className="sm-question-text">{stg.question}</p>
-
-            <div className="sm-review">
-              <h4>Your Collected Clues ({stageCluesFound.length}/{stg.clues.length})</h4>
-              {stageCluesFound.map((idx, i) => {
-                const clue = stg.clues[idx];
-                if (!clue) return null;
-                return (
-                  <div key={idx} className="sm-review-row">
-                    <span className="sm-review-num">#{i + 1}</span>
-                    <span className="sm-review-name">{clue.name}:</span>
-                    <span className="sm-review-clue">{clue.clue}</span>
-                  </div>
-                );
-              })}
-            </div>
-
-            <form className="sm-answer-form" onSubmit={handleStageAnswer}>
-              <input
-                type="text"
-                value={stageAnswer}
-                onChange={(e) => setStageAnswer(e.target.value)}
-                placeholder="Type your answer…"
-                autoFocus
-                maxLength={50}
-              />
-              <button type="submit" className="sm-btn sm-btn-primary">
-                Submit
-              </button>
-            </form>
-
-            {stageWrongAttempts > 0 && (
-              <div className="sm-attempts">
-                Wrong attempts: {stageWrongAttempts}
-              </div>
-            )}
-            {error && <div className="sm-error">{error}</div>}
-
-            <button
-              className="sm-btn sm-btn-secondary"
-              onClick={() => {
-                setShowStageQuestion(false);
-                setError("");
-                setCartAnswerBlocked(true);
-                interactCoolRef.current = true;
-                // Clear all held keys — keyup events are missed while modal was open
-                keysRef.current = {};
-                setTimeout(() => {
-                  setCartAnswerBlocked(false);
-                  interactCoolRef.current = false;
-                }, 600);
-              }}
-            >
-              Back to Exploring
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Stage completion summary ─────────────── */}
-      {showStageSummary !== null && !gameComplete && (
-        <div className="sm-overlay">
-          <div
-            className="sm-modal sm-stage-modal"
-            onClick={(e) => e.stopPropagation()}
-            style={{ borderColor: STAGES[showStageSummary.stage].theme.label }}
-          >
-            <div className="sm-big-icon">🏆</div>
-            <h2>Stage {showStageSummary.stage + 1} Complete!</h2>
-            <h3
-              style={{
-                color: STAGES[showStageSummary.stage].theme.label,
-                margin: "4px 0 16px",
-              }}
-            >
-              {showStageSummary.name}
-            </h3>
-            <div
-              className="sm-score-box"
-              style={{
-                borderColor: STAGES[showStageSummary.stage].theme.label,
-              }}
-            >
-              <span className="sm-score-label">Stage Score</span>
-              <span
-                className="sm-score-value"
-                style={{ color: STAGES[showStageSummary.stage].theme.label }}
-              >
-                {showStageSummary.score}
-              </span>
-            </div>
-            <div className="sm-stage-stats">
-              <div>⏱ Time spent: {Math.floor(showStageSummary.timeSpent)}s</div>
-              <div>💀 Trash triggered: {showStageSummary.trashTriggered}</div>
-              <div>❌ Wrong answers: {showStageSummary.wrongAttempts}</div>
-              <div>📊 Max possible: {STAGE_MAX_SCORE}</div>
-            </div>
-            <button
-              className="sm-btn sm-btn-primary"
-              onClick={() => {
-                setShowStageSummary(null);
-                setShowKeyObtained(false);
-                const next = showStageSummary.stage + 1;
-                setCurrentStage(next);
-                currentStageRef.current = next;
-                stageStartTimeRef.current = timeLeft;
-                setStageCluesFound([]);
-                setStageTrashTriggered([]);
-                setStageWrongAttempts(0);
-                setStageAnswer("");
-                setError("");
-                setHasKey(false);
-                hasKeyRef.current = false;
-                setShowStoryline(true);
-                // Teleport player to a new random spot for the new stage
-                if (stickmanRef.current) {
-                  stickmanRef.current.group.position.set(0, 0, 0);
-                  stickmanAngleRef.current = 0;
-                }
-              }}
-            >
-              {showStageSummary.stage < TOTAL_STAGES - 1
-                ? `🗝️ Use Key → Enter Stage ${showStageSummary.stage + 2}: ${STAGES[showStageSummary.stage + 1].name}`
-                : "🏆 View Final Results"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Game Complete — final summary ─────────── */}
-      {gameComplete &&
-        showStageSummary !== null &&
-        !showFinalSummary &&
-        !showDashboard && (
-          <div className="sm-overlay sm-overlay-solved">
-            <div
-              className="sm-modal sm-stage-modal"
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                borderColor: STAGES[showStageSummary.stage].theme.label,
-              }}
-            >
-              <div className="sm-big-icon">🏆</div>
-              <h2>Final Stage Complete!</h2>
-              <h3
-                style={{
-                  color: STAGES[showStageSummary.stage].theme.label,
-                  margin: "4px 0 16px",
-                }}
-              >
-                {showStageSummary.name}
-              </h3>
-              <div
-                className="sm-score-box"
-                style={{
-                  borderColor: STAGES[showStageSummary.stage].theme.label,
-                }}
-              >
-                <span className="sm-score-label">Stage Score</span>
-                <span
-                  className="sm-score-value"
-                  style={{ color: STAGES[showStageSummary.stage].theme.label }}
-                >
-                  {showStageSummary.score}
-                </span>
-              </div>
-              <div className="sm-stage-stats">
-                <div>
-                  ⏱ Time spent: {Math.floor(showStageSummary.timeSpent)}s
-                </div>
-                <div>💀 Trash triggered: {showStageSummary.trashTriggered}</div>
-                <div>❌ Wrong answers: {showStageSummary.wrongAttempts}</div>
-              </div>
-              <button
-                className="sm-btn sm-btn-primary"
-                style={{ marginTop: 12 }}
-                onClick={() => {
-                  setShowStageSummary(null);
-                  setShowFinalSummary(true);
-                }}
-              >
-                📊 View Full Game Summary
-              </button>
-            </div>
-          </div>
-        )}
-
-      {/* ── Game Complete — solved banner ─────────── */}
-      {gameComplete &&
-        showStageSummary === null &&
-        !showFinalSummary &&
-        !showDashboard && (
-          <div className="sm-overlay sm-overlay-solved">
-            <div className="sm-modal sm-solved-modal">
-              <div className="sm-big-icon">🎉</div>
-              <h2>All Stages Complete!</h2>
-              <div className="sm-score-box">
-                <span className="sm-score-label">Final Score</span>
-                <span className="sm-score-value">{finalScore}</span>
-              </div>
-              <div className="sm-solve-stats">
-                <span>⏱ Time remaining: {fmt(timeLeft)}</span>
-                <span>
-                  🏰 Stages cleared: {stageScores.length}/{TOTAL_STAGES}
-                </span>
-              </div>
-              <button
-                className="sm-btn sm-btn-primary"
-                style={{ marginTop: 12 }}
-                onClick={() => setShowFinalSummary(true)}
-              >
-                📊 View Stage Summary
-              </button>
-            </div>
-          </div>
-        )}
-
-      {/* ── Final summary with stage breakdown ─────── */}
-      {showFinalSummary && !showDashboard && (
-        <div className="sm-overlay sm-overlay-solved">
-          <div className="sm-modal sm-summary-modal">
-            <div className="sm-big-icon">📊</div>
-            <h2>Game Summary</h2>
-            <div className="sm-stage-breakdown">
-              {stageScores.map((s, i) => (
-                <div
-                  key={i}
-                  className="sm-stage-row"
-                  style={{ borderLeftColor: STAGES[s.stage].theme.label }}
-                >
-                  <div className="sm-stage-row-header">
-                    <span style={{ color: STAGES[s.stage].theme.label }}>
-                      Stage {s.stage + 1}: {s.name}
-                    </span>
-                    <span
-                      className="sm-stage-row-score"
-                      style={{ color: STAGES[s.stage].theme.label }}
-                    >
-                      {s.score}
-                    </span>
-                  </div>
-                  <div className="sm-stage-row-details">
-                    ⏱ {Math.floor(s.timeSpent)}s · 💀 {s.trashTriggered} trash
-                    {s.trashTriggered !== 1 ? "" : ""} · ❌ {s.wrongAttempts}{" "}
-                    wrong
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="sm-score-box" style={{ marginTop: 16 }}>
-              <span className="sm-score-label">Total Score</span>
-              <span className="sm-score-value">
-                {stageScores.reduce((sum, s) => sum + s.score, 0)}
-              </span>
-            </div>
-            <div
-              className="sm-score-box"
-              style={{ marginTop: 8, borderColor: "rgba(241,196,15,0.3)" }}
-            >
-              <span className="sm-score-label">Server Score</span>
-              <span className="sm-score-value" style={{ color: "#f1c40f" }}>
-                {finalScore}
-              </span>
-            </div>
-            <button
-              className="sm-btn sm-btn-primary"
-              style={{ marginTop: 16 }}
-              onClick={() => setShowDashboard(true)}
-            >
-              🏅 View Dashboard &amp; Rankings
-            </button>
-            <button
-              className="sm-btn sm-btn-secondary"
-              onClick={() => setShowFinalSummary(false)}
-            >
-              ← Back
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Dashboard / Leaderboard ────────────────── */}
-      {showDashboard && (
-        <div className="sm-overlay sm-overlay-solved">
-          <div className="sm-modal sm-dashboard-modal">
-            <div className="sm-big-icon">🏅</div>
-            <h2>Leaderboard</h2>
-            {(() => {
-              const sorted = [...(players || [])]
-                .filter((p) => p.score > 0)
-                .sort((a, b) => b.score - a.score);
-              const myRank =
-                sorted.findIndex((p) => p._id === currentPlayer?._id) + 1;
-              const top3 = sorted.slice(0, 3);
-              const medals = ["🥇", "🥈", "🥉"];
-              return (
-                <>
-                  <div className="sm-leaderboard">
-                    {top3.length === 0 && (
-                      <p style={{ color: "#888" }}>No scores yet</p>
-                    )}
-                    {top3.map((p, i) => (
-                      <div
-                        key={p._id}
-                        className={`sm-lb-row ${p._id === currentPlayer?._id ? "sm-lb-me" : ""}`}
-                      >
-                        <span className="sm-lb-medal">{medals[i]}</span>
-                        <span className="sm-lb-name">{p.name}</span>
-                        <span className="sm-lb-score">{p.score}</span>
-                      </div>
-                    ))}
-                  </div>
-                  {myRank > 0 && (
-                    <div className="sm-my-rank">
-                      Your Rank: <strong>#{myRank}</strong> out of{" "}
-                      {sorted.length} player{sorted.length !== 1 ? "s" : ""}
-                    </div>
-                  )}
-                  {myRank === 0 && (
-                    <div className="sm-my-rank" style={{ color: "#888" }}>
-                      You haven&rsquo;t scored yet
-                    </div>
-                  )}
-                </>
-              );
-            })()}
-            <button
-              className="sm-btn sm-btn-secondary"
-              style={{ marginTop: 16 }}
-              onClick={() => setShowDashboard(false)}
-            >
-              ← Back to Summary
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Time's up ─────────────────────────────── */}
-      {gameOver && !gameComplete && !showDashboard && (
-        <div className="sm-overlay sm-overlay-over">
-          <div className="sm-modal sm-over-modal">
-            <div className="sm-big-icon">⏰</div>
-            <h2>Time&rsquo;s Up!</h2>
-            <p>
-              You ran out of time at{" "}
-              <strong>Stage {Math.min(currentStage + 1, TOTAL_STAGES)}</strong>.
-            </p>
-            {stageScores.length > 0 && (
-              <div className="sm-stage-breakdown" style={{ marginTop: 12 }}>
-                {stageScores.map((s, i) => (
-                  <div
-                    key={i}
-                    className="sm-stage-row"
-                    style={{ borderLeftColor: STAGES[s.stage].theme.label }}
-                  >
-                    <div className="sm-stage-row-header">
-                      <span style={{ color: STAGES[s.stage].theme.label }}>
-                        Stage {s.stage + 1}: {s.name}
-                      </span>
-                      <span
-                        className="sm-stage-row-score"
-                        style={{ color: STAGES[s.stage].theme.label }}
-                      >
-                        {s.score}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div className="sm-solve-stats">
-              <span>🔑 Clues: {stageCluesFound.length}/{stg.clues.length} (current stage)</span>
-              <span>
-                📊 Total: {stageScores.reduce((sum, s) => sum + s.score, 0)}
-              </span>
-            </div>
-            <button
-              className="sm-btn sm-btn-primary"
-              style={{ marginTop: 12 }}
-              onClick={() => setShowDashboard(true)}
-            >
-              🏅 View Dashboard
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── In-game player cards (bottom-right) ──── */}
+      {/* In-game player cards (bottom-right) */}
       {!anyModal && !gameComplete && !gameOver && players.length > 1 && (
         <div className="sm-players-panel">
           <div className="sm-players-panel-title">Players</div>
           {players.map((p) => (
             <div
               key={p._id}
-              className={`sm-player-row${p._id === currentPlayer?._id ? ' sm-player-me' : ''}`}
+              className={`sm-player-row${p._id === currentPlayer?._id ? " sm-player-me" : ""}`}
             >
               <span className="sm-player-name">
-                {p._id === currentPlayer?._id ? '🙋' : '👤'} {p.name}
+                {p._id === currentPlayer?._id ? "\uD83D\uDE4B" : "\uD83D\uDC64"}{" "}
+                {p.name}
               </span>
               <span className="sm-player-stage">
-                {`Stage ${p.progress?.stage ?? '?'}/${p.progress?.totalStages ?? '?'}`}
+                {`Stage ${p.progress?.stage ?? "?"}/${p.progress?.totalStages ?? "?"}`}
               </span>
             </div>
           ))}
-        </div>
-      )}
-
-      {/* ── Paused ────────────────────────────────── */}
-      {isPaused && (
-        <div className="sm-overlay">
-          <div className="sm-modal sm-pause-modal">
-            <div className="sm-modal-icon">⏸️</div>
-            <h3>Game Paused</h3>
-            <p>Waiting for the host to resume…</p>
-            {stageCluesFound.length > 0 && (
-              <p className="sm-pause-progress">
-                {stageCluesFound.length} clue
-                {stageCluesFound.length !== 1 ? "s" : ""} found so far (Stage{" "}
-                {currentStage + 1})
-              </p>
-            )}
-          </div>
         </div>
       )}
     </div>

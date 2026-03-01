@@ -1,182 +1,16 @@
 import { useState } from "react";
 import { AVAILABLE_OBJECTS } from "./StickmanMysteryGame";
 import "./StickmanSettings.css";
+import { DEFAULT_STAGES } from "./stageData.js";
 
-const STORAGE_KEY = "stickman_custom_config";
-
-/* ── Theme colours per stage ── */
 const THEME_FOR_STAGE = [
   { color: 0x00e5ff, emissive: 0x006b80, beacon: 0x00e5ff, label: "#00e5ff" },
   { color: 0xbb86fc, emissive: 0x5d4380, beacon: 0xbb86fc, label: "#bb86fc" },
-  { color: 0xff5252, emissive: 0x802929, beacon: 0xff5252, label: "#ff5252" },
+  { color: 0xff7043, emissive: 0x802020, beacon: 0xff7043, label: "#ff7043" },
+  { color: 0x448aff, emissive: 0x1a3680, beacon: 0x448aff, label: "#448aff" },
+  { color: 0x69f0ae, emissive: 0x1a5c35, beacon: 0x69f0ae, label: "#69f0ae" },
   { color: 0xffab00, emissive: 0x805500, beacon: 0xffab00, label: "#ffab00" },
   { color: 0x00e676, emissive: 0x00733b, beacon: 0x00e676, label: "#00e676" },
-];
-
-/* ── Default stage data (mirrors DEFAULT_STAGES in the game file) ── */
-const DEFAULT_STAGES = [
-  {
-    name: "The Awakening",
-    answer: "23",
-    question: "You found two numbers hidden in the chamber. Solve: First Number + Second Number = ?",
-    hint: "Simply add the two values you collected from the clues.",
-    storyline: "You awaken in an ancient dungeon. The air is damp and cold. Two glowing ledgers catch your eye. Each holds a secret number — add them together to break the first seal!",
-    objective: "Collect both number clues, then walk to the Answer Cart. Add the two values together and type the total.",
-    clueCount: 2,
-    trashCount: 1,
-    clues: [
-      { name: "Worn Ledger", clue: "First Number = 14", objectShape: "tome" },
-      { name: "Crystal Flask", clue: "Second Number = 9", objectShape: "orb" },
-    ],
-    trash: [
-      { name: "Cracked Urn", msg: "The urn crumbles to dust… worthless trash!" },
-    ],
-    altAnswers: [
-      { answer: "12", question: "You found two numbers hidden in the chamber. Solve: First Number + Second Number = ?", clues: [
-        { name: "Stone Tablet", clue: "First Number = 7", objectShape: "pillar" },
-        { name: "Rune Orb", clue: "Second Number = 5", objectShape: "chest" },
-      ]},
-      { answer: "30", question: "You found two numbers hidden in the chamber. Solve: First Number + Second Number = ?", clues: [
-        { name: "Ancient Chest", clue: "First Number = 18", objectShape: "chest" },
-        { name: "Jade Bowl", clue: "Second Number = 12", objectShape: "lantern" },
-      ]},
-    ],
-  },
-  {
-    name: "The Shadows",
-    answer: "13",
-    question: "Three rune tablets each reveal an input→output pair. Crack the hidden rule, then apply it: what is the output when the input is 6?",
-    hint: "Look at each pair: multiply the input by 2, then add 1. Try it on every pair to confirm, then apply it to 6.",
-    storyline: "Beyond the first gate, darkness swallows you whole. Three glowing tablets flicker on the walls, each engraved with a mysterious pair of numbers linked by an arrow. The shadow priests sealed this vault with a numeric rule — only those who can see the pattern will pass!",
-    objective: "Collect all 3 pattern tablets. Each shows \"input → output\". Discover the rule linking them, then calculate the missing output for input 6.",
-    clueCount: 3,
-    trashCount: 2,
-    clues: [
-      { name: "Shadow Tablet I",   clue: "Pattern Pair I:   2 ➜ 5",  objectShape: "chest" },
-      { name: "Shadow Tablet II",  clue: "Pattern Pair II:  4 ➜ 9",  objectShape: "orb" },
-      { name: "Shadow Tablet III", clue: "Pattern Pair III: 6 ➜ ?",  objectShape: "lantern" },
-    ],
-    trash: [
-      { name: "Empty Coffer", msg: "The coffer is empty… nothing but a waste of time!" },
-      { name: "Dead Compass", msg: "The needle spins wildly… it was cursed!" },
-    ],
-    altAnswers: [
-      { answer: "11", question: "Three rune tablets each reveal an input→output pair. Crack the hidden rule, then apply it: what is the output when the input is 5?", clues: [
-        { name: "Void Tablet I",   clue: "Pattern Pair I:   1 ➜ 3",  objectShape: "diamond" },
-        { name: "Void Tablet II",  clue: "Pattern Pair II:  3 ➜ 7",  objectShape: "crystal" },
-        { name: "Void Tablet III", clue: "Pattern Pair III: 5 ➜ ?",  objectShape: "tome" },
-      ]},
-      { answer: "19", question: "Three rune tablets each reveal an input→output pair. Crack the hidden rule, then apply it: what is the output when the input is 6?", clues: [
-        { name: "Night Tablet I",   clue: "Pattern Pair I:   2 ➜ 7",  objectShape: "mirror" },
-        { name: "Night Tablet II",  clue: "Pattern Pair II:  4 ➜ 13", objectShape: "chest" },
-        { name: "Night Tablet III", clue: "Pattern Pair III: 6 ➜ ?",  objectShape: "pillar" },
-      ]},
-    ],
-  },
-  {
-    name: "The Inferno",
-    answer: "25",
-    question: "Three scorched tablets each show a number and its secret value. Find the hidden rule — then calculate the secret value for 5.",
-    hint: "Try multiplying each number by itself (squaring it). Does the rule hold for all three tablets?",
-    storyline: "The chamber glows red-hot. Lava cracks beneath the floor. Three scorched stone tablets are mounted on the wall. Each one bears a single number and a result — but the formula connecting them has been burned away. Only the mathematician who rediscovers the rule will survive the Inferno!",
-    objective: "Collect all 3 scorched tablets. Each shows \"Number → Secret Value\". Find the mathematical rule and apply it to find the secret value of 5.",
-    clueCount: 3,
-    trashCount: 2,
-    clues: [
-      { name: "Scorched Tablet I",   clue: "3 ➜ 9",  objectShape: "orb" },
-      { name: "Scorched Tablet II",  clue: "4 ➜ 16", objectShape: "tome" },
-      { name: "Scorched Tablet III", clue: "5 ➜ ?",  objectShape: "lantern" },
-    ],
-    trash: [
-      { name: "Ash Pile", msg: "Just a pile of ash… nothing useful here!" },
-      { name: "Burnt Scroll", msg: "The scroll is too burnt to read… total waste!" },
-    ],
-    altAnswers: [
-      { answer: "64", question: "Three scorched tablets each show a number and its secret value. Find the hidden rule — then calculate the secret value for 4.", clues: [
-        { name: "Lava Tablet I",   clue: "2 ➜ 8",  objectShape: "diamond" },
-        { name: "Lava Tablet II",  clue: "3 ➜ 27", objectShape: "mirror" },
-        { name: "Lava Tablet III", clue: "4 ➜ ?",  objectShape: "chest" },
-      ]},
-      { answer: "30", question: "Three scorched tablets each show a number and its secret value. Find the hidden rule — then calculate the secret value for 5.", clues: [
-        { name: "Ember Tablet I",   clue: "3 ➜ 12", objectShape: "crystal" },
-        { name: "Ember Tablet II",  clue: "4 ➜ 20", objectShape: "pillar" },
-        { name: "Ember Tablet III", clue: "5 ➜ ?",  objectShape: "orb" },
-      ]},
-    ],
-  },
-  {
-    name: "The Radiance",
-    answer: "WEST",
-    question: "Follow the compass directions listed in your clues — in order. You start NORTH. What direction are you facing at the end? (NORTH / EAST / SOUTH / WEST)",
-    hint: "Face NORTH. Each turn rotates you 90°: RIGHT = clockwise, LEFT = counter-clockwise.",
-    storyline: "Blinding golden light floods the chamber. A compass rose is carved into the floor. Four glowing stones describe a sequence of turns. Only the navigator who reaches the correct bearing may proceed!",
-    objective: "Collect all 4 direction clues. Follow each turn from the starting direction (NORTH) and submit your final bearing.",
-    clueCount: 4,
-    trashCount: 3,
-    clues: [
-      { name: "Compass Rose", clue: "You start facing NORTH", objectShape: "chest" },
-      { name: "Wind Vane I", clue: "First turn: RIGHT", objectShape: "orb" },
-      { name: "Sun Dial II", clue: "Second turn: RIGHT", objectShape: "tome" },
-      { name: "Sky Chart III", clue: "Third turn: RIGHT", objectShape: "lantern" },
-    ],
-    trash: [
-      { name: "Fool's Gold", msg: "It's just fool's gold… completely worthless!" },
-      { name: "Tarnished Ring", msg: "The ring turns to rust… it was cursed!" },
-      { name: "Hollow Gem", msg: "The gem is hollow inside… just a trick!" },
-    ],
-    altAnswers: [
-      { answer: "EAST", question: "Follow the compass directions listed in your clues — in order. You start NORTH. What direction are you facing at the end? (NORTH / EAST / SOUTH / WEST)", clues: [
-        { name: "Bearing Stone", clue: "You start facing NORTH", objectShape: "diamond" },
-        { name: "Course Rune I", clue: "First turn: RIGHT", objectShape: "mirror" },
-        { name: "Course Rune II", clue: "Second turn: LEFT", objectShape: "crystal" },
-        { name: "Course Rune III", clue: "Third turn: RIGHT", objectShape: "pillar" },
-      ]},
-      { answer: "SOUTH", question: "Follow the compass directions listed in your clues — in order. You start NORTH. What direction are you facing at the end? (NORTH / EAST / SOUTH / WEST)", clues: [
-        { name: "Astrolabe", clue: "You start facing NORTH", objectShape: "chest" },
-        { name: "Heading Slab I", clue: "First turn: RIGHT", objectShape: "orb" },
-        { name: "Heading Slab II", clue: "Second turn: RIGHT", objectShape: "chest" },
-        { name: "Heading Slab III", clue: "Third turn: LEFT", objectShape: "tome" },
-      ]},
-    ],
-  },
-  {
-    name: "The Revelation",
-    answer: "VAULT",
-    question: "Five rune stones each hold one encoded letter. The ancient cipher shifts every letter FORWARD 3 positions (A→D, B→E … Z→C). Decode the 5-letter word by shifting each letter BACK 3.",
-    hint: "Reverse the shift: subtract 3 from each letter's position. Y→V, D→A, X→U, O→L, W→T.",
-    storyline: "The final chamber. Ancient runes glow green on every wall. Five encoded letters are carved into stone pillars. The cipher of the ancients shifts every letter forward by three — only by reversing the shift will the great door open!",
-    objective: "Collect all 5 rune stones. Each shows one encoded letter. Shift each letter BACK by 3 to decode, then submit the 5-letter word.",
-    clueCount: 5,
-    trashCount: 3,
-    clues: [
-      { name: "Verdant Rune I", clue: "Encoded letter 1: Y", objectShape: "tome" },
-      { name: "Verdant Rune II", clue: "Encoded letter 2: D", objectShape: "orb" },
-      { name: "Verdant Rune III", clue: "Encoded letter 3: X", objectShape: "lantern" },
-      { name: "Verdant Rune IV", clue: "Encoded letter 4: O", objectShape: "chest" },
-      { name: "Verdant Rune V", clue: "Encoded letter 5: W", objectShape: "diamond" },
-    ],
-    trash: [
-      { name: "Dead Root", msg: "The root withers in your hands… cursed garbage!" },
-      { name: "Withered Leaf", msg: "The leaf crumbles to nothing… a trap!" },
-      { name: "Hollow Bark", msg: "The bark is hollow and rotten… just junk!" },
-    ],
-    altAnswers: [
-      { answer: "FLAME", question: "Five rune stones each hold one encoded letter. The ancient cipher shifts every letter FORWARD 3 positions (A→D, B→E … Z→C). Decode the 5-letter word by shifting each letter BACK 3.", clues: [
-        { name: "Ember Glyph I", clue: "Encoded letter 1: I", objectShape: "orb" },
-        { name: "Ember Glyph II", clue: "Encoded letter 2: O", objectShape: "chest" },
-        { name: "Ember Glyph III", clue: "Encoded letter 3: D", objectShape: "pillar" },
-        { name: "Ember Glyph IV", clue: "Encoded letter 4: P", objectShape: "diamond" },
-        { name: "Ember Glyph V", clue: "Encoded letter 5: H", objectShape: "crystal" },
-      ]},
-      { answer: "STONE", question: "Five rune stones each hold one encoded letter. The ancient cipher shifts every letter FORWARD 3 positions (A→D, B→E … Z→C). Decode the 5-letter word by shifting each letter BACK 3.", clues: [
-        { name: "Rock Cipher I", clue: "Encoded letter 1: V", objectShape: "mirror" },
-        { name: "Rock Cipher II", clue: "Encoded letter 2: W", objectShape: "tome" },
-        { name: "Rock Cipher III", clue: "Encoded letter 3: R", objectShape: "orb" },
-        { name: "Rock Cipher IV", clue: "Encoded letter 4: Q", objectShape: "chest" },
-        { name: "Rock Cipher V", clue: "Encoded letter 5: H", objectShape: "lantern" },
-      ]},
-    ],
-  },
 ];
 
 /* ── Helpers ──────────────────────────────────────────── */
@@ -428,7 +262,7 @@ const StickmanSettings = ({ onSave, onCancel }) => {
       const parsed = stripJsonComments(JSON.parse(jsonText));
       finalStages = parsed.map((s, i) => ({
         ...s,
-        theme: THEME_FOR_STAGE[i] || THEME_FOR_STAGE[4],
+        theme: THEME_FOR_STAGE[i] || THEME_FOR_STAGE[6],
       }));
     } else {
       finalStages = buildFromStructured();
@@ -611,9 +445,6 @@ const StickmanSettings = ({ onSave, onCancel }) => {
                     </span>
                   </div>
                   <div className="sms-puzzle-meta">
-                    <span className="sms-puzzle-type">
-                      {["➕ Addition", "� Pattern Mapping (rule: ×2+1)", "🔗 Number Sequence (rule: n²)", "🧭 Direction Turns", "🔐 Caesar Cipher"][idx]}
-                    </span>
                     <span className="sms-clue-count-badge">
                       {stage.clueCount} clues · {stage.trashCount} traps
                     </span>

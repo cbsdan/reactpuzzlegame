@@ -6,7 +6,9 @@ const STICKMAN_STORAGE_KEY = "stickman_custom_config";
 const THEME_FOR_STAGE = [
   { color: 0x00e5ff, emissive: 0x006b80, beacon: 0x00e5ff, label: "#00e5ff" },
   { color: 0xbb86fc, emissive: 0x5d4380, beacon: 0xbb86fc, label: "#bb86fc" },
-  { color: 0xff5252, emissive: 0x802929, beacon: 0xff5252, label: "#ff5252" },
+  { color: 0xff7043, emissive: 0x802020, beacon: 0xff7043, label: "#ff7043" },
+  { color: 0x448aff, emissive: 0x1a3680, beacon: 0x448aff, label: "#448aff" },
+  { color: 0x69f0ae, emissive: 0x1a5c35, beacon: 0x69f0ae, label: "#69f0ae" },
   { color: 0xffab00, emissive: 0x805500, beacon: 0xffab00, label: "#ffab00" },
   { color: 0x00e676, emissive: 0x00733b, beacon: 0x00e676, label: "#00e676" },
 ];

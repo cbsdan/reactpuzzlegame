@@ -15,15 +15,6 @@ import StickmanMysteryAdminDashboard from "./StickmanMystery/AdminDashboard";
 
 export const GAMES = [
   {
-    id: "number-mystery",
-    name: "Number Mystery",
-    icon: "🔍",
-    description:
-      "Players guess a secret 4-digit code using Bulls & Cows clues. Score is based on speed and fewest guesses.",
-    PlayerComponent: NumberMysteryGame,
-    AdminDashboard: NumberMysteryAdminDashboard,
-  },
-  {
     id: "stickman-mystery",
     name: "Stickman Mystery",
     icon: "🏃",
@@ -31,6 +22,15 @@ export const GAMES = [
       "Explore a 3D world as a stickman, collect 5 clues from mysterious objects, and solve the riddle before time runs out.",
     PlayerComponent: StickmanMysteryGame,
     AdminDashboard: StickmanMysteryAdminDashboard,
+  },
+  {
+    id: "number-mystery",
+    name: "Number Mystery",
+    icon: "🔍",
+    description:
+      "Players guess a secret 4-digit code using Bulls & Cows clues. Score is based on speed and fewest guesses.",
+    PlayerComponent: NumberMysteryGame,
+    AdminDashboard: NumberMysteryAdminDashboard,
   },
 ];
 
