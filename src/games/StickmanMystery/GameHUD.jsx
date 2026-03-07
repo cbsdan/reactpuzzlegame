@@ -77,7 +77,9 @@ const GameHUD = ({
           🦘 {isJumping ? "JUMP!" : jumpReady ? "Ready" : "Cooldown"}
         </div>
         {hasKey && <div className="sm-hud-pill sm-key-pill">🗝️ KEY</div>}
-        {isSlowed && <div className="sm-hud-pill sm-slowed-pill">🐌 SLOWED</div>}
+        {isSlowed && (
+          <div className="sm-hud-pill sm-slowed-pill">🐌 SLOWED</div>
+        )}
       </div>
       <div className="sm-hud-right">
         <div className="sm-hud-pill sm-controls-hint">
@@ -89,16 +91,6 @@ const GameHUD = ({
         </div>
       </div>
     </div>
-
-    {/* ── Visual hint bar ──────────────────────── */}
-    {!anyModal && currentStage < TOTAL_STAGES && (
-      <div className="sm-hint-bar">
-        <span className="sm-hint-safe">🟢 Calm glow = Clue</span>
-        <span className="sm-hint-danger">
-          🔴 Fast pulse + red dot = Trash (avoid!)
-        </span>
-      </div>
-    )}
 
     {/* ── Collected clue pills ─────────────────── */}
     {stageCluesFound.length > 0 && !anyModal && (
@@ -121,21 +113,30 @@ const GameHUD = ({
     )}
 
     {/* ── Proximity prompt — clue object ────────── */}
-    {nearClue !== null && nearTrash === null && !anyModal && !isPaused && stg.clues[nearClue] && (
-      <div className={`sm-prompt${stageCluesFound.includes(nearClue) ? " collected" : ""}`}>
-        {stageCluesFound.includes(nearClue) ? (
-          `✅ ${stg.clues[nearClue].name} — already inspected`
-        ) : (
-          <span>
-            Press <kbd>E</kbd> to inspect <strong>{stg.clues[nearClue].name}</strong>
-          </span>
-        )}
-      </div>
-    )}
+    {nearClue !== null &&
+      nearTrash === null &&
+      !anyModal &&
+      !isPaused &&
+      stg.clues[nearClue] && (
+        <div
+          className={`sm-prompt${stageCluesFound.includes(nearClue) ? " collected" : ""}`}
+        >
+          {stageCluesFound.includes(nearClue) ? (
+            `✅ ${stg.clues[nearClue].name} — already inspected`
+          ) : (
+            <span>
+              Press <kbd>E</kbd> to inspect{" "}
+              <strong>{stg.clues[nearClue].name}</strong>
+            </span>
+          )}
+        </div>
+      )}
 
     {/* ── Proximity prompt — trash object ────────── */}
     {nearTrash !== null && nearClue === null && !anyModal && !isPaused && (
-      <div className={`sm-prompt${stageTrashTriggered.includes(nearTrash) ? " collected" : ""}`}>
+      <div
+        className={`sm-prompt${stageTrashTriggered.includes(nearTrash) ? " collected" : ""}`}
+      >
         {stageTrashTriggered.includes(nearTrash) ? (
           "💀 Already triggered — it was trash!"
         ) : (
