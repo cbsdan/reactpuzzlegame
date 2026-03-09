@@ -39,7 +39,12 @@ import {
   buildTrashMesh,
   createTextSprite,
 } from "./threeBuilders.js";
-import { generateRandomPosSeeded, makePrng, hashStr, resolveCollisions } from "./gameUtils.js";
+import {
+  generateRandomPosSeeded,
+  makePrng,
+  hashStr,
+  resolveCollisions,
+} from "./gameUtils.js";
 import GameHUD from "./GameHUD.jsx";
 import GameModals from "./GameModals.jsx";
 
@@ -73,30 +78,79 @@ const StickmanMysteryGame = () => {
 
   // Resolve active stages: admin config → localStorage saved config → built-in defaults
   const adminConfig = gameState?.stickmanConfig;
-  const STAGES = adminConfig?.stages || (() => {
-    try {
-      const saved = localStorage.getItem("stickman_custom_config");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed?.stages && Array.isArray(parsed.stages) && parsed.stages.length > 0) {
-          // Re-attach themes if missing
-          return parsed.stages.map((s, i) => ({
-            ...s,
-            theme: s.theme || [
-              { color: 0x00e5ff, emissive: 0x006b80, beacon: 0x00e5ff, label: "#00e5ff" },
-              { color: 0xbb86fc, emissive: 0x5d4380, beacon: 0xbb86fc, label: "#bb86fc" },
-              { color: 0xff7043, emissive: 0x802020, beacon: 0xff7043, label: "#ff7043" },
-              { color: 0x448aff, emissive: 0x1a3680, beacon: 0x448aff, label: "#448aff" },
-              { color: 0x69f0ae, emissive: 0x1a5c35, beacon: 0x69f0ae, label: "#69f0ae" },
-              { color: 0xffab00, emissive: 0x805500, beacon: 0xffab00, label: "#ffab00" },
-              { color: 0x00e676, emissive: 0x00733b, beacon: 0x00e676, label: "#00e676" },
-            ][i] || { color: 0x00e5ff, emissive: 0x006b80, beacon: 0x00e5ff, label: "#00e5ff" },
-          }));
+  const STAGES =
+    adminConfig?.stages ||
+    (() => {
+      try {
+        const saved = localStorage.getItem("stickman_custom_config");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (
+            parsed?.stages &&
+            Array.isArray(parsed.stages) &&
+            parsed.stages.length > 0
+          ) {
+            // Re-attach themes if missing
+            return parsed.stages.map((s, i) => ({
+              ...s,
+              theme: s.theme ||
+                [
+                  {
+                    color: 0x00e5ff,
+                    emissive: 0x006b80,
+                    beacon: 0x00e5ff,
+                    label: "#00e5ff",
+                  },
+                  {
+                    color: 0xbb86fc,
+                    emissive: 0x5d4380,
+                    beacon: 0xbb86fc,
+                    label: "#bb86fc",
+                  },
+                  {
+                    color: 0xff7043,
+                    emissive: 0x802020,
+                    beacon: 0xff7043,
+                    label: "#ff7043",
+                  },
+                  {
+                    color: 0x448aff,
+                    emissive: 0x1a3680,
+                    beacon: 0x448aff,
+                    label: "#448aff",
+                  },
+                  {
+                    color: 0x69f0ae,
+                    emissive: 0x1a5c35,
+                    beacon: 0x69f0ae,
+                    label: "#69f0ae",
+                  },
+                  {
+                    color: 0xffab00,
+                    emissive: 0x805500,
+                    beacon: 0xffab00,
+                    label: "#ffab00",
+                  },
+                  {
+                    color: 0x00e676,
+                    emissive: 0x00733b,
+                    beacon: 0x00e676,
+                    label: "#00e676",
+                  },
+                ][i] || {
+                  color: 0x00e5ff,
+                  emissive: 0x006b80,
+                  beacon: 0x00e5ff,
+                  label: "#00e5ff",
+                },
+            }));
+          }
         }
+      } catch {
+        /* ignore */
       }
-    } catch { /* ignore */ }
-    return DEFAULT_STAGES;
-  })();
+      return DEFAULT_STAGES;
+    })();
 
   /* ── Three.js refs ─────────────────────────────────── */
   const containerRef = useRef(null);
@@ -126,6 +180,10 @@ const StickmanMysteryGame = () => {
   const isPausedRef = useRef(false);
   const nearCartRef = useRef(false);
   const cartMeshRef = useRef(null);
+  // Array of [x, z] spawn positions, one per stage — populated at scene init
+  const stageSpawnPositionsRef = useRef([]);
+  // Array of [x, z] cart positions, one per stage — populated at scene init
+  const stageCartSpawnPositionsRef = useRef([]);
   const wallBoxesRef = useRef([]);
   const torchFlamesRef = useRef([]);
   const currentStageRef = useRef(_saved?.stage ?? 0);
@@ -174,16 +232,26 @@ const StickmanMysteryGame = () => {
   /* ── React state ───────────────────────────────────── */
   const [timeLeft, setTimeLeft] = useState(() => {
     // Initialize from server time if game is already running, accounting for saved penalty
-    if (gameState?.startedAt && gameState?.status === 'playing') {
-      const elapsed = Date.now() - new Date(gameState.startedAt).getTime() - (gameState.totalPausedMs || 0);
-      return Math.max(0, GAME_DURATION - Math.floor(elapsed / 1000) - (_saved?.timePenalty ?? 0));
+    if (gameState?.startedAt && gameState?.status === "playing") {
+      const elapsed =
+        Date.now() -
+        new Date(gameState.startedAt).getTime() -
+        (gameState.totalPausedMs || 0);
+      return Math.max(
+        0,
+        GAME_DURATION - Math.floor(elapsed / 1000) - (_saved?.timePenalty ?? 0),
+      );
     }
     return GAME_DURATION;
   });
   const [timePenalty, setTimePenalty] = useState(_saved?.timePenalty ?? 0);
   const [currentStage, setCurrentStage] = useState(_saved?.stage ?? 0);
-  const [stageCluesFound, setStageCluesFound] = useState(_saved?.stageCluesFound ?? []);
-  const [stageTrashTriggered, setStageTrashTriggered] = useState(_saved?.stageTrashTriggered ?? []);
+  const [stageCluesFound, setStageCluesFound] = useState(
+    _saved?.stageCluesFound ?? [],
+  );
+  const [stageTrashTriggered, setStageTrashTriggered] = useState(
+    _saved?.stageTrashTriggered ?? [],
+  );
   const [nearClue, setNearClue] = useState(null);
   const [nearTrash, setNearTrash] = useState(null);
   const [showClue, setShowClue] = useState(null);
@@ -192,7 +260,9 @@ const StickmanMysteryGame = () => {
   const [stageAnswer, setStageAnswer] = useState("");
   const [stageWrongAttempts, setStageWrongAttempts] = useState(0);
   const [error, setError] = useState("");
-  const [gameComplete, setGameComplete] = useState(_saved?.gameComplete ?? false);
+  const [gameComplete, setGameComplete] = useState(
+    _saved?.gameComplete ?? false,
+  );
   const [finalScore, setFinalScore] = useState(_saved?.finalScore ?? 0);
   const [gameOver, setGameOver] = useState(false);
   const [nearCart, setNearCart] = useState(false);
@@ -219,7 +289,9 @@ const StickmanMysteryGame = () => {
   useEffect(() => {
     if (!_smKey || !gameState?.startedAt) return;
     if (gameOver) {
-      try { sessionStorage.removeItem(_smKey); } catch {}
+      try {
+        sessionStorage.removeItem(_smKey);
+      } catch {}
       return;
     }
     const pos = stickmanRef.current?.group?.position;
@@ -308,9 +380,15 @@ const StickmanMysteryGame = () => {
     const newStarted = gameState?.startedAt;
     if (newStarted && newStarted !== prevStartedAtRef.current) {
       // Clear saved progress so the fresh game starts clean
-      if (_smKey) try { sessionStorage.removeItem(_smKey); } catch {}
+      if (_smKey)
+        try {
+          sessionStorage.removeItem(_smKey);
+        } catch {}
       // Compute time from server clock
-      const elapsed = Date.now() - new Date(newStarted).getTime() - (gameState?.totalPausedMs || 0);
+      const elapsed =
+        Date.now() -
+        new Date(newStarted).getTime() -
+        (gameState?.totalPausedMs || 0);
       setTimeLeft(Math.max(0, GAME_DURATION - Math.floor(elapsed / 1000)));
       setCurrentStage(0);
       setStageCluesFound([]);
@@ -357,10 +435,18 @@ const StickmanMysteryGame = () => {
       pushVelocityRef.current = { x: 0, z: 0 };
       timePenaltyRef.current = 0;
       setTimePenalty(0);
-      // reset stickman position
+      // reset stickman and cart to their stage-0 spawn positions
       if (stickmanRef.current) {
-        stickmanRef.current.group.position.set(0, 0, 0);
+        const sp = stageSpawnPositionsRef.current[0] ?? [0, 0];
+        stickmanRef.current.group.position.set(sp[0], 0, sp[1]);
         stickmanAngleRef.current = 0;
+      }
+      if (cartMeshRef.current) {
+        const cp = stageCartSpawnPositionsRef.current[0] ?? [
+          CART_POS[0],
+          CART_POS[2],
+        ];
+        cartMeshRef.current.group.position.set(cp[0], 0, cp[1]);
       }
       // restore all clue object beacons
       clueMeshesRef.current.forEach((o) => {
@@ -393,8 +479,14 @@ const StickmanMysteryGame = () => {
     timerRef.current = setInterval(() => {
       // Re-sync from server clock each tick, subtract accumulated personal penalty
       if (gameState?.startedAt) {
-        const elapsed = Date.now() - new Date(gameState.startedAt).getTime() - (gameState?.totalPausedMs || 0);
-        const remaining = Math.max(0, GAME_DURATION - Math.floor(elapsed / 1000) - timePenaltyRef.current);
+        const elapsed =
+          Date.now() -
+          new Date(gameState.startedAt).getTime() -
+          (gameState?.totalPausedMs || 0);
+        const remaining = Math.max(
+          0,
+          GAME_DURATION - Math.floor(elapsed / 1000) - timePenaltyRef.current,
+        );
         setTimeLeft(remaining);
         if (remaining <= 0) {
           setGameOver(true);
@@ -410,7 +502,14 @@ const StickmanMysteryGame = () => {
       }
     }, 1000);
     return () => clearInterval(timerRef.current);
-  }, [gameComplete, gameOver, isPaused, gameState?.status, gameState?.startedAt, gameState?.totalPausedMs]);
+  }, [
+    gameComplete,
+    gameOver,
+    isPaused,
+    gameState?.status,
+    gameState?.startedAt,
+    gameState?.totalPausedMs,
+  ]);
 
   /* ════════════════════════════════════════════════════
      Three.js scene — runs once on mount
@@ -429,7 +528,7 @@ const StickmanMysteryGame = () => {
     // ── Scene ─────────────────────────────────────────
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x1a1a2e);
-    scene.fog = new THREE.FogExp2(0x1a1a2e, 0.030);
+    scene.fog = new THREE.FogExp2(0x1a1a2e, 0.03);
     sceneRef.current = scene;
 
     // ── Raycaster for mouse hover ─────────────────────
@@ -502,7 +601,12 @@ const StickmanMysteryGame = () => {
     // Central arcane summoning circle on the floor
     const arcaneRing1 = new THREE.Mesh(
       new THREE.RingGeometry(3.1, 3.4, 36),
-      new THREE.MeshBasicMaterial({ color: 0x2a1a6e, transparent: true, opacity: 0.32, side: THREE.DoubleSide }),
+      new THREE.MeshBasicMaterial({
+        color: 0x2a1a6e,
+        transparent: true,
+        opacity: 0.32,
+        side: THREE.DoubleSide,
+      }),
     );
     arcaneRing1.rotation.x = -Math.PI / 2;
     arcaneRing1.position.y = 0.015;
@@ -510,7 +614,12 @@ const StickmanMysteryGame = () => {
 
     const arcaneRing2 = new THREE.Mesh(
       new THREE.RingGeometry(4.6, 4.8, 36),
-      new THREE.MeshBasicMaterial({ color: 0x1e1060, transparent: true, opacity: 0.2, side: THREE.DoubleSide }),
+      new THREE.MeshBasicMaterial({
+        color: 0x1e1060,
+        transparent: true,
+        opacity: 0.2,
+        side: THREE.DoubleSide,
+      }),
     );
     arcaneRing2.rotation.x = -Math.PI / 2;
     arcaneRing2.position.y = 0.015;
@@ -519,7 +628,12 @@ const StickmanMysteryGame = () => {
     // Inner glow disc
     const glowDisc = new THREE.Mesh(
       new THREE.CircleGeometry(2.8, 32),
-      new THREE.MeshBasicMaterial({ color: 0x120a38, transparent: true, opacity: 0.55, side: THREE.DoubleSide }),
+      new THREE.MeshBasicMaterial({
+        color: 0x120a38,
+        transparent: true,
+        opacity: 0.55,
+        side: THREE.DoubleSide,
+      }),
     );
     glowDisc.rotation.x = -Math.PI / 2;
     glowDisc.position.y = 0.014;
@@ -528,24 +642,32 @@ const StickmanMysteryGame = () => {
     // ── Stars — varied-colour night sky ──────────────
     const starCount = 420;
     const starPositions = new Float32Array(starCount * 3);
-    const starColors    = new Float32Array(starCount * 3);
+    const starColors = new Float32Array(starCount * 3);
     for (let i = 0; i < starCount; i++) {
-      starPositions[i * 3]     = (Math.random() - 0.5) * 220;
+      starPositions[i * 3] = (Math.random() - 0.5) * 220;
       starPositions[i * 3 + 1] = Math.random() * 65 + 20;
       starPositions[i * 3 + 2] = (Math.random() - 0.5) * 220;
       // White, faint-blue, or faint-purple tint
       const tint = Math.random();
-      starColors[i * 3]     = tint < 0.6 ? 1.0 : tint < 0.8 ? 0.72 : 0.85;
+      starColors[i * 3] = tint < 0.6 ? 1.0 : tint < 0.8 ? 0.72 : 0.85;
       starColors[i * 3 + 1] = tint < 0.6 ? 1.0 : tint < 0.8 ? 0.72 : 0.6;
-      starColors[i * 3 + 2] = tint < 0.6 ? 1.0 : tint < 0.8 ? 1.0  : 1.0;
+      starColors[i * 3 + 2] = tint < 0.6 ? 1.0 : tint < 0.8 ? 1.0 : 1.0;
     }
     const starGeo = new THREE.BufferGeometry();
-    starGeo.setAttribute("position", new THREE.BufferAttribute(starPositions, 3));
-    starGeo.setAttribute("color",    new THREE.BufferAttribute(starColors, 3));
+    starGeo.setAttribute(
+      "position",
+      new THREE.BufferAttribute(starPositions, 3),
+    );
+    starGeo.setAttribute("color", new THREE.BufferAttribute(starColors, 3));
     scene.add(
       new THREE.Points(
         starGeo,
-        new THREE.PointsMaterial({ vertexColors: true, size: 0.2, transparent: true, opacity: 0.82 }),
+        new THREE.PointsMaterial({
+          vertexColors: true,
+          size: 0.2,
+          transparent: true,
+          opacity: 0.82,
+        }),
       ),
     );
 
@@ -595,27 +717,51 @@ const StickmanMysteryGame = () => {
       roughness: 0.9,
       metalness: 0.06,
     });
-    [[-15, -15], [15, -15], [-15, 15], [15, 15]].forEach(([cx, cz]) => {
+    [
+      [-15, -15],
+      [15, -15],
+      [-15, 15],
+      [15, 15],
+    ].forEach(([cx, cz]) => {
       const colGroup = new THREE.Group();
       // Base plinth
-      const plinth = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.28, 0.82), colCapMat);
+      const plinth = new THREE.Mesh(
+        new THREE.BoxGeometry(0.82, 0.28, 0.82),
+        colCapMat,
+      );
       plinth.position.y = 0.14;
       colGroup.add(plinth);
       // Shaft
-      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.34, 3.5, 8), colMat);
+      const shaft = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.27, 0.34, 3.5, 8),
+        colMat,
+      );
       shaft.position.y = 2.05;
       colGroup.add(shaft);
       // Capital flare
-      const capital = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.27, 0.26, 8), colCapMat);
+      const capital = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.44, 0.27, 0.26, 8),
+        colCapMat,
+      );
       capital.position.y = 4.0;
       colGroup.add(capital);
       // Abacus slab
-      const abacus = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.14, 0.92), colCapMat);
+      const abacus = new THREE.Mesh(
+        new THREE.BoxGeometry(0.92, 0.14, 0.92),
+        colCapMat,
+      );
       abacus.position.y = 4.2;
       colGroup.add(abacus);
       // Subtle emissive rune ring at mid-column
-      const colRuneMat = new THREE.MeshBasicMaterial({ color: 0x1e1040, transparent: true, opacity: 0.35 });
-      const colRune = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.025, 4, 16), colRuneMat);
+      const colRuneMat = new THREE.MeshBasicMaterial({
+        color: 0x1e1040,
+        transparent: true,
+        opacity: 0.35,
+      });
+      const colRune = new THREE.Mesh(
+        new THREE.TorusGeometry(0.32, 0.025, 4, 16),
+        colRuneMat,
+      );
       colRune.rotation.x = Math.PI / 2;
       colRune.position.y = 2.0;
       colGroup.add(colRune);
@@ -625,13 +771,43 @@ const StickmanMysteryGame = () => {
 
     // ── Random position generation (seeded per room so all clients match) ────
     const rng = makePrng(hashStr(currentRoom?._id || "room0"));
-    const occupied = [
-      [0, 0],
-      [CART_POS[0], CART_POS[2]],
-    ];
+    const occupied = [];
 
-    // ── Stickman ──────────────────────────────────────
+    // ── Per-stage actor AND cart spawn positions ──────────────────────
+    // Generate both pairs together (actor then cart per stage) so they are well
+    // separated from each other AND from all clue/trash objects placed afterward.
+    const stageActorSpawns = [];
+    const stageCartSpawns = [];
+    STAGES.forEach((_, i) => {
+      const fallbackActor = [0, (i - Math.floor(STAGES.length / 2)) * 4];
+      const fallbackCart = [CART_POS[0], CART_POS[2] + i * 3];
+      const actor =
+        generateRandomPosSeeded(
+          rng,
+          occupied,
+          wallBoxes,
+          3.5,
+          BOUNDARY - 2,
+          5,
+        ) ?? fallbackActor;
+      occupied.push(actor);
+      stageActorSpawns.push(actor);
+      const cart =
+        generateRandomPosSeeded(rng, occupied, wallBoxes, 4, BOUNDARY - 2, 5) ??
+        fallbackCart;
+      occupied.push(cart);
+      stageCartSpawns.push(cart);
+    });
+    stageSpawnPositionsRef.current = stageActorSpawns;
+    stageCartSpawnPositionsRef.current = stageCartSpawns;
+
+    // ── Stickman (placed at stage 0 spawn) ──────────────────────
     const stickman = buildStickman();
+    stickman.group.position.set(
+      stageActorSpawns[0][0],
+      0,
+      stageActorSpawns[0][1],
+    );
     scene.add(stickman.group);
     stickmanRef.current = stickman;
 
@@ -647,7 +823,14 @@ const StickmanMysteryGame = () => {
           beaconColor: stage.theme.beacon,
           labelColor: stage.theme.label,
         };
-        const pos = generateRandomPosSeeded(rng, occupied, wallBoxes, 4, BOUNDARY - 2, 5);
+        const pos = generateRandomPosSeeded(
+          rng,
+          occupied,
+          wallBoxes,
+          4,
+          BOUNDARY - 2,
+          5,
+        );
         if (!pos) return;
         occupied.push(pos);
         const obj = buildObjectMesh(themedData, clueIdx);
@@ -661,6 +844,8 @@ const StickmanMysteryGame = () => {
 
     // ── Answer Cart ───────────────────────────────────
     const cart = buildCartMesh();
+    // Place at stage-0 random cart spawn (overrides the baked-in CART_POS)
+    cart.group.position.set(stageCartSpawns[0][0], 0, stageCartSpawns[0][1]);
     scene.add(cart.group);
     cartMeshRef.current = cart;
 
@@ -675,7 +860,14 @@ const StickmanMysteryGame = () => {
           beaconColor: stage.theme.beacon,
           labelColor: stage.theme.label,
         };
-        const pos = generateRandomPosSeeded(rng, occupied, wallBoxes, 4, BOUNDARY - 2, 5);
+        const pos = generateRandomPosSeeded(
+          rng,
+          occupied,
+          wallBoxes,
+          4,
+          BOUNDARY - 2,
+          5,
+        );
         if (!pos) return;
         occupied.push(pos);
         const mesh = buildTrashMesh(themedData, trashIdx);
@@ -694,8 +886,14 @@ const StickmanMysteryGame = () => {
 
     // ── Restore saved progress (if reloading mid-game) ───────────
     if (_saved) {
-      // Restore stickman position
-      stickman.group.position.set(_saved.posX ?? 0, 0, _saved.posZ ?? 0);
+      // Restore stickman position (fall back to the saved stage’s random spawn)
+      const savedStageSpawn =
+        stageActorSpawns[_saved.stage ?? 0] ?? stageActorSpawns[0];
+      stickman.group.position.set(
+        _saved.posX ?? savedStageSpawn[0],
+        0,
+        _saved.posZ ?? savedStageSpawn[1],
+      );
       stickmanAngleRef.current = _saved.posAngle ?? 0;
       // Hide beacons for clues/trash already interacted in restored stage
       const rStage = _saved.stage ?? 0;
@@ -780,10 +978,7 @@ const StickmanMysteryGame = () => {
           // Move relative to camera yaw so W always goes where camera faces
           dir
             .normalize()
-            .applyAxisAngle(
-              new THREE.Vector3(0, 1, 0),
-              cameraYawRef.current,
-            );
+            .applyAxisAngle(new THREE.Vector3(0, 1, 0), cameraYawRef.current);
           // Face the character in the movement direction
           stickmanAngleRef.current = Math.atan2(dir.x, dir.z) + Math.PI;
           stickman.group.position.addScaledVector(dir, effectiveSpeed * delta);
@@ -947,8 +1142,12 @@ const StickmanMysteryGame = () => {
       /* —— Camera follow (mouse-drag orbit) —— */
       const CAM_DIST = 9.43; // sqrt(5² + 8²)
       // Smooth lerp actual yaw/pitch toward targets
-      cameraYawRef.current += (cameraYawTargetRef.current - cameraYawRef.current) * Math.min(1, 12 * delta);
-      cameraPitchRef.current += (cameraPitchTargetRef.current - cameraPitchRef.current) * Math.min(1, 12 * delta);
+      cameraYawRef.current +=
+        (cameraYawTargetRef.current - cameraYawRef.current) *
+        Math.min(1, 12 * delta);
+      cameraPitchRef.current +=
+        (cameraPitchTargetRef.current - cameraPitchRef.current) *
+        Math.min(1, 12 * delta);
       const yaw = cameraYawRef.current;
       const pitch = cameraPitchRef.current;
       const camOff = new THREE.Vector3(
@@ -1018,8 +1217,10 @@ const StickmanMysteryGame = () => {
       }
 
       /* —— Cart proximity —— */
-      const cartDx = px - CART_POS[0];
-      const cartDz = pz - CART_POS[2];
+      const curCartPos = stageCartSpawnPositionsRef.current[curStage] ??
+        stageCartSpawnPositionsRef.current[0] ?? [CART_POS[0], CART_POS[2]];
+      const cartDx = px - curCartPos[0];
+      const cartDz = pz - curCartPos[1];
       const cartDist = Math.sqrt(cartDx * cartDx + cartDz * cartDz);
       const isNearCart = cartDist < CART_INTERACT_DIST;
       if (isNearCart !== nearCartRef.current) {
@@ -1096,14 +1297,14 @@ const StickmanMysteryGame = () => {
         if (!o.group.visible) return;
         if (o.beacon && o.beacon.visible) {
           o.beacon.position.y = 2.5 + Math.sin(time * 1.5 + i * 1.3) * 0.2;
-          o.beacon.material.opacity =
-            0.6 + Math.sin(time * 2 + i * 0.9) * 0.3;
+          o.beacon.material.opacity = 0.6 + Math.sin(time * 2 + i * 0.9) * 0.3;
         }
         // Rune ring: slow clockwise spin + gentle vertical bob
         if (o.runeRing) {
           o.runeRing.rotation.z += delta * (0.55 + (i % 3) * 0.1);
           o.runeRing.position.y = 0.72 + Math.sin(time * 1.1 + i * 0.8) * 0.18;
-          o.runeRing.material.opacity = 0.38 + Math.sin(time * 1.8 + i * 1.1) * 0.16;
+          o.runeRing.material.opacity =
+            0.38 + Math.sin(time * 1.8 + i * 1.1) * 0.16;
         }
         if (o.mesh && o.clueIdx !== 4) {
           if (o.mesh.isMeshGroup) {
@@ -1166,7 +1367,8 @@ const StickmanMysteryGame = () => {
         // Outer flare halo: slow breathe
         if (t.flare) {
           t.flare.scale.setScalar(0.85 + Math.sin(time * 6 + i * 2.1) * 0.18);
-          t.flare.material.opacity = 0.2 + Math.sin(time * 8.5 + i * 1.9) * 0.12;
+          t.flare.material.opacity =
+            0.2 + Math.sin(time * 8.5 + i * 1.9) * 0.12;
         }
         // Point light intensity
         t.light.intensity = 0.75 + f1 * 0.28 + f2 * 0.08;
@@ -1192,7 +1394,8 @@ const StickmanMysteryGame = () => {
           // Restore previous
           if (prevMesh && prevMesh.material) {
             prevMesh.material.emissiveIntensity =
-              prevMesh.userData._baseEmissive ?? prevMesh.material.emissiveIntensity;
+              prevMesh.userData._baseEmissive ??
+              prevMesh.material.emissiveIntensity;
             prevMesh.scale.setScalar(1);
           }
           // Highlight new
@@ -1317,7 +1520,7 @@ const StickmanMysteryGame = () => {
         cameraYawTargetRef.current -= dx * 0.004;
         cameraPitchTargetRef.current = THREE.MathUtils.clamp(
           cameraPitchTargetRef.current + dy * 0.004,
-          0.1,  // ~6° — keeps camera above ground
+          0.1, // ~6° — keeps camera above ground
           1.35, // ~77° — near top-down
         );
       }
@@ -1491,7 +1694,9 @@ const StickmanMysteryGame = () => {
       setTimeLeft((prev) => Math.max(0, prev - wrongTimePenalty));
       setStageWrongAttempts((p) => p + 1);
       setStageAnswer("");
-      setError(`That's not correct — think again! (−${wrongTimePenalty}s time penalty)`);
+      setError(
+        `That's not correct — think again! (−${wrongTimePenalty}s time penalty)`,
+      );
       return;
     }
 
@@ -1499,12 +1704,14 @@ const StickmanMysteryGame = () => {
     const stageMaxScore = STAGE_MAX_SCORES[currentStage] || 1000;
     const timeSpent = stageStartTimeRef.current - timeLeft;
     const trashHit = stageTrashTriggered.length;
-    
+
     // Penalty calculations (percentage-based for balance across difficulty tiers)
     const timePenalty = Math.floor(timeSpent / 5); // 1 point per 5 seconds
     const trashPenalty = Math.floor(trashHit * (stageMaxScore * 0.1)); // 10% of max per trash
-    const wrongPenalty = Math.floor(stageWrongAttempts * (stageMaxScore * 0.15)); // 15% of max per wrong
-    
+    const wrongPenalty = Math.floor(
+      stageWrongAttempts * (stageMaxScore * 0.15),
+    ); // 15% of max per wrong
+
     const score = Math.max(
       0,
       stageMaxScore - timePenalty - trashPenalty - wrongPenalty,
@@ -1560,7 +1767,6 @@ const StickmanMysteryGame = () => {
   /* ── Format helpers ────────────────────────────────── */
   const fmt = (s) =>
     `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
-
 
   /* =======================================================
      JSX
@@ -1657,6 +1863,9 @@ const StickmanMysteryGame = () => {
         hasKeyRef={hasKeyRef}
         stageCluesFoundRef={stageCluesFoundRef}
         stageTrashTriggeredRef={stageTrashTriggeredRef}
+        stageSpawnPositionsRef={stageSpawnPositionsRef}
+        stageCartSpawnPositionsRef={stageCartSpawnPositionsRef}
+        cartMeshRef={cartMeshRef}
         handleStageAnswer={handleStageAnswer}
       />
 

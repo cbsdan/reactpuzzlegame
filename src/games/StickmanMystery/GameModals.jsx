@@ -71,13 +71,18 @@ const GameModals = ({
   hasKeyRef,
   stageCluesFoundRef,
   stageTrashTriggeredRef,
+  stageSpawnPositionsRef,
+  stageCartSpawnPositionsRef,
+  cartMeshRef,
   // ── handlers ──
   handleStageAnswer,
 }) => {
   const stageIdx = Math.min(currentStage, TOTAL_STAGES - 1);
 
   /* helper to close most modals and clear keys */
-  const clearKeys = () => { if (keysRef) keysRef.current = {}; };
+  const clearKeys = () => {
+    if (keysRef) keysRef.current = {};
+  };
 
   return (
     <>
@@ -93,7 +98,9 @@ const GameModals = ({
               onClick={(e) => e.stopPropagation()}
             >
               <div className="sm-modal-icon">📜</div>
-              <h3>Stage {currentStage + 1}: {stg.name}</h3>
+              <h3>
+                Stage {currentStage + 1}: {stg.name}
+              </h3>
               <p className="sm-storyline-text">{stg.storyline}</p>
               <p className="sm-objective-text">
                 <strong>📌 Objective:</strong> {stg.objective}
@@ -105,7 +112,10 @@ const GameModals = ({
               </div>
               <button
                 className="sm-btn sm-btn-primary"
-                onClick={() => { setShowStoryline(false); clearKeys(); }}
+                onClick={() => {
+                  setShowStoryline(false);
+                  clearKeys();
+                }}
               >
                 ⚔️ Begin Exploration
               </button>
@@ -123,9 +133,9 @@ const GameModals = ({
             <div className="sm-big-icon">🗝️</div>
             <h2>Key Obtained!</h2>
             <p className="sm-key-text">
-              You solved the riddle of <strong>{stg.name}</strong>!
-              A mysterious key materializes in your hand. Use it to unlock the
-              door to the next stage.
+              You solved the riddle of <strong>{stg.name}</strong>! A mysterious
+              key materializes in your hand. Use it to unlock the door to the
+              next stage.
             </p>
             <button
               className="sm-btn sm-btn-primary"
@@ -141,7 +151,10 @@ const GameModals = ({
       {showClue !== null && (
         <div
           className="sm-overlay"
-          onClick={() => { setShowClue(null); clearKeys(); }}
+          onClick={() => {
+            setShowClue(null);
+            clearKeys();
+          }}
         >
           <div
             className="sm-modal sm-clue-modal"
@@ -152,7 +165,10 @@ const GameModals = ({
             <p className="sm-clue-text">{stg.clues[showClue]?.clue ?? ""}</p>
             <button
               className="sm-btn"
-              onClick={() => { setShowClue(null); clearKeys(); }}
+              onClick={() => {
+                setShowClue(null);
+                clearKeys();
+              }}
             >
               Got it ({stageCluesFound.length}/{stg.clues.length} clues)
             </button>
@@ -164,7 +180,10 @@ const GameModals = ({
       {showTrash !== null && (
         <div
           className="sm-overlay"
-          onClick={() => { setShowTrash(null); clearKeys(); }}
+          onClick={() => {
+            setShowTrash(null);
+            clearKeys();
+          }}
         >
           <div
             className="sm-modal sm-trap-modal"
@@ -186,7 +205,10 @@ const GameModals = ({
             </div>
             <button
               className="sm-btn"
-              onClick={() => { setShowTrash(null); clearKeys(); }}
+              onClick={() => {
+                setShowTrash(null);
+                clearKeys();
+              }}
             >
               Ouch! Continue
             </button>
@@ -209,7 +231,8 @@ const GameModals = ({
 
             <div className="sm-review">
               <h4>
-                Your Collected Clues ({stageCluesFound.length}/{stg.clues.length})
+                Your Collected Clues ({stageCluesFound.length}/
+                {stg.clues.length})
               </h4>
               {stageCluesFound.map((idx, i) => {
                 const clue = stg.clues[idx];
@@ -247,7 +270,9 @@ const GameModals = ({
             {stageWrongAttempts > 0 && (
               <div className="sm-attempts">
                 Wrong attempts: {stageWrongAttempts} (−
-                {stageWrongAttempts * (STAGE_WRONG_TIME_PENALTY[currentStage] ?? 15)}s total)
+                {stageWrongAttempts *
+                  (STAGE_WRONG_TIME_PENALTY[currentStage] ?? 15)}
+                s total)
               </div>
             )}
             {error && <div className="sm-error">{error}</div>}
@@ -282,12 +307,19 @@ const GameModals = ({
           >
             <div className="sm-big-icon">🏆</div>
             <h2>Stage {showStageSummary.stage + 1} Complete!</h2>
-            <h3 style={{ color: STAGES[showStageSummary.stage].theme.label, margin: "4px 0 16px" }}>
+            <h3
+              style={{
+                color: STAGES[showStageSummary.stage].theme.label,
+                margin: "4px 0 16px",
+              }}
+            >
               {showStageSummary.name}
             </h3>
             <div
               className="sm-score-box"
-              style={{ borderColor: STAGES[showStageSummary.stage].theme.label }}
+              style={{
+                borderColor: STAGES[showStageSummary.stage].theme.label,
+              }}
             >
               <span className="sm-score-label">Stage Score</span>
               <span
@@ -301,7 +333,10 @@ const GameModals = ({
               <div>⏱ Time spent: {Math.floor(showStageSummary.timeSpent)}s</div>
               <div>💀 Trash triggered: {showStageSummary.trashTriggered}</div>
               <div>❌ Wrong answers: {showStageSummary.wrongAttempts}</div>
-              <div>📊 Max possible: {STAGE_MAX_SCORES[showStageSummary.stage] || 1000}</div>
+              <div>
+                📊 Max possible:{" "}
+                {STAGE_MAX_SCORES[showStageSummary.stage] || 1000}
+              </div>
             </div>
             <button
               className="sm-btn sm-btn-primary"
@@ -323,8 +358,25 @@ const GameModals = ({
                 if (hasKeyRef) hasKeyRef.current = false;
                 setShowStoryline(true);
                 if (stickmanRef?.current) {
-                  stickmanRef.current.group.position.set(0, 0, 0);
+                  const nextSpawn = stageSpawnPositionsRef?.current?.[next] ?? [
+                    0, 0,
+                  ];
+                  stickmanRef.current.group.position.set(
+                    nextSpawn[0],
+                    0,
+                    nextSpawn[1],
+                  );
                   if (stickmanAngleRef) stickmanAngleRef.current = 0;
+                }
+                if (cartMeshRef?.current) {
+                  const nextCart = stageCartSpawnPositionsRef?.current?.[
+                    next
+                  ] ?? [0, 0, -10];
+                  cartMeshRef.current.group.position.set(
+                    nextCart[0],
+                    0,
+                    nextCart[1],
+                  );
                 }
               }}
             >
@@ -345,16 +397,25 @@ const GameModals = ({
             <div
               className="sm-modal sm-stage-modal"
               onClick={(e) => e.stopPropagation()}
-              style={{ borderColor: STAGES[showStageSummary.stage].theme.label }}
+              style={{
+                borderColor: STAGES[showStageSummary.stage].theme.label,
+              }}
             >
               <div className="sm-big-icon">🏆</div>
               <h2>Final Stage Complete!</h2>
-              <h3 style={{ color: STAGES[showStageSummary.stage].theme.label, margin: "4px 0 16px" }}>
+              <h3
+                style={{
+                  color: STAGES[showStageSummary.stage].theme.label,
+                  margin: "4px 0 16px",
+                }}
+              >
                 {showStageSummary.name}
               </h3>
               <div
                 className="sm-score-box"
-                style={{ borderColor: STAGES[showStageSummary.stage].theme.label }}
+                style={{
+                  borderColor: STAGES[showStageSummary.stage].theme.label,
+                }}
               >
                 <span className="sm-score-label">Stage Score</span>
                 <span
@@ -365,7 +426,9 @@ const GameModals = ({
                 </span>
               </div>
               <div className="sm-stage-stats">
-                <div>⏱ Time spent: {Math.floor(showStageSummary.timeSpent)}s</div>
+                <div>
+                  ⏱ Time spent: {Math.floor(showStageSummary.timeSpent)}s
+                </div>
                 <div>💀 Trash triggered: {showStageSummary.trashTriggered}</div>
                 <div>❌ Wrong answers: {showStageSummary.wrongAttempts}</div>
               </div>
@@ -438,8 +501,8 @@ const GameModals = ({
                     </span>
                   </div>
                   <div className="sm-stage-row-details">
-                    ⏱ {Math.floor(s.timeSpent)}s · 💀 {s.trashTriggered} trash · ❌{" "}
-                    {s.wrongAttempts} wrong
+                    ⏱ {Math.floor(s.timeSpent)}s · 💀 {s.trashTriggered} trash ·
+                    ❌ {s.wrongAttempts} wrong
                   </div>
                 </div>
               ))}
@@ -567,7 +630,8 @@ const GameModals = ({
             )}
             <div className="sm-solve-stats">
               <span>
-                🔑 Clues: {stageCluesFound.length}/{stg.clues.length} (current stage)
+                🔑 Clues: {stageCluesFound.length}/{stg.clues.length} (current
+                stage)
               </span>
               <span>
                 📊 Total: {stageScores.reduce((sum, s) => sum + s.score, 0)}
