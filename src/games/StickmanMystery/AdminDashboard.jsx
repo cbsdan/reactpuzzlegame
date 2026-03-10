@@ -33,7 +33,7 @@ function loadActiveStages(stickmanConfig) {
 }
 
 const StickmanMysteryAdminDashboard = () => {
-  const { players, gameState, adminAction } = useGame();
+  const { players, gameState, adminAction, currentRoom } = useGame();
   const [answerRevealed, setAnswerRevealed] = useState(false);
   const [watchedPlayerId, setWatchedPlayerId] = useState(null);
   const [refOpen, setRefOpen] = useState(false);
@@ -170,6 +170,7 @@ const StickmanMysteryAdminDashboard = () => {
                 watchedPlayer={watchedPlayer}
                 allPlayers={players}
                 stages={activeStages}
+                roomId={currentRoom?._id}
               />
             </div>
           </div>

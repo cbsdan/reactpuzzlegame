@@ -3,6 +3,8 @@ import { AVAILABLE_OBJECTS } from "./StickmanMysteryGame";
 import "./StickmanSettings.css";
 import { DEFAULT_STAGES } from "./stageData.js";
 
+const STORAGE_KEY = "stickman_custom_config";
+
 const THEME_FOR_STAGE = [
   { color: 0x00e5ff, emissive: 0x006b80, beacon: 0x00e5ff, label: "#00e5ff" },
   { color: 0xbb86fc, emissive: 0x5d4380, beacon: 0xbb86fc, label: "#bb86fc" },
@@ -19,7 +21,7 @@ const THEME_FOR_STAGE = [
 function stagesToJson(stagesList) {
   return stagesList.map((s) => {
     // eslint-disable-next-line no-unused-vars
-    const { theme, mode, selectedAlt, customAnswer, customQuestion, customStoryline, customObjective, customClues, ...clean } = s;
+    const { theme, mode, selectedAlt, customAnswer, customQuestion, customStoryline, customObjective, customClues, altAnswers, ...clean } = s;
     return clean;
   });
 }
@@ -31,7 +33,7 @@ function stagesToJson(stagesList) {
 function stagesToJsonLabeled(stagesList) {
   return stagesList.map((s, i) => {
     // eslint-disable-next-line no-unused-vars
-    const { theme, mode, selectedAlt, customAnswer, customQuestion, customStoryline, customObjective, customClues, ...clean } = s;
+    const { theme, mode, selectedAlt, customAnswer, customQuestion, customStoryline, customObjective, customClues, altAnswers, ...clean } = s;
     return { "//": `━━━ Stage ${i + 1}: ${clean.name || `Stage ${i + 1}`} ━━━`, ...clean };
   });
 }
@@ -76,8 +78,9 @@ const StickmanSettings = ({ onSave, onCancel }) => {
 
   /* ── Structured-editor state ── */
   const [stages, setStages] = useState(() =>
-    savedStages.map((s) => ({
+    savedStages.map((s, i) => ({
       ...s,
+      trash: Array.isArray(s.trash) ? s.trash : (DEFAULT_STAGES[i]?.trash ?? []),
       mode: "default",
       selectedAlt: 0,
       customAnswer: "",
@@ -263,6 +266,8 @@ const StickmanSettings = ({ onSave, onCancel }) => {
       finalStages = parsed.map((s, i) => ({
         ...s,
         theme: THEME_FOR_STAGE[i] || THEME_FOR_STAGE[6],
+        trash: Array.isArray(s.trash) ? s.trash : (DEFAULT_STAGES[i]?.trash ?? []),
+        altAnswers: stages[i]?.altAnswers ?? s.altAnswers ?? [],
       }));
     } else {
       finalStages = buildFromStructured();
@@ -320,8 +325,10 @@ const StickmanSettings = ({ onSave, onCancel }) => {
     setJsonError("");
     const parsed = stripJsonComments(JSON.parse(jsonText));
     setStages(
-      parsed.map((s) => ({
+      parsed.map((s, i) => ({
         ...s,
+        trash: Array.isArray(s.trash) ? s.trash : (DEFAULT_STAGES[i]?.trash ?? []),
+        altAnswers: stages[i]?.altAnswers ?? s.altAnswers ?? [],
         mode: "default",
         selectedAlt: 0,
         customAnswer: "",
@@ -394,7 +401,7 @@ const StickmanSettings = ({ onSave, onCancel }) => {
           <div className="sms-json-panel">
             <div className="sms-json-toolbar">
               <span className="sms-json-desc">
-                Edit all 5 stages as a single JSON array. All fields are fully customisable.
+                Edit all {stages.length} stages as a single JSON array. All fields are fully customisable.
               </span>
               <button className="sms-json-apply-btn" onClick={applyJsonToStructured}>
                 ↩ Apply to Stage Editor

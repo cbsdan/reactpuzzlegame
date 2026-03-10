@@ -45,25 +45,30 @@ export const DEFAULT_STAGES = [
     ],
   },
   {
-    name: "The Hourglass Hall",
-    answer: "13",
-    question: "Three ancient tablets each display an input→output pair. A hidden mathematical rule connects them. Crack the rule and find the output when the input is 6.",
-    hint: "Look at each pair carefully: try multiplying the input by 2, then adding 1. Verify it on every pair, then apply it to 6.",
-    storyline: "A grand hall stretches before you, lined with countless shattered hourglasses. Three glowing pedestals stand in the gloom — each engraved with a mysterious pair of numbers linked by an arrow. The clock priests sealed this vault with a numeric rule. Only those who can decode the pattern will pass!",
-    objective: "Collect all 3 pattern tablets. Each shows \"input → output\". Discover the rule linking them, then calculate the missing output for input 6. Type the number at the Answer Cart.",
+    name: "The Chamber of the Patchkeeper",
+    answer: "50005",
+    question: "Speak the gateway number the Keeper uses, and the dungeon's machines will once again accept their patches.",
+    hint: "The many-armed Keeper of deployments communicates over a specific network port. When its services fail with 'Run Services FAILED — Unable to send rest', this five-digit port must be opened.",
+    storyline: "Your party steps into a chamber filled with strange mechanisms. Metal pipes run through the walls like veins, carrying messages to distant parts of the dungeon. In the center stands a stone console with a sealed gate behind it. Three glowing runes appear one by one.",
+    objective: "Collect all 3 rune clues. Each reveals something about the Keeper of deployments and the gateway it requires. Submit the gateway number at the Answer Cart.",
     clueCount: 3,
     trashCount: 2,
     theme: { color: 0xbb86fc, emissive: 0x5d4380, beacon: 0xbb86fc, label: "#bb86fc" },
     clues: [
-      { name: "Shadow Tablet I",   clue: "Pattern Pair I:   2 → 5",  objectShape: "lantern" },
-      { name: "Shadow Tablet II",  clue: "Pattern Pair II:  4 → 9",  objectShape: "orb" },
-      { name: "Shadow Tablet III", clue: "Pattern Pair III: 6 → ?",  objectShape: "chest" },
+      { name: "Rune I – The Keeper",      clue: "When the systems of the kingdom fall into disrepair, a many-armed overseer awakens. Its agents travel across the realm, delivering fixes to broken machines. Name the creature whose likeness this keeper bears — and you will know the deployment tool.", objectShape: "lantern" },
+      { name: "Rune II – The Hidden Gate", clue: "The Keeper is known to you. Yet even the Keeper cannot send its agents without a gateway. Every messenger of the network must pass through a numbered tunnel. Speak the type of gateway the Keeper requires to function.", objectShape: "orb" },
+      { name: "Rune III – The Curse",      clue: "Many who attempt the Keeper's command encounter the same curse:\n\n'Run Services FAILED on Station\nUnable to send rest'\n\nOnly those who know the Keeper well will recognise the numbered gateway needed to banish this failure and restore the flow of patches.", objectShape: "chest" },
     ],
     trash: [
-      { name: "Bone Dust Heap", msg: "Just crumbled bones — nothing useful here, keep searching!" },
-      { name: "Empty Potion Vial", msg: "The vial was empty all along — a cruel ruse!" },
+      { name: "Corroded Pipe",  msg: "A broken segment of pipe — it carries no messages, only rust and disappointment!" },
+      { name: "Blank Console",  msg: "The console screen is dark and empty — nothing useful to be found here!" },
     ],
     altAnswers: [
+      { answer: "13", question: "Three ancient tablets each display an input→output pair. A hidden mathematical rule connects them. Crack the rule and find the output when the input is 6.", clues: [
+        { name: "Shadow Tablet I",   clue: "Pattern Pair I:   2 → 5",  objectShape: "lantern" },
+        { name: "Shadow Tablet II",  clue: "Pattern Pair II:  4 → 9",  objectShape: "orb" },
+        { name: "Shadow Tablet III", clue: "Pattern Pair III: 6 → ?",  objectShape: "chest" },
+      ]},
       { answer: "11", question: "Three rune tablets each reveal an input→output pair. Crack the hidden rule, then apply it: what is the output when the input is 5?", clues: [
         { name: "Void Tablet I",   clue: "Pattern Pair I:   1 → 3",  objectShape: "diamond" },
         { name: "Void Tablet II",  clue: "Pattern Pair II:  3 → 7",  objectShape: "crystal" },
@@ -71,13 +76,8 @@ export const DEFAULT_STAGES = [
       ]},
       { answer: "TIME", question: "I heal all wounds yet cause all scars. No one can see me, touch me, or stop me — yet all are slaves to me. Three clues reveal my name. What am I?", clues: [
         { name: "Shattered Hourglass", clue: "Clue 1: I can be wasted, saved, or spent — but never refilled once gone. Every passing second consumes me.", objectShape: "lantern" },
-        { name: "Ancient Clock Face", clue: "Clue 2: Seconds, minutes, and hours are my units. Calendars track me. Historians chronicle me.", objectShape: "orb" },
-        { name: "Faded Sundial", clue: "Clue 3: I march forward without pause and wait for no one. I heal wounds — and open others. Four letters: T _ M _", objectShape: "chest" },
-      ]},
-      { answer: "WIND", question: "You feel me but cannot see me. I move mountains grain by grain. Sailors worship me, trees fear me. Four letters.", clues: [
-        { name: "Torn Banner", clue: "Clue 1: I am invisible yet powerful enough to fill sails and uproot ancient trees.", objectShape: "tome" },
-        { name: "Rustling Scroll", clue: "Clue 2: I carry seeds, scatter leaves, and shape sand dunes over centuries. You feel me but cannot hold me.", objectShape: "chest" },
-        { name: "Weather Vane", clue: "Clue 3: Meteorologists measure my speed and direction. Windmills harvest my energy. Four letters: W _ N _", objectShape: "orb" },
+        { name: "Ancient Clock Face",  clue: "Clue 2: Seconds, minutes, and hours are my units. Calendars track me. Historians chronicle me.", objectShape: "orb" },
+        { name: "Faded Sundial",       clue: "Clue 3: I march forward without pause and wait for no one. I heal wounds — and open others. Four letters: T _ M _", objectShape: "chest" },
       ]},
     ],
   },
@@ -129,11 +129,11 @@ export const DEFAULT_STAGES = [
     trashCount: 3,
     theme: { color: 0x448aff, emissive: 0x1a3680, beacon: 0x448aff, label: "#448aff" },
     clues: [
-      { name: "Panel 1 — D", clue: "Letter 1 of 5: 'D' — stands for Digital. Modern radiology abandoned film for ___ital storage and transmission.", objectShape: "tome" },
-      { name: "Panel 2 — I", clue: "Letter 2 of 5: 'I' — stands for Imaging. CT, MRI, PET, ultrasound, and X-ray are all forms of medical ___aging.", objectShape: "orb" },
-      { name: "Panel 3 — C", clue: "Letter 3 of 5: 'C' — stands for Communications. This standard defines ___ommunications between scanners, PACS servers, and radiologist workstations.", objectShape: "chest" },
-      { name: "Panel 4 — O", clue: "Letter 4 of 5: 'O' — stands for Of. A two-letter bridge in the full name: 'Digital Imaging and Communications ___ Medicine'.", objectShape: "lantern" },
-      { name: "Panel 5 — M", clue: "Letter 5 of 5: 'M' — stands for Medicine. The field that created and depends entirely on this imaging standard.", objectShape: "diamond" },
+      { name: "Clinical Panel I",   clue: "First component of the standard: Radiology's defining revolution was abandoning physical film in favour of electronic files that can be stored on servers and transmitted across networks. The first word of this five-part standard names this fundamental shift.", objectShape: "tome" },
+      { name: "Clinical Panel II",  clue: "Second component: CT, MRI, PET, ultrasound, and X-ray share one category — pictures of the body's interior acquired through technology rather than surgery. The second word of this standard names what these clinically produced pictures are collectively called.", objectShape: "orb" },
+      { name: "Clinical Panel III", clue: "Third component: Scanners, PACS servers, and radiologist workstations must exchange data with one another seamlessly. The third word of this standard names the act of sending and receiving information between connected systems.", objectShape: "chest" },
+      { name: "Clinical Panel IV",  clue: "Fourth component: A small word — yet essential. The full standard name reads: 'Digital Imaging and ___ ___ Medicine.' The fourth word is a short preposition that bridges the technology with the discipline it was built to serve.", objectShape: "lantern" },
+      { name: "Clinical Panel V",   clue: "Fifth and final component: This entire standard was created to serve one discipline — the science and practice of diagnosing and treating disease, carried out by doctors and hospitals worldwide. The fifth word names that discipline.", objectShape: "diamond" },
     ],
     trash: [
       { name: "Corrupt Tag (FFFF,FFFF)", msg: "Tag (FFFF,FFFF) — undefined private attribute! This DICOM tag is corrupt and completely useless!" },
@@ -142,17 +142,17 @@ export const DEFAULT_STAGES = [
     ],
     altAnswers: [
       { answer: "HIPAA", question: "Five panels reveal one letter each of a landmark US healthcare privacy law enacted in 1996. Arrange them to spell the 5-letter acronym.", clues: [
-        { name: "Shield Plaque H", clue: "Letter 1 of 5: 'H' — stands for Health. The ___ Insurance Portability and Accountability Act governs patient data.", objectShape: "pillar" },
-        { name: "Shield Plaque I", clue: "Letter 2 of 5: 'I' — stands for Insurance. Health ___ Portability — you can keep coverage when changing employers.", objectShape: "crystal" },
-        { name: "Shield Plaque P", clue: "Letter 3 of 5: 'P' — stands for Portability. Health Insurance ___ — your coverage travels with you.", objectShape: "mirror" },
-        { name: "Shield Plaque A", clue: "Letter 4 of 5: 'A' — stands for Accountability. ___ means those who misuse patient data can be audited and penalised.", objectShape: "tome" },
-        { name: "Shield Plaque A2", clue: "Letter 5 of 5: 'A' — stands for Act. This is a US federal law — the Health Insurance Portability and Accountability ___.", objectShape: "chest" },
+        { name: "Shield Plaque I",   clue: "First component: This law protects one category of personal data above all others — records, insurance policies, and services pertaining to one's physical well-being and medical care. The first word of this federal act names that protected category.", objectShape: "pillar" },
+        { name: "Shield Plaque II",  clue: "Second component: The law ensures that when workers change employers, this financial coverage — which pays for medical treatments and hospital stays — travels with them. Name this type of portable financial protection.", objectShape: "crystal" },
+        { name: "Shield Plaque III", clue: "Third component: The law enshrines a specific right — the ability to carry your medical coverage from one employer to the next without losing it. Name the single word describing this right of continuity and movement.", objectShape: "mirror" },
+        { name: "Shield Plaque IV",  clue: "Fourth component: The law creates legal responsibility. Those who misuse patient data can be audited, fined, and prosecuted. Name the principle that makes institutions answerable for their actions.", objectShape: "tome" },
+        { name: "Shield Plaque V",   clue: "Fifth component: Every formally enacted piece of legislation ends with this word in its title. This is a US federal law signed by the President into binding law. Name the word that classifies any formally enacted legislation.", objectShape: "chest" },
       ]},
       { answer: "PACS", question: "Four panels reveal the letters of the system radiologists use daily to store, retrieve, and view medical images. Spell the 4-letter acronym.", clues: [
-        { name: "Archive Tile P", clue: "Letter 1 of 4: 'P' — stands for Picture. A ___ Archiving and Communication System stores every DICOM image.", objectShape: "orb" },
-        { name: "Archive Tile A", clue: "Letter 2 of 4: 'A' — stands for Archiving. Picture ___ — long-term storage of millions of medical images.", objectShape: "lantern" },
-        { name: "Archive Tile C", clue: "Letter 3 of 4: 'C' — stands for Communication. Picture Archiving and ___ — transmitting images to radiologists.", objectShape: "diamond" },
-        { name: "Archive Tile S", clue: "Letter 4 of 4: 'S' — stands for System. Picture Archiving and Communication ___ — the complete infrastructure.", objectShape: "pillar" },
+        { name: "Archive Tile I",   clue: "First component: The primary content of this system — visual representations of the body's interior produced by CT, MRI, and X-ray scanners. Each one is a visual record that radiologists interpret. Name this category of clinical visual records.", objectShape: "orb" },
+        { name: "Archive Tile II",  clue: "Second component: Every image produced by a scanner must be preserved — stored on servers for years, available for future comparison and legal audit. Name the word that describes this act of long-term storage and preservation of records.", objectShape: "lantern" },
+        { name: "Archive Tile III", clue: "Third component: Stored images must travel — from storage servers to radiologist workstations across the network. Name the word for the act of sending and receiving information between connected systems.", objectShape: "diamond" },
+        { name: "Archive Tile IV",  clue: "Fourth component: This is not a single device but a complete infrastructure — servers, viewing stations, transmission protocols, and long-term storage unified into one whole. Name the word for this complete, integrated structure.", objectShape: "pillar" },
       ]},
       { answer: "32", question: "Five signal panels each show one term in a doubling sequence. Starting from 1, each term is double the previous. What is the 5th term?", clues: [
         { name: "Signal Panel I",   clue: "Term 1: 1", objectShape: "pillar" },
@@ -176,7 +176,7 @@ export const DEFAULT_STAGES = [
     clues: [
       { name: "Pipe Scroll", clue: "Clue 1: In HL7 v2, I am the first segment of every message. My second field is always '|' — the field separator that defines how every subsequent field in the message is parsed.", objectShape: "tome" },
       { name: "System Notice", clue: "Clue 2: I carry Sending Application (field 3), Sending Facility (field 4), Receiving Application (field 5), Message Type (field 9), and Message Control ID (field 10). Without me, no HL7 message can be processed.", objectShape: "orb" },
-      { name: "Header Rune", clue: "Clue 3: My three letters — M, S, H — abbreviate my full name: Message Segment Header. I am the mandatory first segment in every HL7 v2 clinical transaction ever sent.", objectShape: "chest" },
+      { name: "Header Rune", clue: "Clue 3: No HL7 v2 message may begin without me. I am the single mandatory first segment that every receiving system reads before processing anything else. My full name is three words — and my three-character code takes the first letter of each: the type of content I carry, the structural unit I represent, and the position I hold in every message.", objectShape: "chest" },
     ],
     trash: [
       { name: "Orphaned OBX Segment", msg: "An OBX with no parent OBR — this HL7 message is malformed and will be rejected! A diagnostic dead end!" },
@@ -187,12 +187,12 @@ export const DEFAULT_STAGES = [
       { answer: "PID", question: "This HL7 v2 segment carries the patient's name, date of birth, medical record number, and address. It is the backbone of every ADT message. Name the 3-letter segment.", clues: [
         { name: "Patient Ledger", clue: "Clue 1: I hold the Patient Identifier List (field 3), Patient Name (field 5), and Date of Birth (field 7). I define exactly who every HL7 message is about.", objectShape: "pillar" },
         { name: "Identity Scroll", clue: "Clue 2: In an ADT^A01 Admit message, I follow MSH and EVN. Without me, the patient has no identity in the receiving system.", objectShape: "crystal" },
-        { name: "Registry Mark", clue: "Clue 3: My three letters — P, I, D — stand for Patient Identification. I am the most referenced segment across all HL7 v2 message types.", objectShape: "diamond" },
+        { name: "Registry Mark", clue: "Clue 3: I am the most referenced segment across all HL7 v2 message types. My three-letter code is derived from my full name: the subject I always describe (the individual receiving care), the concept of establishing exactly who that individual is, and the word that distinguishes one person's record from all others in the system.", objectShape: "diamond" },
       ]},
       { answer: "OBX", question: "This HL7 v2 segment carries individual observation results — lab values, vital signs, and radiology findings. Each result gets its own instance. Name the 3-letter segment.", clues: [
         { name: "Lab Result Tile", clue: "Clue 1: I carry a single observation — a glucose level, a blood pressure reading, or a pathology finding. One result, one me.", objectShape: "mirror" },
         { name: "Result Scroll", clue: "Clue 2: My fields include Observation Identifier (field 3), Observation Value (field 5), and Units (field 6). I follow OBR segments in laboratory ORU^R01 messages.", objectShape: "tome" },
-        { name: "Value Rune", clue: "Clue 3: My three letters — O, B, X — stand for Observation. I am the segment that delivers the actual clinical measurement data in every HL7 results message.", objectShape: "lantern" },
+        { name: "Value Rune", clue: "Clue 3: I deliver the actual clinical measurement data in every HL7 results message. My first letter abbreviates the core concept — the act of noting a single clinical finding or measured value. The remaining two letters complete the three-character segment identifier that appears once per individual result in every ORU^R01 message.", objectShape: "lantern" },
       ]},
       { answer: "10", question: "Three number stones reveal the first three triangular numbers (the sum of consecutive integers). Find the pattern and give the 4th triangular number.", clues: [
         { name: "Triangle Stone I",   clue: "T(1) = 1   (sum of 1)", objectShape: "pillar" },

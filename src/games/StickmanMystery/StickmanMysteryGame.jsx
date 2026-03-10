@@ -78,79 +78,59 @@ const StickmanMysteryGame = () => {
 
   // Resolve active stages: admin config → localStorage saved config → built-in defaults
   const adminConfig = gameState?.stickmanConfig;
-  const STAGES =
-    adminConfig?.stages ||
-    (() => {
-      try {
-        const saved = localStorage.getItem("stickman_custom_config");
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (
-            parsed?.stages &&
-            Array.isArray(parsed.stages) &&
-            parsed.stages.length > 0
-          ) {
-            // Re-attach themes if missing
-            return parsed.stages.map((s, i) => ({
-              ...s,
-              theme: s.theme ||
-                [
-                  {
-                    color: 0x00e5ff,
-                    emissive: 0x006b80,
-                    beacon: 0x00e5ff,
-                    label: "#00e5ff",
-                  },
-                  {
-                    color: 0xbb86fc,
-                    emissive: 0x5d4380,
-                    beacon: 0xbb86fc,
-                    label: "#bb86fc",
-                  },
-                  {
-                    color: 0xff7043,
-                    emissive: 0x802020,
-                    beacon: 0xff7043,
-                    label: "#ff7043",
-                  },
-                  {
-                    color: 0x448aff,
-                    emissive: 0x1a3680,
-                    beacon: 0x448aff,
-                    label: "#448aff",
-                  },
-                  {
-                    color: 0x69f0ae,
-                    emissive: 0x1a5c35,
-                    beacon: 0x69f0ae,
-                    label: "#69f0ae",
-                  },
-                  {
-                    color: 0xffab00,
-                    emissive: 0x805500,
-                    beacon: 0xffab00,
-                    label: "#ffab00",
-                  },
-                  {
-                    color: 0x00e676,
-                    emissive: 0x00733b,
-                    beacon: 0x00e676,
-                    label: "#00e676",
-                  },
-                ][i] || {
-                  color: 0x00e5ff,
-                  emissive: 0x006b80,
-                  beacon: 0x00e5ff,
-                  label: "#00e5ff",
-                },
-            }));
-          }
+
+  // Shared stage-theme palette (index = stage number)
+  const _STAGE_THEMES = [
+    { color: 0x00e5ff, emissive: 0x006b80, beacon: 0x00e5ff, label: "#00e5ff" },
+    { color: 0xbb86fc, emissive: 0x5d4380, beacon: 0xbb86fc, label: "#bb86fc" },
+    { color: 0xff7043, emissive: 0x802020, beacon: 0xff7043, label: "#ff7043" },
+    { color: 0x448aff, emissive: 0x1a3680, beacon: 0x448aff, label: "#448aff" },
+    { color: 0x69f0ae, emissive: 0x1a5c35, beacon: 0x69f0ae, label: "#69f0ae" },
+    { color: 0xffab00, emissive: 0x805500, beacon: 0xffab00, label: "#ffab00" },
+    { color: 0x00e676, emissive: 0x00733b, beacon: 0x00e676, label: "#00e676" },
+  ];
+  // Ensure every stage has required fields regardless of the source (adminConfig,
+  // localStorage, or DEFAULT_STAGES).  This is the single normalization point so
+  // all three paths get identical treatment.
+  const _normalizeStages = (rawStages) =>
+    rawStages.map((s, i) => ({
+      ...s,
+      clues:
+        Array.isArray(s.clues) && s.clues.length > 0
+          ? s.clues
+          : (DEFAULT_STAGES[i]?.clues ?? []),
+      trash:
+        Array.isArray(s.trash) && s.trash.length > 0
+          ? s.trash
+          : (DEFAULT_STAGES[i]?.trash ?? []),
+      altAnswers: Array.isArray(s.altAnswers) ? s.altAnswers : [],
+      theme: s.theme || _STAGE_THEMES[i] || _STAGE_THEMES[0],
+    }));
+
+  const STAGES = (() => {
+    // 1. Admin config from server (highest priority)
+    if (adminConfig?.stages?.length > 0) {
+      return _normalizeStages(adminConfig.stages);
+    }
+    // 2. Player's locally-saved custom config
+    try {
+      const saved = localStorage.getItem("stickman_custom_config");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (
+          parsed?.stages &&
+          Array.isArray(parsed.stages) &&
+          parsed.stages.length > 0
+        ) {
+          return _normalizeStages(parsed.stages);
         }
-      } catch {
-        /* ignore */
       }
-      return DEFAULT_STAGES;
-    })();
+    } catch {
+      /* ignore */
+    }
+    // 3. Built-in defaults (already fully populated)
+    return DEFAULT_STAGES;
+  })();
 
   /* ── Three.js refs ─────────────────────────────────── */
   const containerRef = useRef(null);
@@ -814,7 +794,7 @@ const StickmanMysteryGame = () => {
     // ── Clue objects (5 per stage × 5 stages = 25) ────
     const clueMeshes = [];
     STAGES.forEach((stage, stageIdx) => {
-      stage.clues.forEach((clueData, clueIdx) => {
+      (stage.clues ?? []).forEach((clueData, clueIdx) => {
         const themedData = {
           ...clueData,
           pos: [0, 0, 0],
@@ -852,7 +832,7 @@ const StickmanMysteryGame = () => {
     // ── Trash objects (3 per stage × 5 stages = 15) ───
     const trashMeshes = [];
     STAGES.forEach((stage, stageIdx) => {
-      stage.trash.forEach((trashData, trashIdx) => {
+      (stage.trash ?? []).forEach((trashData, trashIdx) => {
         const themedData = {
           ...trashData,
           color: stage.theme.color,
@@ -860,13 +840,15 @@ const StickmanMysteryGame = () => {
           beaconColor: stage.theme.beacon,
           labelColor: stage.theme.label,
         };
+        // Use relaxed minDist (2.5 vs 4) and no center-avoidance so the seeded RNG
+        // can always find a valid spot even when occupied[] is already dense (35+ items).
         const pos = generateRandomPosSeeded(
           rng,
           occupied,
           wallBoxes,
-          4,
+          2.5,
           BOUNDARY - 2,
-          5,
+          0,
         );
         if (!pos) return;
         occupied.push(pos);

@@ -106,8 +106,8 @@ const GameModals = ({
                 <strong>📌 Objective:</strong> {stg.objective}
               </p>
               <div className="sm-storyline-info">
-                <span>🔑 Clues to find: {stg.clues.length}</span>
-                <span>💀 Traps hidden: {stg.trash.length}</span>
+                <span>🔑 Clues to find: {stg.clues?.length ?? 0}</span>
+                <span>💀 Traps hidden: {stg.trash?.length ?? 0}</span>
                 {currentStage > 0 && <span>⚠️ Difficulty increased!</span>}
               </div>
               <button
@@ -170,7 +170,7 @@ const GameModals = ({
                 clearKeys();
               }}
             >
-              Got it ({stageCluesFound.length}/{stg.clues.length} clues)
+              Got it ({stageCluesFound.length}/{stg.clues?.length ?? 0} clues)
             </button>
           </div>
         </div>

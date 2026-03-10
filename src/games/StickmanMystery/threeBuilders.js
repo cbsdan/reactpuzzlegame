@@ -124,7 +124,8 @@ export function createTextSprite(text, color = "#ffffff") {
   const mat = new THREE.SpriteMaterial({
     map: tex,
     transparent: true,
-    depthTest: false,
+    depthTest: true,
+    depthWrite: false,
   });
   const sprite = new THREE.Sprite(mat);
   sprite.scale.set(4, 1, 1);
@@ -261,7 +262,7 @@ export function buildObjectMesh(objData, index) {
   group.add(pool);
 
   const label = createTextSprite(objData.name, objData.labelColor || "#ffffff");
-  label.position.y = 3.2;
+  label.position.y = 2.4;
   group.add(label);
 
   group.position.set(objData.pos[0], objData.pos[1], objData.pos[2]);
@@ -348,7 +349,7 @@ export function buildCartMesh() {
   group.add(light);
 
   const label = createTextSprite("Answer Cart", "#ff6b35");
-  label.position.y = 3.5;
+  label.position.y = 2.6;
   group.add(label);
 
   group.position.set(CART_POS[0], CART_POS[1], CART_POS[2]);
@@ -502,7 +503,7 @@ export function buildTrashMesh(trashData, shapeIdx) {
   group.add(ring);
 
   const label = createTextSprite(trashData.name, trashData.labelColor || "#ffffff");
-  label.position.y = 3.2;
+  label.position.y = 2.4;
   group.add(label);
 
   const warnMat = new THREE.MeshBasicMaterial({ color: 0xff3333, transparent: true, opacity: 0.8 });

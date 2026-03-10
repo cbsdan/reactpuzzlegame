@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { DEFAULT_STAGES } from "./StickmanMysteryGame";
+import { WALL_SEGMENTS, BOUNDARY, CART_POS } from "./constants";
+import { makePrng, hashStr, generateRandomPosSeeded } from "./gameUtils";
 
 const STICKMAN_STORAGE_KEY = "stickman_custom_config";
 const THEME_FOR_STAGE = [
@@ -29,24 +31,7 @@ function loadActiveStagesLocal() {
   return DEFAULT_STAGES;
 }
 
-/* ── Maze layout — identical to StickmanMysteryGame ─── */
-const WALL_SEGMENTS = [
-  { x: 0,   z: -18, w: 38,  d: 1.2, h: 3.2 },
-  { x: 0,   z:  18, w: 38,  d: 1.2, h: 3.2 },
-  { x: -18, z:   0, w: 1.2, d: 38,  h: 3.2 },
-  { x:  18, z:   0, w: 1.2, d: 38,  h: 3.2 },
-  { x: -10, z:  -8, w:  8,  d: 0.6, h: 2.6 },
-  { x:   8, z:  -8, w:  8,  d: 0.6, h: 2.6 },
-  { x: -10, z:   8, w:  8,  d: 0.6, h: 2.6 },
-  { x:   8, z:   8, w:  8,  d: 0.6, h: 2.6 },
-  { x: -10, z:   0, w: 0.6, d: 16,  h: 2.6 },
-  { x:  10, z:  -2, w: 0.6, d: 12,  h: 2.6 },
-  { x:  -2, z:  -4, w:  6,  d: 0.6, h: 2.6 },
-  { x:   2, z:   4, w:  6,  d: 0.6, h: 2.6 },
-];
-
-/* Same constants as the game */
-const CART_POS    = [0, 0, -10];
+/* ── Same camera constants as the game ─────────────── */
 const CAM_DIST    = 9.43;            // sqrt(5²+8²) — exact game value
 const CAM_PITCH   = Math.atan2(5, 8); // ≈0.559 rad — default game pitch
 
@@ -56,9 +41,7 @@ const PLAYER_COLORS = [
   0x54a0ff, 0x5f27cd, 0x01a3a4, 0xf368e0,
 ];
 
-/* Fixed positions for clue/trash objects inside the maze */
-const CLUE_SPOTS  = [[-6,-8],[6,-8],[-5,5],[7,5],[-3,-3],[-12,3],[12,-3],[0,12]];
-const TRASH_SPOTS = [[-12,-5],[12,6],[3,-10]];
+
 
 /* ── Scene builder helpers ───────────────────────────── */
 
@@ -136,15 +119,17 @@ function makeLabel(text, colorHex) {
    The watched player's own stickman is rendered in-scene.
    Only players on the same stage are shown.
 ───────────────────────────────────────────────────── */
-const PlayerSpectatorView = ({ watchedPlayer, allPlayers, stages }) => {
+const PlayerSpectatorView = ({ watchedPlayer, allPlayers, stages, roomId }) => {
   const containerRef = useRef(null);
   const watchedRef   = useRef(watchedPlayer);
   const allRef       = useRef(allPlayers);
   const stagesRef    = useRef(stages || loadActiveStagesLocal());
+  const roomIdRef    = useRef(roomId);
 
   useEffect(() => { watchedRef.current = watchedPlayer; }, [watchedPlayer]);
   useEffect(() => { allRef.current    = allPlayers;    }, [allPlayers]);
   useEffect(() => { stagesRef.current = stages?.length > 0 ? stages : loadActiveStagesLocal(); }, [stages]);
+  useEffect(() => { roomIdRef.current = roomId; }, [roomId]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -181,7 +166,7 @@ const PlayerSpectatorView = ({ watchedPlayer, allPlayers, stages }) => {
       new THREE.MeshStandardMaterial({ color: 0x080c18, roughness: 1 }),
     );
     ceil.rotation.x = Math.PI / 2;
-    ceil.position.y = 3.2;
+    ceil.position.y = 5.2;
     scene.add(ceil);
 
     /* ── Walls — same style as game's buildWallMesh() ─── */
@@ -202,6 +187,43 @@ const PlayerSpectatorView = ({ watchedPlayer, allPlayers, stages }) => {
       cap.position.set(w.x, w.h + 0.06, w.z);
       scene.add(cap);
     });
+
+    /* ── Seeded position pre-computation (mirrors game's build sequence) ── */
+    const activeStagesSnap = stagesRef.current;
+    const wallBoxes = WALL_SEGMENTS.map((w) => ({ ...w }));
+    const rng = makePrng(hashStr(roomIdRef.current || "room0"));
+    const occupied = [];
+
+    // 1. Per-stage actor + cart spawns (must occur before clue/trash to match RNG order)
+    const stageCartPositions = [];
+    activeStagesSnap.forEach((_, si) => {
+      const fallbackActor = [0, (si - Math.floor(activeStagesSnap.length / 2)) * 4];
+      const fallbackCart  = [CART_POS[0], CART_POS[2]];
+      const actor = generateRandomPosSeeded(rng, occupied, wallBoxes, 3.5, BOUNDARY - 2, 5) ?? fallbackActor;
+      occupied.push(actor);
+      const cart  = generateRandomPosSeeded(rng, occupied, wallBoxes, 4,   BOUNDARY - 2, 5) ?? fallbackCart;
+      occupied.push(cart);
+      stageCartPositions.push(cart);
+    });
+
+    // 2. Clue positions (all stages × all clues, in stage order)
+    const allCluePositions = activeStagesSnap.map((stage) =>
+      (stage.clues ?? []).map(() => {
+        const pos = generateRandomPosSeeded(rng, occupied, wallBoxes, 4, BOUNDARY - 2, 5) ?? [0, 0];
+        occupied.push(pos);
+        return pos;
+      })
+    );
+
+    // 3. Trash positions (all stages × all trash, after all clues — same as game)
+    // Uses same relaxed params as game (minDist=2.5, avoidCenter=0) to keep sequences in sync.
+    const allTrashPositions = activeStagesSnap.map((stage) =>
+      (stage.trash ?? []).map(() => {
+        const pos = generateRandomPosSeeded(rng, occupied, wallBoxes, 2.5, BOUNDARY - 2, 0) ?? [0, 0];
+        occupied.push(pos);
+        return pos;
+      })
+    );
 
     /* ── Answer Cart — same as game's buildCartMesh() ─── */
     const cartGroup = new THREE.Group();
@@ -224,17 +246,20 @@ const PlayerSpectatorView = ({ watchedPlayer, allPlayers, stages }) => {
     const cartLabelSprite = makeLabel("Answer Cart", 0xff6b35);
     cartLabelSprite.scale.set(4, 0.9, 1);
     cartLabelSprite.position.y = 3.5; cartGroup.add(cartLabelSprite);
-    cartGroup.position.set(CART_POS[0], CART_POS[1], CART_POS[2]);
+    const stage0CartPos = stageCartPositions[0] ?? [CART_POS[0], CART_POS[2]];
+    cartGroup.position.set(stage0CartPos[0], 0, stage0CartPos[1]);
     scene.add(cartGroup);
 
     /* ── Stage objects (clues + trash) — rebuilt when watched stage changes ── */
     let lastStage = -1;
     let stageObjs = [];
 
-    function buildStageObjects(stageDef) {
+    function buildStageObjects(stageDef, stageIdx) {
       const objs = [];
+      const cluePos  = allCluePositions[stageIdx]  ?? [];
+      const trashPos = allTrashPositions[stageIdx] ?? [];
       (stageDef.clues ?? []).forEach((clue, i) => {
-        const [gx, gz] = CLUE_SPOTS[i % CLUE_SPOTS.length];
+        const [gx, gz] = cluePos[i] ?? [0, 0];
         const group = new THREE.Group();
         const gem = new THREE.Mesh(
           new THREE.OctahedronGeometry(0.38, 0),
@@ -254,7 +279,7 @@ const PlayerSpectatorView = ({ watchedPlayer, allPlayers, stages }) => {
         objs.push(group);
       });
       (stageDef.trash ?? []).forEach((trash, i) => {
-        const [gx, gz] = TRASH_SPOTS[i % TRASH_SPOTS.length];
+        const [gx, gz] = trashPos[i] ?? [0, 0];
         const group = new THREE.Group();
         const box = new THREE.Mesh(
           new THREE.BoxGeometry(0.55, 0.45, 0.45),
@@ -334,17 +359,20 @@ const PlayerSpectatorView = ({ watchedPlayer, allPlayers, stages }) => {
       /* ── Watched player: position + camera ─────────── */
       const wp  = watchedRef.current;
 
-      /* Rebuild stage objects when watched player advances a stage */
+      /* Rebuild stage objects and move cart when watched player advances a stage */
       {
         const newStage = wp?.progress?.stage ?? 1;
         if (newStage !== lastStage) {
           lastStage = newStage;
+          // Move cart to this stage's computed position
+          const stageIdx = (newStage - 1) % activeStagesSnap.length;
+          const cartPos = stageCartPositions[stageIdx] ?? stage0CartPos;
+          cartGroup.position.set(cartPos[0], 0, cartPos[1]);
+          // Rebuild clue/trash objects
           stageObjs.forEach((g) => scene.remove(g));
           stageObjs = [];
-          const activeStages = stagesRef.current;
-          const def = activeStages[(newStage - 1) % activeStages.length]
-            ?? DEFAULT_STAGES[(newStage - 1) % DEFAULT_STAGES.length];
-          if (def) stageObjs = buildStageObjects(def);
+          const def = activeStagesSnap[stageIdx] ?? DEFAULT_STAGES[stageIdx];
+          if (def) stageObjs = buildStageObjects(def, stageIdx);
         }
       }
       /* Animate clue gems (spin + float) */
