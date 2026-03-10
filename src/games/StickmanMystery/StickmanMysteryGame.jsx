@@ -44,6 +44,7 @@ import {
   makePrng,
   hashStr,
   resolveCollisions,
+  cameraOcclusionT,
 } from "./gameUtils.js";
 import GameHUD from "./GameHUD.jsx";
 import GameModals from "./GameModals.jsx";
@@ -1137,10 +1138,22 @@ const StickmanMysteryGame = () => {
         Math.sin(pitch) * CAM_DIST,
         Math.cos(yaw) * Math.cos(pitch) * CAM_DIST,
       );
-      camera.position.lerp(
-        stickman.group.position.clone().add(camOff),
-        8 * delta,
+      const idealCamPos = stickman.group.position.clone().add(camOff);
+      // ── Prevent camera clipping through walls ──────────────────────────────
+      // Ray origin: player's head (look-at point)
+      const playerHead = new THREE.Vector3(
+        stickman.group.position.x,
+        stickman.group.position.y + 1.5,
+        stickman.group.position.z,
       );
+      const tHit = cameraOcclusionT(playerHead, idealCamPos, wallBoxesRef.current);
+      // Pull back 0.3 world-units before the wall surface to avoid any clipping
+      const rayDist = playerHead.distanceTo(idealCamPos);
+      const tSafe = Math.max(0.05, tHit - (rayDist > 0 ? 0.3 / rayDist : 0));
+      const safeCamPos = tSafe < 1.0
+        ? playerHead.clone().lerp(idealCamPos, tSafe)
+        : idealCamPos;
+      camera.position.lerp(safeCamPos, Math.min(1, 8 * delta));
       camera.lookAt(
         stickman.group.position.x,
         stickman.group.position.y + 1.5,

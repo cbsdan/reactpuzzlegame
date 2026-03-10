@@ -49,6 +49,73 @@ export function resolveCollisions(pos, walls, radius) {
   }
 }
 
+/**
+ * Ray-AABB wall occlusion test.
+ * Casts a ray from `from` to `to` (both THREE.Vector3) and returns the smallest
+ * t ∈ [0, 1] at which the ray first enters any wall box, or 1.0 if no wall is hit.
+ * Use the returned t to clamp the camera position before the wall surface.
+ */
+export function cameraOcclusionT(from, to, walls) {
+  let tMin = 1.0;
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const dz = to.z - from.z;
+
+  for (const w of walls) {
+    const halfW = w.w / 2;
+    const halfD = w.d / 2;
+    const minX = w.x - halfW, maxX = w.x + halfW;
+    const minY = -0.2,        maxY = w.h ?? 5.0;
+    const minZ = w.z - halfD, maxZ = w.z + halfD;
+
+    let tEnter = 0;
+    let tExit  = tMin;
+
+    // X slab
+    if (Math.abs(dx) < 1e-8) {
+      if (from.x < minX || from.x > maxX) continue;
+    } else {
+      let t1 = (minX - from.x) / dx;
+      let t2 = (maxX - from.x) / dx;
+      if (t1 > t2) { const tmp = t1; t1 = t2; t2 = tmp; }
+      tEnter = Math.max(tEnter, t1);
+      tExit  = Math.min(tExit,  t2);
+      if (tEnter >= tExit) continue;
+    }
+
+    // Y slab
+    if (Math.abs(dy) < 1e-8) {
+      if (from.y < minY || from.y > maxY) continue;
+    } else {
+      let t1 = (minY - from.y) / dy;
+      let t2 = (maxY - from.y) / dy;
+      if (t1 > t2) { const tmp = t1; t1 = t2; t2 = tmp; }
+      tEnter = Math.max(tEnter, t1);
+      tExit  = Math.min(tExit,  t2);
+      if (tEnter >= tExit) continue;
+    }
+
+    // Z slab
+    if (Math.abs(dz) < 1e-8) {
+      if (from.z < minZ || from.z > maxZ) continue;
+    } else {
+      let t1 = (minZ - from.z) / dz;
+      let t2 = (maxZ - from.z) / dz;
+      if (t1 > t2) { const tmp = t1; t1 = t2; t2 = tmp; }
+      tEnter = Math.max(tEnter, t1);
+      tExit  = Math.min(tExit,  t2);
+      if (tEnter >= tExit) continue;
+    }
+
+    // Valid hit: ray enters wall at tEnter within (0, tMin)
+    if (tEnter >= 0 && tEnter < tMin) {
+      tMin = tEnter;
+    }
+  }
+
+  return tMin;
+}
+
 /** Simple djb2 string hash → unsigned 32-bit integer (shared seed for all clients) */
 export function hashStr(str) {
   let h = 5381;
