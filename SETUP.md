@@ -45,9 +45,15 @@ VITE_API_URL=http://localhost:5173
 ```
 
 ### 3. Run Development Server
-
+frontend:
 ```bash
 npm run dev
+```
+backend:
+```bash
+.\.venv\Scripts\activate
+
+python api/index.py
 ```
 
 The app will be available at `http://localhost:5173`
@@ -67,6 +73,8 @@ vercel
 3. Add environment variables in Vercel dashboard:
    - `MONGODB_URI`: Your MongoDB connection string
    - `VITE_API_URL`: Your production URL (e.g., https://your-app.vercel.app)
+
+
 
 ## Project Structure
 
