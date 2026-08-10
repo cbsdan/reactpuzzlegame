@@ -101,36 +101,6 @@ const Player = () => {
     }
   };
 
-  const getGameStatusText = () => {
-    if (!gameState) return "Loading...";
-
-    switch (gameState.status) {
-      case "playing":
-        return "🎮 Game is Running!";
-      case "paused":
-        return "⏸️ Game Paused";
-      case "idle":
-        return "⏳ Waiting to Start";
-      default:
-        return "Unknown Status";
-    }
-  };
-
-  const getGameStatusColor = () => {
-    if (!gameState) return "#888";
-
-    switch (gameState.status) {
-      case "playing":
-        return "#4caf50";
-      case "paused":
-        return "#ff9800";
-      case "idle":
-        return "#2196f3";
-      default:
-        return "#888";
-    }
-  };
-
   return (
     <div className="player-container">
       {removedNotification && (
@@ -152,8 +122,8 @@ const Player = () => {
       )}
       <div className="player-header">
         <div className="header-left">
-          <span className="header-logo">🧩</span>
-          <span className="header-title">Puzzle Game</span>
+          <span className="header-logo"><img className="h1-logo" src="/favicon.png" alt="" width="40" height="40" /></span>
+          <span className="header-title">Game Lobby</span>
         </div>
         <div className="header-center">
           {currentRoom && (
@@ -161,12 +131,6 @@ const Player = () => {
               Room: <strong>{currentRoom.passkey}</strong>
             </span>
           )}
-          <div
-            className="game-status"
-            style={{ "--status-color": getGameStatusColor() }}
-          >
-            {getGameStatusText()}
-          </div>
         </div>
         <div className="header-right">
           {currentPlayer && (
@@ -208,7 +172,7 @@ const Player = () => {
             <h2>Welcome, {currentPlayer.name}! 👋</h2>
             <p>
               Session score: <strong>{currentPlayer.score || 0}</strong>
-      
+
             </p>
           </div>
 

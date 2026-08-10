@@ -337,7 +337,7 @@ def room_admin_action(room_id):
         action = data.get('action')
         game_type = data.get('gameType')
         
-        if not action or action not in ['start', 'pause', 'resume', 'restart', 'stop', 'clear-sessions', 'delete-session']:
+        if not action or action not in ['start', 'pause', 'resume', 'restart', 'stop', 'clear-sessions', 'delete-session', 'update-config']:
             return jsonify({'success': False, 'error': 'Invalid action'}), 400
         
         game_states = db['gamestate']
@@ -358,7 +358,30 @@ def room_admin_action(room_id):
         new_status = None
         additional_updates = {}
         
-        if action == 'start':
+        if action == 'update-config':
+            # Push updated triviaConfig to the existing game state without touching status
+            trivia_config = data.get('triviaConfig')
+            if trivia_config is not None:
+                additional_updates['triviaConfig'] = trivia_config
+            stickman_config = data.get('stickmanConfig')
+            if stickman_config is not None:
+                additional_updates['stickmanConfig'] = stickman_config
+            # Update in DB and return immediately
+            result = game_states.find_one_and_update(
+                {'roomId': room_oid},
+                {
+                    '$set': {**additional_updates, 'updatedAt': datetime.utcnow()},
+                    '$inc': {'version': 1}
+                },
+                return_document=True
+            )
+            if result:
+                result['_id'] = str(result['_id'])
+                result['roomId'] = str(result['roomId'])
+                result.pop('targetNumber', None)
+                result.pop('mysteryAnswer', None)
+            return jsonify({'success': True, 'action': action, 'gameState': result}), 200
+        elif action == 'start':
             new_status = 'playing'
             additional_updates['startedAt'] = datetime.utcnow()
             additional_updates['pausedAt'] = None
@@ -383,6 +406,9 @@ def room_admin_action(room_id):
                         additional_updates['stickmanConfig'] = stickman_config
                     else:
                         additional_updates['stickmanConfig'] = None
+                elif game_type == 'trivia-challenge':
+                    trivia_config = data.get('triviaConfig') or {}
+                    additional_updates['triviaConfig'] = trivia_config
             # Reset all player progress for the new game
             players_collection.update_many(
                 {'roomId': room_oid},
@@ -392,6 +418,10 @@ def room_admin_action(room_id):
                     'stickmanMystery': {
                         'score': 0, 'solved': False, 'wrongAttempts': 0, 'stageScores': [],
                         'solvedAt': None, 'progress': None, 'posX': None, 'posZ': None, 'posAngle': None
+                    },
+                    'triviaChallenge': {
+                        'score': 0, 'completed': False, 'currentRound': 0,
+                        'questionsAnswered': 0, 'correctAnswers': 0, 'solvedAt': None
                     }
                 }}
             )
@@ -438,6 +468,14 @@ def room_admin_action(room_id):
                         'wrongAttempts': sm.get('wrongAttempts', 0),
                         'stageScores': sm.get('stageScores', []),
                     }
+                elif game_type_snap == 'trivia-challenge':
+                    tc = p.get('triviaChallenge') or {}
+                    entry['triviaChallenge'] = {
+                        'score': tc.get('score', p.get('score', 0)),
+                        'completed': tc.get('completed', False),
+                        'questionsAnswered': tc.get('questionsAnswered', 0),
+                        'correctAnswers': tc.get('correctAnswers', 0),
+                    }
                 session_scores.append(entry)
             winner = max(session_scores, key=lambda x: x['score'], default=None) if session_scores else None
             session_snapshot = {
@@ -461,6 +499,10 @@ def room_admin_action(room_id):
                     'stickmanMystery': {
                         'score': 0, 'solved': False, 'wrongAttempts': 0, 'stageScores': [],
                         'solvedAt': None, 'progress': None, 'posX': None, 'posZ': None, 'posAngle': None
+                    },
+                    'triviaChallenge': {
+                        'score': 0, 'completed': False, 'currentRound': 0,
+                        'questionsAnswered': 0, 'correctAnswers': 0, 'solvedAt': None
                     }
                 }}
             )
@@ -528,6 +570,14 @@ def room_admin_action(room_id):
                             'wrongAttempts': sm.get('wrongAttempts', 0),
                             'stageScores': sm.get('stageScores', []),
                         }
+                    elif game_type_snap == 'trivia-challenge':
+                        tc = p.get('triviaChallenge') or {}
+                        entry['triviaChallenge'] = {
+                            'score': tc.get('score', p.get('score', 0)),
+                            'completed': tc.get('completed', False),
+                            'questionsAnswered': tc.get('questionsAnswered', 0),
+                            'correctAnswers': tc.get('correctAnswers', 0),
+                        }
                     session_scores.append(entry)
                 winner = max(session_scores, key=lambda x: x['score'], default=None) if session_scores else None
                 session_snapshot = {
@@ -548,6 +598,7 @@ def room_admin_action(room_id):
             additional_updates['mysteryAnswer'] = None
             additional_updates['mysteryQuestion'] = None
             additional_updates['stickmanConfig'] = None
+            additional_updates['triviaConfig'] = None
             # Reset player scores so they aren't double-counted (session snapshot already captured them)
             players_collection.update_many(
                 {'roomId': room_oid},
@@ -557,6 +608,10 @@ def room_admin_action(room_id):
                     'stickmanMystery': {
                         'score': 0, 'solved': False, 'wrongAttempts': 0, 'stageScores': [],
                         'solvedAt': None, 'progress': None, 'posX': None, 'posZ': None, 'posAngle': None
+                    },
+                    'triviaChallenge': {
+                        'score': 0, 'completed': False, 'currentRound': 0,
+                        'questionsAnswered': 0, 'correctAnswers': 0, 'solvedAt': None
                     }
                 }}
             )
@@ -834,6 +889,24 @@ def events():
                 if not is_admin:
                     game_state.pop('targetNumber', None)  # only strip for non-admins
                     game_state.pop('mysteryAnswer', None)
+                    # Strip correct answers from trivia questions for players
+                    trivia_cfg = game_state.get('triviaConfig')
+                    if trivia_cfg and isinstance(trivia_cfg, dict):
+                        questions = trivia_cfg.get('questions')
+                        if questions and isinstance(questions, dict):
+                            stripped = {}
+                            for cat_name, cat_data in questions.items():
+                                if isinstance(cat_data, dict):
+                                    qs = cat_data.get('questions', [])
+                                    stripped[cat_name] = {
+                                        **cat_data,
+                                        'questions': [{k: v for k, v in q.items() if k != 'answer'} for q in qs]
+                                    }
+                                elif isinstance(cat_data, list):
+                                    stripped[cat_name] = [{k: v for k, v in q.items() if k != 'answer'} for q in cat_data]
+                                else:
+                                    stripped[cat_name] = cat_data
+                            trivia_cfg['questions'] = stripped
             
             return jsonify({
                 'success': True,
@@ -861,6 +934,80 @@ def events():
             'error': str(e)
         }), 500
 
+
+
+# ── Trivia Challenge – submit answer per question ─────────────────────
+@app.route('/api/rooms/<room_id>/trivia-answer', methods=['POST'])
+def submit_trivia_answer(room_id):
+    db = get_database()
+    if db is None:
+        return jsonify({'success': False, 'error': 'Database not configured'}), 503
+
+    try:
+        room_oid = ObjectId(room_id)
+        data = request.get_json() or {}
+        player_id = data.get('playerId')
+        points_earned = int(data.get('pointsEarned', 0))
+        total_score = int(data.get('totalScore', 0))
+        total_questions = int(data.get('totalQuestionsAnswered', 0))
+        is_correct = bool(data.get('isCorrect', False))
+        current_round = int(data.get('currentRound', 1))
+
+        if not player_id:
+            return jsonify({'success': False, 'error': 'playerId required'}), 400
+
+        game_states = db['gamestate']
+        game_state = game_states.find_one({'roomId': room_oid})
+
+        if not game_state or game_state.get('status') != 'playing':
+            return jsonify({'success': False, 'error': 'Game is not active'}), 400
+
+        trivia_config = game_state.get('triviaConfig') or {}
+        total_rounds = trivia_config.get('rounds', 3)
+        q_per_round = trivia_config.get('questionsPerRound', 5)
+        total_possible = total_rounds * q_per_round
+        is_completed = total_questions >= total_possible
+
+        players_collection = db['players']
+
+        # Read current state to accumulate correct answers
+        player_doc = players_collection.find_one({'_id': ObjectId(player_id)})
+        prev_correct = 0
+        if player_doc:
+            tc = player_doc.get('triviaChallenge') or {}
+            prev_correct = tc.get('correctAnswers', 0)
+
+        new_correct = prev_correct + (1 if is_correct else 0)
+
+        update_fields = {
+            'score': max(0, total_score),
+            'solved': is_completed,
+            'triviaChallenge.score': max(0, total_score),
+            'triviaChallenge.completed': is_completed,
+            'triviaChallenge.currentRound': current_round,
+            'triviaChallenge.questionsAnswered': total_questions,
+            'triviaChallenge.correctAnswers': new_correct,
+        }
+
+        if is_completed:
+            update_fields['triviaChallenge.solvedAt'] = datetime.utcnow()
+
+        players_collection.update_one(
+            {'_id': ObjectId(player_id), 'roomId': room_oid},
+            {'$set': update_fields}
+        )
+
+        # Increment version so leaderboard refreshes for all
+        game_states.update_one({'roomId': room_oid}, {'$inc': {'version': 1}})
+
+        return jsonify({
+            'success': True,
+            'score': total_score,
+            'completed': is_completed,
+        }), 200
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 # ── Multiplayer position sync for Stickman game ──────────────────────

@@ -455,6 +455,31 @@ export const GameProvider = ({ children }) => {
     }
   };
 
+  // Submit a trivia answer (Trivia Challenge game)
+  const submitTriviaAnswer = async (answerData = {}) => {
+    if (!currentRoom || !currentPlayer) {
+      return { success: false, error: "Not in a room" };
+    }
+    try {
+      const response = await fetch(
+        `${API_URL}/api/rooms/${currentRoom._id}/trivia-answer`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            playerId: currentPlayer._id,
+            ...answerData,
+          }),
+        },
+      );
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error("Trivia answer submission failed:", error);
+      return { success: false, error: error.message };
+    }
+  };
+
   // Start polling when room is set
   useEffect(() => {
     if (currentRoom && initialized) {
@@ -492,6 +517,7 @@ export const GameProvider = ({ children }) => {
     adminAction,
     submitGuess,
     submitAnswer,
+    submitTriviaAnswer,
   };
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;

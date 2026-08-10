@@ -109,13 +109,18 @@
   flex-shrink: 0;
 }
 
+.player-header > * {
+  flex: 1;
+  min-width: 0; /* Prevents long text/content from overflowing or breaking equal sizing */
+}
+
 .header-logo {
   font-size: 1.5rem;
   line-height: 1;
 }
 
 .header-title {
-  font-size: 1.1rem;
+  font-size: 1.4rem;
   font-weight: 800;
   color: #e6edf3;
   letter-spacing: 0.3px;
@@ -148,6 +153,7 @@
 .header-right {
   display: flex;
   align-items: center;
+  justify-content: right;
   flex-shrink: 0;
 }
 

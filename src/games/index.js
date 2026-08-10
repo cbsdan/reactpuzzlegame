@@ -12,8 +12,19 @@ import NumberMysteryGame from "../components/NumberMysteryGame";
 import NumberMysteryAdminDashboard from "./NumberMystery/AdminDashboard";
 import StickmanMysteryGame from "./StickmanMystery/StickmanMysteryGame";
 import StickmanMysteryAdminDashboard from "./StickmanMystery/AdminDashboard";
+import TriviaChallengeGame from "./TriviaChallenge/TriviaChallengeGame";
+import TriviaChallengeAdminDashboard from "./TriviaChallenge/TriviaChallengeAdminDashboard";
 
 export const GAMES = [
+  {
+    id: "trivia-challenge",
+    name: "Trivia Challenge",
+    icon: "🧠",
+    description:
+      "A fast-paced trivia game with rounds, categories, and a live leaderboard.",
+    PlayerComponent: TriviaChallengeGame,
+    AdminDashboard: TriviaChallengeAdminDashboard,
+  },
   {
     id: "stickman-mystery",
     name: "Stickman Mystery",

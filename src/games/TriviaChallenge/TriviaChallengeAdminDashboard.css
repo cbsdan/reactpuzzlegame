@@ -1,0 +1,206 @@
+/* ═══════════════════════════════════════════════════════════════════
+   Trivia Challenge – Admin Dashboard Styles
+   ═══════════════════════════════════════════════════════════════════ */
+
+.tc-admin-dashboard {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  color: #e2e8f0;
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+}
+
+/* ── Header ──────────────────────────────────────────────────── */
+.tc-dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.tc-dashboard-title {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.tc-dashboard-icon {
+  font-size: 1.6rem;
+}
+
+.tc-dashboard-title h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.tc-dashboard-title p {
+  margin: 0.15rem 0 0;
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+/* ── Stat pills ──────────────────────────────────────────────── */
+.tc-dashboard-pills {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.tc-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 0.5rem 1rem;
+  min-width: 80px;
+  backdrop-filter: blur(6px);
+}
+
+.tc-pill-val {
+  font-size: 1.3rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.tc-pill-label {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tc-pill.completed-pill .tc-pill-val { color: #34d399; }
+.tc-pill.playing-pill .tc-pill-val { color: #fbbf24; }
+.tc-pill.avg-pill .tc-pill-val { color: #a78bfa; }
+
+/* ── Config summary ──────────────────────────────────────────── */
+.tc-config-panel {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px;
+  padding: 0.8rem 1.1rem;
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+}
+
+.tc-config-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.tc-config-label {
+  color: #94a3b8;
+}
+
+.tc-config-val {
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+/* ── Leaderboard ─────────────────────────────────────────────── */
+.tc-leaderboard {
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(255,255,255,0.02);
+}
+
+.tc-lb-header {
+  display: grid;
+  grid-template-columns: 45px 1fr 90px 90px 90px 80px;
+  padding: 0.65rem 1.1rem;
+  background: rgba(255,255,255,0.04);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+}
+
+.tc-lb-row {
+  display: grid;
+  grid-template-columns: 45px 1fr 90px 90px 90px 80px;
+  padding: 0.7rem 1.1rem;
+  align-items: center;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  font-size: 0.88rem;
+  transition: background 0.2s;
+}
+
+.tc-lb-row:last-child {
+  border-bottom: none;
+}
+
+.tc-lb-row:hover {
+  background: rgba(255,255,255,0.03);
+}
+
+.tc-lb-row.tc-row-completed {
+  background: rgba(16,185,129,0.05);
+}
+
+.tc-lb-row.tc-row-playing {
+  background: rgba(251,191,36,0.03);
+}
+
+.tc-lb-rank {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.tc-lb-name {
+  font-weight: 600;
+}
+
+.tc-lb-round {
+  color: #a5b4fc;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.tc-lb-answered {
+  color: #94a3b8;
+  font-size: 0.82rem;
+}
+
+.tc-lb-status {
+  font-size: 0.82rem;
+}
+
+.tc-lb-score {
+  font-weight: 700;
+  text-align: right;
+  color: #fbbf24;
+  font-variant-numeric: tabular-nums;
+}
+
+.tc-empty {
+  text-align: center;
+  padding: 2rem;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+/* ── Responsive ──────────────────────────────────────────────── */
+@media (max-width: 650px) {
+  .tc-lb-header,
+  .tc-lb-row {
+    grid-template-columns: 35px 1fr 65px 65px;
+    font-size: 0.78rem;
+  }
+  .tc-lb-header span:nth-child(4),
+  .tc-lb-row span:nth-child(4),
+  .tc-lb-header span:nth-child(5),
+  .tc-lb-row span:nth-child(5) {
+    display: none;
+  }
+}

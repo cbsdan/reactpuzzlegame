@@ -12,7 +12,7 @@ const Home = () => {
   const handleCreateRoom = async () => {
     setError('');
     const result = await createRoom();
-    
+
     if (!result.success) {
       setError(result.error || 'Failed to create room');
     }
@@ -21,19 +21,19 @@ const Home = () => {
   const handleJoinRoom = async (e) => {
     e.preventDefault();
     setError('');
-    
+
     if (!passkey.trim()) {
       setError('Please enter the room passkey');
       return;
     }
-    
+
     if (!playerName.trim()) {
       setError('Please enter your name');
       return;
     }
 
     const result = await joinRoom(passkey, playerName);
-    
+
     if (!result.success) {
       setError(result.error || 'Failed to join room');
     }
@@ -43,23 +43,25 @@ const Home = () => {
     <div className="home-container">
       <div className="home-content">
         <div className="home-header">
-          <h1>🧩 Puzzle Game</h1>
+          <h1><img className="h1-logo" src="/favicon.png" alt="" width="70" height="70" /> Game Lobby</h1>
           <p>Create a room to host or join an existing game</p>
         </div>
 
         {mode === null ? (
           <div className="mode-selection">
-            <button 
+            <button
               className="mode-btn create-btn"
-              onClick={() => setMode('create')}
+              onClick={handleCreateRoom}
               disabled={loading}
             >
               <span className="mode-icon">🎮</span>
-              <span className="mode-text">Create Room</span>
+              <span className="mode-text" >
+                {loading ? 'Creating...' : 'Create Room'}
+              </span>
               <span className="mode-desc">Start a new game as Admin</span>
             </button>
 
-            <button 
+            <button
               className="mode-btn join-btn"
               onClick={() => setMode('join')}
               disabled={loading}
@@ -74,18 +76,18 @@ const Home = () => {
             <div className="mode-card">
               <h2>Create a New Room</h2>
               <p className="info-text">You will become the admin of this room</p>
-              
-              <button 
+
+              <button
                 className="confirm-btn"
                 onClick={handleCreateRoom}
                 disabled={loading}
               >
                 {loading ? 'Creating...' : 'Create Room'}
               </button>
-              
+
               {error && <div className="error-message">{error}</div>}
-              
-              <button 
+
+              <button
                 className="back-btn"
                 onClick={() => { setMode(null); setError(''); }}
                 disabled={loading}
@@ -127,7 +129,7 @@ const Home = () => {
                   />
                 </div>
 
-                <button 
+                <button
                   type="submit"
                   className="confirm-btn"
                   disabled={loading}
@@ -135,10 +137,10 @@ const Home = () => {
                   {loading ? 'Joining...' : 'Join Room'}
                 </button>
               </form>
-              
+
               {error && <div className="error-message">{error}</div>}
-              
-              <button 
+
+              <button
                 className="back-btn"
                 onClick={() => { setMode(null); setError(''); setPasskey(''); setPlayerName(''); }}
                 disabled={loading}
