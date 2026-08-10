@@ -2,98 +2,39 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from datetime import datetime
 from bson.objectid import ObjectId
-from pymongo import MongoClient
-from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
-import os
 import secrets
-import random
 
-# --- Inline MongoDB connection (avoids module import issues on Vercel) ---
-_mongo_client = None
+try:
+    from .db import get_database
+except ImportError:
+    from db import get_database
 
-def get_mongodb_client():
-    global _mongo_client
-    if _mongo_client is not None:
-        return _mongo_client
-    mongodb_uri = os.environ.get('MONGODB_URI')
-    if not mongodb_uri:
-        return None
-    try:
-        _mongo_client = MongoClient(
-            mongodb_uri,
-            serverSelectionTimeoutMS=60000,
-            connectTimeoutMS=60000,
-            socketTimeoutMS=60000,
-            retryWrites=True,
-            retryReads=True,
-            maxPoolSize=10,
-            minPoolSize=1,
-            waitQueueTimeoutMS=60000
-        )
-        _mongo_client.admin.command('ping')
-        return _mongo_client
-    except Exception:
-        return None
+try:
+    from .number_mystery import number_mystery_bp, generate_target_number, generate_clues
+except ImportError:
+    from number_mystery import number_mystery_bp, generate_target_number, generate_clues
 
-def get_database():
-    client = get_mongodb_client()
-    if client is None:
-        return None
-    return client['reactpuzzlegame']
-# -------------------------------------------------------------------------
+try:
+    from .stickman_mystery import stickman_mystery_bp
+except ImportError:
+    from stickman_mystery import stickman_mystery_bp
+
+try:
+    from .trivia_challenge import trivia_challenge_bp
+except ImportError:
+    from trivia_challenge import trivia_challenge_bp
 
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=False)
 
+# Register game-specific blueprints
+app.register_blueprint(number_mystery_bp)
+app.register_blueprint(stickman_mystery_bp)
+app.register_blueprint(trivia_challenge_bp)
+
 def generate_passkey():
     """Generate a 6-character passkey"""
     return secrets.token_hex(3).upper()
-
-def generate_target_number():
-    """Generate a 4-digit number with all unique digits (first digit non-zero)"""
-    first = random.randint(1, 9)
-    rest = random.sample([d for d in range(0, 10) if d != first], 3)
-    return str(first) + ''.join(str(d) for d in rest)
-
-def generate_clues(number):
-    """Generate 3 mystery clues for the target number without revealing it"""
-    digits = [int(d) for d in number]
-    digit_sum = sum(digits)
-    max_digit = max(digits)
-    even_count = sum(1 for d in digits if d % 2 == 0)
-    odd_count = 4 - even_count
-    first_digit = digits[0]
-    last_digit = digits[-1]
-    clues = [
-        f"The sum of all four digits is {digit_sum}",
-        f"There {'is' if even_count == 1 else 'are'} {even_count} even digit{'s' if even_count != 1 else ''} in the code",
-        f"The first digit is greater than {first_digit - 1} and the last digit is {'even' if last_digit % 2 == 0 else 'odd'}",
-    ]
-    return clues
-
-def get_bulls_cows(target, guess):
-    """Calculate bulls (correct position) and cows (correct digit, wrong position)"""
-    bulls = sum(t == g for t, g in zip(target, guess))
-    cows = sum(min(target.count(d), guess.count(d)) for d in set(guess)) - bulls
-    return bulls, cows
-
-def get_digit_results(target, guess):
-    """Return per-digit result list: 'bull', 'cow', or 'miss' for each position"""
-    results = ['miss'] * 4
-    target_remaining = list(target)
-    # First pass: bulls (right digit, right spot)
-    for i in range(4):
-        if guess[i] == target[i]:
-            results[i] = 'bull'
-            target_remaining[i] = None
-    # Second pass: cows (right digit, wrong spot)
-    for i in range(4):
-        if results[i] == 'bull':
-            continue
-        if guess[i] in target_remaining:
-            results[i] = 'cow'
-            target_remaining[target_remaining.index(guess[i])] = None
-    return results
 
 def get_room_by_id(db, room_id):
     """Get a room by ID and include its players and gameState"""
@@ -130,7 +71,7 @@ def get_room_by_id(db, room_id):
             game_state.pop('targetNumber', None)  # never expose to clients
         
         return room
-    except:
+    except Exception:
         return None
 
 # Rooms Routes
@@ -682,165 +623,7 @@ def room_game_state(room_id):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/api/rooms/<room_id>/guess', methods=['POST'])
-def submit_guess(room_id):
-    db = get_database()
-    if db is None:
-        return jsonify({'success': False, 'error': 'Database not configured'}), 503
-    
-    try:
-        room_oid = ObjectId(room_id)
-        data = request.get_json() or {}
-        player_id = data.get('playerId')
-        guess = str(data.get('guess', '')).strip()
-        
-        if not player_id:
-            return jsonify({'success': False, 'error': 'playerId required'}), 400
-        if not guess or len(guess) != 4 or not guess.isdigit():
-            return jsonify({'success': False, 'error': 'Guess must be a 4-digit number'}), 400
-        
-        game_states = db['gamestate']
-        game_state = game_states.find_one({'roomId': room_oid})
-        
-        if not game_state or game_state.get('status') != 'playing':
-            return jsonify({'success': False, 'error': 'Game is not active'}), 400
-        
-        target = game_state.get('targetNumber')
-        if not target:
-            return jsonify({'success': False, 'error': 'No target number set'}), 400
-        
-        bulls, cows = get_bulls_cows(target, guess)
-        digit_results = get_digit_results(target, guess)
-        is_correct = (bulls == 4)
-        
-        score = 0
-        if is_correct:
-            # Calculate score
-            started_at = game_state.get('startedAt')
-            if started_at:
-                elapsed = (datetime.utcnow() - started_at).total_seconds()
-            else:
-                elapsed = 0
-            # Score = 1000 - time penalty - guess penalty (but floor at 0)
-            # We pass guess count from client
-            guess_count = int(data.get('guessCount', 1))
-            score = max(0, int(1000 - elapsed * 3 - guess_count * 50))
-            
-            # Update player — root fields (denorm) + numberMystery sub-doc
-            players_collection = db['players']
-            players_collection.update_one(
-                {'_id': ObjectId(player_id)},
-                {'$set': {
-                    'score': score,
-                    'solved': True,
-                    'numberMystery': {
-                        'score': score,
-                        'solved': True,
-                        'guessCount': guess_count,
-                        'solvedAt': datetime.utcnow(),
-                    }
-                }}
-            )
-            
-            # Increment version so all clients get update
-            game_states.update_one({'roomId': room_oid}, {'$inc': {'version': 1}})
-        
-        return jsonify({
-            'success': True,
-            'bulls': bulls,
-            'cows': cows,
-            'digitResults': digit_results,
-            'isCorrect': is_correct,
-            'score': score,
-        }), 200
-    
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-# Submit a text answer (Stickman Mystery and future text-answer games)
-@app.route('/api/rooms/<room_id>/answer', methods=['POST'])
-def submit_answer(room_id):
-    db = get_database()
-    if db is None:
-        return jsonify({'success': False, 'error': 'Database not configured'}), 503
-
-    try:
-        room_oid = ObjectId(room_id)
-        data = request.get_json() or {}
-        player_id = data.get('playerId')
-        answer = str(data.get('answer', '')).strip()
-        time_left = int(data.get('timeLeft', 0))
-        wrong_attempts = int(data.get('wrongAttempts', 0))
-
-        if not player_id or not answer:
-            return jsonify({'success': False, 'error': 'playerId and answer are required'}), 400
-
-        game_states = db['gamestate']
-        game_state = game_states.find_one({'roomId': room_oid})
-
-        if not game_state or game_state.get('status') != 'playing':
-            return jsonify({'success': False, 'error': 'Game is not active'}), 400
-
-        game_type = game_state.get('gameType', '')
-        players_collection = db['players']
-        score = 0
-        is_correct = False
-
-        if game_type == 'stickman-mystery':
-            # Stickman has multi-stage scoring computed client-side; trust totalScore
-            total_score = int(data.get('totalScore', 0))
-            # The client validates each stage answer locally, so we accept and record
-            is_correct = True
-            score = max(0, total_score)
-            players_collection.update_one(
-                {'_id': ObjectId(player_id)},
-                {'$set': {
-                    'score': score,
-                    'solved': True,
-                    'stickmanMystery': {
-                        'score': score,
-                        'solved': True,
-                        'wrongAttempts': wrong_attempts,
-                        'stageScores': data.get('stageScores', []),
-                        'solvedAt': datetime.utcnow(),
-                    }
-                }}
-            )
-            game_states.update_one({'roomId': room_oid}, {'$inc': {'version': 1}})
-        else:
-            correct_answer = str(game_state.get('mysteryAnswer', '')).strip()
-            is_correct = answer.upper() == correct_answer.upper()
-
-            if is_correct:
-                # Score = 1000 − elapsed*2 − wrongAttempts*100  (elapsed = 300 − timeLeft)
-                elapsed = 300 - max(0, time_left)
-                score = max(0, int(1000 - elapsed * 2 - wrong_attempts * 100))
-
-                players_collection.update_one(
-                    {'_id': ObjectId(player_id)},
-                    {'$set': {
-                        'score': score,
-                        'solved': True,
-                        'numberMystery': {
-                            'score': score,
-                            'solved': True,
-                            'guessCount': wrong_attempts + 1,
-                            'solvedAt': datetime.utcnow(),
-                        }
-                    }}
-                )
-                game_states.update_one({'roomId': room_oid}, {'$inc': {'version': 1}})
-
-        return jsonify({
-            'success': True,
-            'isCorrect': is_correct,
-            'score': score,
-        }), 200
-
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-# Events Route (Long Polling) - Updated for rooms
+# Events Route (Long Polling)
 @app.route('/api/events', methods=['GET'])
 def events():
     db = get_database()
@@ -918,7 +701,7 @@ def events():
                 'timestamp': datetime.utcnow().isoformat()
             }), 200
         
-        # No game-state update but always return fresh player list (progress data updates every 150ms)
+        # No game-state update but always return fresh player list
         return jsonify({
             'success': True,
             'hasUpdate': False,
@@ -933,192 +716,6 @@ def events():
             'success': False,
             'error': str(e)
         }), 500
-
-
-
-# ── Trivia Challenge – submit answer per question ─────────────────────
-@app.route('/api/rooms/<room_id>/trivia-answer', methods=['POST'])
-def submit_trivia_answer(room_id):
-    db = get_database()
-    if db is None:
-        return jsonify({'success': False, 'error': 'Database not configured'}), 503
-
-    try:
-        room_oid = ObjectId(room_id)
-        data = request.get_json() or {}
-        player_id = data.get('playerId')
-        points_earned = int(data.get('pointsEarned', 0))
-        total_score = int(data.get('totalScore', 0))
-        total_questions = int(data.get('totalQuestionsAnswered', 0))
-        is_correct = bool(data.get('isCorrect', False))
-        current_round = int(data.get('currentRound', 1))
-
-        if not player_id:
-            return jsonify({'success': False, 'error': 'playerId required'}), 400
-
-        game_states = db['gamestate']
-        game_state = game_states.find_one({'roomId': room_oid})
-
-        if not game_state or game_state.get('status') != 'playing':
-            return jsonify({'success': False, 'error': 'Game is not active'}), 400
-
-        trivia_config = game_state.get('triviaConfig') or {}
-        total_rounds = trivia_config.get('rounds', 3)
-        q_per_round = trivia_config.get('questionsPerRound', 5)
-        total_possible = total_rounds * q_per_round
-        is_completed = total_questions >= total_possible
-
-        players_collection = db['players']
-
-        # Read current state to accumulate correct answers
-        player_doc = players_collection.find_one({'_id': ObjectId(player_id)})
-        prev_correct = 0
-        if player_doc:
-            tc = player_doc.get('triviaChallenge') or {}
-            prev_correct = tc.get('correctAnswers', 0)
-
-        new_correct = prev_correct + (1 if is_correct else 0)
-
-        update_fields = {
-            'score': max(0, total_score),
-            'solved': is_completed,
-            'triviaChallenge.score': max(0, total_score),
-            'triviaChallenge.completed': is_completed,
-            'triviaChallenge.currentRound': current_round,
-            'triviaChallenge.questionsAnswered': total_questions,
-            'triviaChallenge.correctAnswers': new_correct,
-        }
-
-        if is_completed:
-            update_fields['triviaChallenge.solvedAt'] = datetime.utcnow()
-
-        players_collection.update_one(
-            {'_id': ObjectId(player_id), 'roomId': room_oid},
-            {'$set': update_fields}
-        )
-
-        # Increment version so leaderboard refreshes for all
-        game_states.update_one({'roomId': room_oid}, {'$inc': {'version': 1}})
-
-        return jsonify({
-            'success': True,
-            'score': total_score,
-            'completed': is_completed,
-        }), 200
-
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
-# ── Multiplayer position sync for Stickman game ──────────────────────
-@app.route('/api/rooms/<room_id>/sync-position', methods=['POST'])
-def sync_position(room_id):
-    db = get_database()
-    if db is None:
-        return jsonify({'success': False, 'error': 'Database not configured'}), 503
-    try:
-        room_oid = ObjectId(room_id)
-        data = request.get_json() or {}
-        player_id = data.get('playerId')
-        x = float(data.get('x', 0))
-        z = float(data.get('z', 0))
-        angle = float(data.get('angle', 0))
-        current_stage = data.get('stage')  # which stage this player is on
-
-        if not player_id:
-            return jsonify({'success': False, 'error': 'playerId required'}), 400
-
-        players_collection = db['players']
-
-        # Build update — position + optional Stickman-specific progress data
-        update_fields = {
-            # Keep top-level pos fields for stage-filter queries
-            'posX': x, 'posZ': z, 'posAngle': angle,
-            # Also write into namespaced sub-doc
-            'stickmanMystery.posX': x,
-            'stickmanMystery.posZ': z,
-            'stickmanMystery.posAngle': angle,
-            'posUpdatedAt': datetime.utcnow()
-        }
-        if current_stage is not None:
-            update_fields['currentStage'] = int(current_stage)
-        progress = data.get('progress')
-        if progress and isinstance(progress, dict):
-            update_fields['progress'] = progress                    # legacy top-level
-            update_fields['stickmanMystery.progress'] = progress    # namespaced
-            # Mirror live accumulated score to both root and sub-doc
-            if 'score' in progress:
-                update_fields['score'] = int(progress['score'])
-                update_fields['stickmanMystery.score'] = int(progress['score'])
-
-        # Update this player's position
-        players_collection.update_one(
-            {'_id': ObjectId(player_id), 'roomId': room_oid},
-            {'$set': update_fields}
-        )
-
-        # Read & clear any pending push for this player
-        player_doc = players_collection.find_one_and_update(
-            {'_id': ObjectId(player_id), 'roomId': room_oid, 'pendingPushX': {'$exists': True}},
-            {'$unset': {'pendingPushX': '', 'pendingPushZ': ''}},
-            return_document=False  # return the doc BEFORE clearing so we read the push
-        )
-        pending_push = None
-        if player_doc and 'pendingPushX' in player_doc:
-            pending_push = {'fx': player_doc['pendingPushX'], 'fz': player_doc['pendingPushZ']}
-
-        # Get all players' positions in this room — filter by same stage if set
-        pos_filter = {'roomId': room_oid, 'posX': {'$exists': True}}
-        if current_stage is not None:
-            pos_filter['currentStage'] = int(current_stage)
-        all_players = list(players_collection.find(
-            pos_filter,
-            {'_id': 1, 'name': 1, 'posX': 1, 'posZ': 1, 'posAngle': 1}
-        ))
-
-        positions = []
-        for p in all_players:
-            positions.append({
-                'playerId': str(p['_id']),
-                'name': p.get('name', ''),
-                'x': p.get('posX', 0),
-                'z': p.get('posZ', 0),
-                'angle': p.get('posAngle', 0),
-            })
-
-        return jsonify({
-            'success': True,
-            'positions': positions,
-            'pendingPush': pending_push,
-        }), 200
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/api/rooms/<room_id>/push', methods=['POST'])
-def push_player(room_id):
-    db = get_database()
-    if db is None:
-        return jsonify({'success': False, 'error': 'Database not configured'}), 503
-    try:
-        room_oid = ObjectId(room_id)
-        data = request.get_json() or {}
-        target_id = data.get('targetId')
-        fx = float(data.get('forceX', 0))
-        fz = float(data.get('forceZ', 0))
-
-        if not target_id:
-            return jsonify({'success': False, 'error': 'targetId required'}), 400
-
-        players_collection = db['players']
-        players_collection.update_one(
-            {'_id': ObjectId(target_id), 'roomId': room_oid},
-            {'$set': {'pendingPushX': fx, 'pendingPushZ': fz}}
-        )
-
-        return jsonify({'success': True}), 200
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
