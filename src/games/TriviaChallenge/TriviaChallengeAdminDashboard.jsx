@@ -21,7 +21,9 @@ const TriviaChallengeAdminDashboard = () => {
   // Accessor: prefer namespaced sub-doc
   const tc = (player) => player.triviaChallenge || {};
 
-  // Sort: completed first (by score desc), then playing (by questionsAnswered desc)
+  const selectedCategory = triviaConfig.selectedCategory || "All";
+
+  // Sort: completed first (by score desc, then totalTimeTaken asc), then playing (by score desc, then totalTimeTaken asc)
   const sorted = [...players].sort((a, b) => {
     const aDone = tc(a).completed;
     const bDone = tc(b).completed;
@@ -30,7 +32,9 @@ const TriviaChallengeAdminDashboard = () => {
     const aScore = tc(a).score || a.score || 0;
     const bScore = tc(b).score || b.score || 0;
     if (aScore !== bScore) return bScore - aScore;
-    return (tc(b).questionsAnswered || 0) - (tc(a).questionsAnswered || 0);
+    const aTime = tc(a).totalTimeTaken ?? 9999;
+    const bTime = tc(b).totalTimeTaken ?? 9999;
+    return aTime - bTime;
   });
 
   const completedCount = players.filter((p) => tc(p).completed).length;
@@ -96,9 +100,13 @@ const TriviaChallengeAdminDashboard = () => {
             {timerEnabled ? `${timerSeconds}s` : "Off"}
           </span>
         </div>
+        <div className="tc-config-item">
+          <span className="tc-config-label">Assigned Category:</span>
+          <span className="tc-config-val">{selectedCategory}</span>
+        </div>
         {categoryNames.length > 0 && (
           <div className="tc-config-item">
-            <span className="tc-config-label">Categories:</span>
+            <span className="tc-config-label">Enabled Categories:</span>
             <span className="tc-config-val">{categoryNames.join(", ")}</span>
           </div>
         )}
