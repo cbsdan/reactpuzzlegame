@@ -32,11 +32,15 @@ function buildEditorEntry(questions, modified = false, icon = "❓", isCustomCat
   };
 }
 
+const API_URL = import.meta.env.VITE_API_URL || "";
+
 const TriviaSettings = ({ onSave, onCancel }) => {
   const [rounds, setRounds] = useState(3);
   const [questionsPerRound, setQuestionsPerRound] = useState(5);
   const [timerEnabled, setTimerEnabled] = useState(true);
   const [timerSeconds, setTimerSeconds] = useState(15);
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [loadingApi, setLoadingApi] = useState(false);
 
   // "settings" | "questions" | "json"
   const [tab, setTab] = useState("settings");
@@ -60,6 +64,71 @@ const TriviaSettings = ({ onSave, onCancel }) => {
     });
     return init;
   });
+
+  // Fetch categories and questions from backend API on mount
+  useEffect(() => {
+    let isMounted = true;
+    const fetchBackendData = async () => {
+      try {
+        setLoadingApi(true);
+        const [catRes, qRes] = await Promise.all([
+          fetch(`${API_URL}/api/trivia/categories`),
+          fetch(`${API_URL}/api/trivia/questions`),
+        ]);
+        const catData = await catRes.json();
+        const qData = await qRes.json();
+
+        if (isMounted && catData.success && Array.isArray(catData.categories) && catData.categories.length > 0) {
+          const apiCatNames = catData.categories.map((c) => c.name);
+          const editors = {};
+          const catIdMap = {};
+
+          catData.categories.forEach((catObj) => {
+            catIdMap[catObj.id] = catObj.name;
+            editors[catObj.name] = {
+              dbId: catObj.id,
+              icon: catObj.icon || "❓",
+              questions: [],
+              modified: false,
+              isCustomCat: false,
+              isDirty: false,
+            };
+          });
+
+          if (qData.success && Array.isArray(qData.questions)) {
+            qData.questions.forEach((qObj) => {
+              const catName = catIdMap[qObj.categoryId];
+              if (catName && editors[catName]) {
+                editors[catName].questions.push({
+                  dbId: qObj.id,
+                  question: qObj.question,
+                  difficulty: qObj.difficulty,
+                  choices: qObj.choices,
+                  answer: qObj.answer,
+                });
+              }
+            });
+          }
+
+          setCatOrder(apiCatNames);
+          setEnabledCats(new Set(apiCatNames));
+          setCatEditors(editors);
+          if (apiCatNames.length > 0) {
+            setSelectedCategory(apiCatNames[0]);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load trivia data from backend:", err);
+      } finally {
+        if (isMounted) setLoadingApi(false);
+      }
+    };
+
+    fetchBackendData();
+    return () => {
+      isMounted = false;
+    };
+  }, [API_URL]);
 
   // Modal: which category is being edited (null = none)
   const [editingCat, setEditingCat] = useState(null);
@@ -459,6 +528,7 @@ const TriviaSettings = ({ onSave, onCancel }) => {
       questionsPerRound: Math.max(1, Math.min(20, questionsPerRound)),
       timerEnabled,
       timerSeconds: Math.max(5, Math.min(60, timerSeconds)),
+      selectedCategory,
       questions,
     });
   };
@@ -787,6 +857,29 @@ const TriviaSettings = ({ onSave, onCancel }) => {
                     <span className="ts-hint">seconds per question</span>
                   </div>
                 )}
+              </div>
+            </div>
+
+            <div className="ts-section">
+              <div className="ts-section-title">🎯 Assigned Game Category (Admin Only)</div>
+              <p className="ts-hint" style={{ marginBottom: "10px" }}>
+                Players cannot choose categories during gameplay. Select the assigned category for this trivia game:
+              </p>
+              <div className="ts-row">
+                <span className="ts-label">Category for Game</span>
+                <select
+                  className="ts-input"
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  style={{ minWidth: "200px", padding: "6px 10px", borderRadius: "6px" }}
+                >
+                  <option value="All">🌟 All Enabled Categories (Mixed)</option>
+                  {catOrder.filter((cat) => enabledCats.has(cat)).map((cat) => (
+                    <option key={cat} value={cat}>
+                      {catEditors[cat]?.icon || DEFAULT_TRIVIA_QUESTIONS[cat]?.icon || "❓"} {cat}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
