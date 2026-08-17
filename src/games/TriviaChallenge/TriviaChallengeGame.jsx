@@ -8,11 +8,10 @@ const LETTERS = ["A", "B", "C", "D"];
 /**
  * TriviaChallengeGame – Player-facing trivia component.
  *
- * Game flow:
- *   1. Category selection  →  2. Answer questions  →  (repeat for N rounds)  →  3. Leaderboard
- *
- * All scoring is calculated locally and submitted to the server per-question
- * via `submitTriviaAnswer` so the live leaderboard stays up-to-date for all players.
+ * Requirements:
+ *   1. Category is chosen by Admin only; player directly starts playing.
+ *   2. Speed-based scoring across all players (faster answer = higher bonus).
+ *   3. Asynchronous self-paced play (state stored in MongoDB via submitTriviaAnswer).
  */
 const TriviaChallengeGame = () => {
   const { gameState, players, currentPlayer, submitTriviaAnswer } = useGame();
@@ -24,18 +23,58 @@ const TriviaChallengeGame = () => {
   const questionsPerRound = triviaConfig.questionsPerRound || 5;
   const timerEnabled = triviaConfig.timerEnabled !== undefined ? triviaConfig.timerEnabled : true;
   const timerSeconds = triviaConfig.timerSeconds || 15;
+  const selectedCategory = triviaConfig.selectedCategory || "All";
 
-  // Build category list from questions data
-  const allCategories = Object.keys(questionsData);
+  // Build list of active questions for this session based on Admin configuration
+  const buildGameQuestions = () => {
+    let list = [];
+    const catKeys = Object.keys(questionsData);
 
-  // ── Local game state ─────────────────────────────────────────
-  const [phase, setPhase] = useState("category"); // 'category' | 'question' | 'complete'
-  const [currentRound, setCurrentRound] = useState(1);
-  const [categoriesPlayed, setCategoriesPlayed] = useState([]);
-  const [currentCategory, setCurrentCategory] = useState(null);
-  const [questionIndex, setQuestionIndex] = useState(0);
-  const [totalScore, setTotalScore] = useState(0);
-  const [totalQuestionsAnswered, setTotalQuestionsAnswered] = useState(0);
+    if (selectedCategory && selectedCategory !== "All" && questionsData[selectedCategory]) {
+      const catObj = questionsData[selectedCategory];
+      const qs = catObj.questions || catObj;
+      if (Array.isArray(qs)) {
+        list = qs.map((q) => ({ ...q, category: selectedCategory, icon: catObj.icon || "❓" }));
+      }
+    } else {
+      // Mixed across enabled categories
+      catKeys.forEach((catKey) => {
+        const catObj = questionsData[catKey];
+        const qs = catObj.questions || catObj;
+        if (Array.isArray(qs)) {
+          qs.forEach((q) => {
+            list.push({ ...q, category: catKey, icon: catObj.icon || "❓" });
+          });
+        }
+      });
+    }
+
+    const totalNeeded = totalRounds * questionsPerRound;
+    if (list.length === 0) {
+      // Fallback if empty
+      const defaultCat = DEFAULT_TRIVIA_QUESTIONS["Movies"];
+      list = (defaultCat.questions || []).map((q) => ({ ...q, category: "Movies", icon: defaultCat.icon }));
+    }
+
+    return list.slice(0, totalNeeded);
+  };
+
+  const gameQuestions = buildGameQuestions();
+  const totalPossibleQuestions = Math.min(totalRounds * questionsPerRound, gameQuestions.length);
+
+  // ── Local game state (initialized from player history for async play) ──
+  const tcSaved = currentPlayer?.triviaChallenge || {};
+  const initialAnswered = tcSaved.questionsAnswered || 0;
+  const initialScore = tcSaved.score || 0;
+  const initialTimeTaken = tcSaved.totalTimeTaken || 0;
+  const initialRound = tcSaved.currentRound || 1;
+  const isAlreadyCompleted = tcSaved.completed || (initialAnswered >= totalPossibleQuestions && totalPossibleQuestions > 0);
+
+  const [phase, setPhase] = useState(isAlreadyCompleted ? "complete" : "question");
+  const [totalScore, setTotalScore] = useState(initialScore);
+  const [totalQuestionsAnswered, setTotalQuestionsAnswered] = useState(initialAnswered);
+  const [totalTimeTaken, setTotalTimeTaken] = useState(initialTimeTaken);
+  const [currentRound, setCurrentRound] = useState(initialRound);
 
   // Question-level state
   const [selectedAnswer, setSelectedAnswer] = useState(null);
@@ -43,8 +82,11 @@ const TriviaChallengeGame = () => {
   const [showPopup, setShowPopup] = useState(false);
   const [popupPoints, setPopupPoints] = useState(0);
   const [timeLeft, setTimeLeft] = useState(timerSeconds);
+
   const timerRef = useRef(null);
   const answeredRef = useRef(false);
+
+  const currentQ = gameQuestions[totalQuestionsAnswered] || null;
 
   // ── Timer logic ──────────────────────────────────────────────
   const stopTimer = useCallback(() => {
@@ -70,6 +112,14 @@ const TriviaChallengeGame = () => {
     }, 1000);
   }, [timerEnabled, timerSeconds, stopTimer]);
 
+  // Start timer on initial mount or when moving to next question
+  useEffect(() => {
+    if (phase === "question" && currentQ && !answeredRef.current) {
+      startTimer();
+    }
+    return () => stopTimer();
+  }, [phase, totalQuestionsAnswered, startTimer, stopTimer, currentQ]);
+
   // Auto-submit when timer runs out
   useEffect(() => {
     if (timerEnabled && timeLeft === 0 && phase === "question" && !answeredRef.current) {
@@ -78,48 +128,24 @@ const TriviaChallengeGame = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeLeft, timerEnabled, phase]);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => stopTimer();
-  }, [stopTimer]);
-
-  // ── Get current question ─────────────────────────────────────
-  const getCategoryQuestions = (catName) => {
-    const cat = questionsData[catName];
-    if (!cat) return [];
-    const qs = cat.questions || cat;
-    return Array.isArray(qs) ? qs.slice(0, questionsPerRound) : [];
-  };
-
-  const currentQuestions = currentCategory ? getCategoryQuestions(currentCategory) : [];
-  const currentQ = currentQuestions[questionIndex] || null;
-
-  // ── Handlers ─────────────────────────────────────────────────
-  const pickCategory = (catName) => {
-    setCurrentCategory(catName);
-    setCategoriesPlayed((prev) => [...prev, catName]);
-    setQuestionIndex(0);
-    setSelectedAnswer(null);
-    setIsCorrect(null);
-    answeredRef.current = false;
-    setPhase("question");
-    startTimer();
-  };
-
+  // ── Score & Speed Calculation ────────────────────────────────
   const calculateScore = (difficulty, remaining) => {
-    const baseScore = difficulty * 100;
+    const baseScore = (difficulty || 1) * 100;
     if (timerEnabled && remaining > 0) {
-      const bonus = Math.floor((remaining / timerSeconds) * difficulty * 50);
-      return baseScore + bonus;
+      // Speed bonus: up to 100 bonus pts * difficulty based on remaining time ratio
+      const speedFactor = remaining / timerSeconds;
+      const speedBonus = Math.floor(speedFactor * (difficulty || 1) * 100);
+      return baseScore + speedBonus;
     }
     return baseScore;
   };
 
   const handleAnswer = async (choiceIndex) => {
-    if (answeredRef.current || selectedAnswer !== null) return;
+    if (answeredRef.current || selectedAnswer !== null || !currentQ) return;
     answeredRef.current = true;
     stopTimer();
 
+    const timeSpent = Math.max(0, timerSeconds - timeLeft);
     const correct = choiceIndex === currentQ.answer;
     const earned = correct ? calculateScore(currentQ.difficulty, timeLeft) : 0;
 
@@ -128,81 +154,74 @@ const TriviaChallengeGame = () => {
     setPopupPoints(earned);
     setShowPopup(true);
 
-    const newTotal = totalScore + earned;
+    const newTotalScore = totalScore + earned;
     const newQAnswered = totalQuestionsAnswered + 1;
-    setTotalScore(newTotal);
-    setTotalQuestionsAnswered(newQAnswered);
+    const newTotalTime = Math.round((totalTimeTaken + timeSpent) * 100) / 100;
+    const calculatedRound = Math.min(totalRounds, Math.floor(newQAnswered / questionsPerRound) + 1);
 
-    // Submit to server
+    setTotalScore(newTotalScore);
+    setTotalQuestionsAnswered(newQAnswered);
+    setTotalTimeTaken(newTotalTime);
+    setCurrentRound(calculatedRound);
+
+    // Submit to server for real-time async leaderboard syncing
     try {
       await submitTriviaAnswer({
-        questionIndex,
+        questionIndex: totalQuestionsAnswered,
         selectedAnswer: choiceIndex,
         timeRemaining: timeLeft,
-        round: currentRound,
-        category: currentCategory,
+        timeTaken: timeSpent,
+        totalTimeTaken: newTotalTime,
+        round: calculatedRound,
+        category: currentQ.category,
         isCorrect: correct,
         pointsEarned: earned,
-        totalScore: newTotal,
+        totalScore: newTotalScore,
         totalQuestionsAnswered: newQAnswered,
-        currentRound,
+        currentRound: calculatedRound,
       });
     } catch (e) {
       console.error("Failed to submit trivia answer:", e);
     }
 
-    // Advance after delay
+    // Advance to next question or complete phase after popup animation
     setTimeout(() => {
       setShowPopup(false);
-      advanceQuestion(newTotal, newQAnswered);
+      if (newQAnswered >= totalPossibleQuestions) {
+        setPhase("complete");
+      } else {
+        setSelectedAnswer(null);
+        setIsCorrect(null);
+        answeredRef.current = false;
+        startTimer();
+      }
     }, 1200);
   };
 
   const handleTimeout = () => {
-    handleAnswer(-1); // -1 = no answer selected → wrong
+    handleAnswer(-1); // -1 = timeout / no choice selected
   };
 
-  const advanceQuestion = (latestScore, latestQAnswered) => {
-    const nextIdx = questionIndex + 1;
-
-    if (nextIdx < currentQuestions.length) {
-      // Next question in same category
-      setQuestionIndex(nextIdx);
-      setSelectedAnswer(null);
-      setIsCorrect(null);
-      answeredRef.current = false;
-      startTimer();
-    } else {
-      // Round complete
-      const nextRound = currentRound + 1;
-      if (nextRound <= totalRounds && categoriesPlayed.length < allCategories.length) {
-        setCurrentRound(nextRound);
-        setCurrentCategory(null);
-        setQuestionIndex(0);
-        setSelectedAnswer(null);
-        setIsCorrect(null);
-        answeredRef.current = false;
-        setPhase("category");
-      } else {
-        // Game complete
-        setPhase("complete");
-      }
-    }
-  };
-
-  // ── Leaderboard data ─────────────────────────────────────────
+  // ── Leaderboard data with Speed Tiebreaker ────────────────────
   const leaderboard = [...players]
     .map((p) => ({
       ...p,
       triviaScore: p.triviaChallenge?.score ?? p.score ?? 0,
       triviaAnswered: p.triviaChallenge?.questionsAnswered ?? 0,
       triviaRound: p.triviaChallenge?.currentRound ?? 0,
+      totalTimeTaken: p.triviaChallenge?.totalTimeTaken ?? 9999,
+      completed: p.triviaChallenge?.completed ?? false,
     }))
-    .sort((a, b) => b.triviaScore - a.triviaScore);
+    .sort((a, b) => {
+      if (b.triviaScore !== a.triviaScore) {
+        return b.triviaScore - a.triviaScore;
+      }
+      // On equal score, lower time taken (faster player) ranks higher
+      return a.totalTimeTaken - b.totalTimeTaken;
+    });
 
   // ── Progress calculation ─────────────────────────────────────
-  const totalPossibleQuestions = totalRounds * questionsPerRound;
-  const progressPct = Math.min(100, (totalQuestionsAnswered / totalPossibleQuestions) * 100);
+  const progressPct = Math.min(100, (totalQuestionsAnswered / (totalPossibleQuestions || 1)) * 100);
 
   // ── Timer ring SVG values ────────────────────────────────────
   const timerRadius = 34;
@@ -237,57 +256,24 @@ const TriviaChallengeGame = () => {
         </div>
       </div>
 
-      {/* ── Phase: Category Selection ────────── */}
-      {phase === "category" && (
-        <div className="trivia-category-phase">
-          <div className="trivia-category-title">Choose a Category</div>
-          <div className="trivia-category-sub">
-            Round {currentRound} — pick a topic to answer questions from
-          </div>
-          <div className="trivia-category-grid">
-            {allCategories.map((catName) => {
-              const played = categoriesPlayed.includes(catName);
-              const catData = questionsData[catName];
-              const icon = catData?.icon || "❓";
-              const qCount = (catData?.questions || catData || []).length;
-
-              return (
-                <div
-                  key={catName}
-                  className={`trivia-category-card ${played ? "disabled" : ""}`}
-                  onClick={() => !played && pickCategory(catName)}
-                >
-                  <span className="trivia-cat-icon">{icon}</span>
-                  <span className="trivia-cat-name">{catName}</span>
-                  <span className="trivia-cat-count">
-                    {Math.min(qCount, questionsPerRound)} question{Math.min(qCount, questionsPerRound) !== 1 ? "s" : ""}
-                  </span>
-                  {played && <span className="trivia-cat-played-badge">✓ Played</span>}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       {/* ── Phase: Question ────────────────── */}
       {phase === "question" && currentQ && (
         <div className="trivia-question-phase">
           {/* Header: category + difficulty + question # */}
           <div className="trivia-q-header">
             <span className="trivia-q-category-badge">
-              {questionsData[currentCategory]?.icon || "❓"} {currentCategory}
+              {currentQ.icon || "❓"} {currentQ.category}
             </span>
             <div className="trivia-q-difficulty">
               {[1, 2, 3, 4, 5].map((d) => (
                 <span
                   key={d}
-                  className={`trivia-diff-dot ${d <= currentQ.difficulty ? "active" : ""}`}
+                  className={`trivia-diff-dot ${d <= (currentQ.difficulty || 1) ? "active" : ""}`}
                 />
               ))}
             </div>
             <span className="trivia-q-number">
-              Q{questionIndex + 1}/{currentQuestions.length}
+              Q{totalQuestionsAnswered + 1}/{totalPossibleQuestions}
             </span>
           </div>
 
@@ -353,13 +339,16 @@ const TriviaChallengeGame = () => {
             <div className="trivia-complete-title">Trivia Complete!</div>
             <div className="trivia-final-score">
               Your final score: <strong>{totalScore}</strong> pts
+              <div style={{ fontSize: "0.9rem", color: "#64748b", marginTop: "4px" }}>
+                ⏱ Total time: {totalTimeTaken}s
+              </div>
             </div>
           </div>
 
           {/* Leaderboard */}
           <div className="trivia-leaderboard">
             <div className="trivia-lb-title">
-              📊 Leaderboard
+              📊 Live Leaderboard (Ranked by Score &amp; Speed)
             </div>
             {leaderboard.map((p, i) => (
               <div
@@ -377,10 +366,10 @@ const TriviaChallengeGame = () => {
                 </span>
                 <span className="trivia-lb-progress">
                   {p.triviaAnswered > 0
-                    ? `${p.triviaAnswered} answered`
+                    ? `${p.triviaAnswered} answered (${p.totalTimeTaken < 9000 ? `${p.totalTimeTaken}s` : ""})`
                     : "Playing..."}
                 </span>
-                <span className="trivia-lb-score">{p.triviaScore}</span>
+                <span className="trivia-lb-score">{p.triviaScore} pts</span>
               </div>
             ))}
           </div>
