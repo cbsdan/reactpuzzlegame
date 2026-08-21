@@ -34,12 +34,12 @@ function buildEditorEntry(questions, modified = false, icon = "❓", isCustomCat
 
 const API_URL = import.meta.env.VITE_API_URL || "";
 
-const TriviaSettings = ({ onSave, onCancel }) => {
-  const [rounds, setRounds] = useState(3);
-  const [questionsPerRound, setQuestionsPerRound] = useState(5);
-  const [timerEnabled, setTimerEnabled] = useState(true);
-  const [timerSeconds, setTimerSeconds] = useState(15);
-  const [selectedCategory, setSelectedCategory] = useState("All");
+const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
+  const [rounds, setRounds] = useState(() => initialConfig?.rounds || 3);
+  const [questionsPerRound, setQuestionsPerRound] = useState(() => initialConfig?.questionsPerRound || 5);
+  const [timerEnabled, setTimerEnabled] = useState(() => initialConfig?.timerEnabled !== undefined ? initialConfig.timerEnabled : true);
+  const [timerSeconds, setTimerSeconds] = useState(() => initialConfig?.timerSeconds || 15);
+  const [selectedCategory, setSelectedCategory] = useState(() => initialConfig?.selectedCategory || "All");
   const [loadingApi, setLoadingApi] = useState(false);
 
   // "settings" | "questions" | "json"
@@ -113,8 +113,10 @@ const TriviaSettings = ({ onSave, onCancel }) => {
           setCatOrder(apiCatNames);
           setEnabledCats(new Set(apiCatNames));
           setCatEditors(editors);
-          if (apiCatNames.length > 0) {
-            setSelectedCategory(apiCatNames[0]);
+
+          // Preserve selectedCategory if provided in initialConfig
+          if (initialConfig?.selectedCategory) {
+            setSelectedCategory(initialConfig.selectedCategory);
           }
         }
       } catch (err) {
@@ -128,7 +130,7 @@ const TriviaSettings = ({ onSave, onCancel }) => {
     return () => {
       isMounted = false;
     };
-  }, [API_URL]);
+  }, [API_URL, initialConfig]);
 
   // Modal: which category is being edited (null = none)
   const [editingCat, setEditingCat] = useState(null);
@@ -500,7 +502,7 @@ const TriviaSettings = ({ onSave, onCancel }) => {
   /* ══════════════════════════════════════
      Save — FIX: always include ALL enabled categories
   ══════════════════════════════════════ */
-  const handleSave = () => {
+  const handleSave = async () => {
     let questions;
     if (jsonCustom && jsonValid) {
       // JSON editor override takes precedence
@@ -523,6 +525,57 @@ const TriviaSettings = ({ onSave, onCancel }) => {
         }
       });
     }
+
+    // Persist any custom/modified category and question edits to backend DB
+    try {
+      for (const [catName, editor] of Object.entries(catEditors)) {
+        if (!editor.modified && !editor.isCustomCat) continue;
+        let catId = editor.dbId;
+        if (!catId) {
+          const catRes = await fetch(`${API_URL}/api/trivia/categories`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: catName, icon: editor.icon }),
+          });
+          const catData = await catRes.json();
+          if (catData.success && catData.category) {
+            catId = catData.category.id;
+          }
+        }
+        if (catId && Array.isArray(editor.questions)) {
+          for (const q of editor.questions) {
+            if (!q.question?.trim()) continue;
+            if (q.dbId) {
+              await fetch(`${API_URL}/api/trivia/questions/${q.dbId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  question: q.question,
+                  difficulty: q.difficulty,
+                  choices: q.choices,
+                  answer: q.answer,
+                }),
+              });
+            } else {
+              await fetch(`${API_URL}/api/trivia/questions`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  categoryId: catId,
+                  question: q.question,
+                  difficulty: q.difficulty,
+                  choices: q.choices,
+                  answer: q.answer,
+                }),
+              });
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Failed to sync trivia edits to backend DB:", e);
+    }
+
     onSave({
       rounds: Math.max(1, Math.min(10, rounds)),
       questionsPerRound: Math.max(1, Math.min(20, questionsPerRound)),
