@@ -115,7 +115,7 @@
 
 .tc-lb-header {
   display: grid;
-  grid-template-columns: 45px 1fr 90px 90px 90px 80px;
+  grid-template-columns: 45px 1fr 90px 85px 85px 90px 80px;
   padding: 0.65rem 1.1rem;
   background: rgba(255,255,255,0.04);
   border-bottom: 1px solid rgba(255,255,255,0.06);
@@ -128,7 +128,7 @@
 
 .tc-lb-row {
   display: grid;
-  grid-template-columns: 45px 1fr 90px 90px 90px 80px;
+  grid-template-columns: 45px 1fr 90px 85px 85px 90px 80px;
   padding: 0.7rem 1.1rem;
   align-items: center;
   border-bottom: 1px solid rgba(255,255,255,0.03);

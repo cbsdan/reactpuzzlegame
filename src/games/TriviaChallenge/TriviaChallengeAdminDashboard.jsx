@@ -126,6 +126,7 @@ const TriviaChallengeAdminDashboard = () => {
               <span>#</span>
               <span>Player</span>
               <span>Round</span>
+              <span>Correct</span>
               <span>Answered</span>
               <span>Status</span>
               <span>Score</span>
@@ -152,6 +153,9 @@ const TriviaChallengeAdminDashboard = () => {
                   <span className="tc-lb-name">{player.name}</span>
                   <span className="tc-lb-round">
                     {t.currentRound || 0}/{totalRounds}
+                  </span>
+                  <span className="tc-lb-correct">
+                    {t.correctAnswers || 0}/{t.questionsAnswered || 0}
                   </span>
                   <span className="tc-lb-answered">
                     {t.questionsAnswered || 0}
