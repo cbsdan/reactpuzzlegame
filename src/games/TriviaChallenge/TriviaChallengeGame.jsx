@@ -146,6 +146,28 @@ const TriviaChallengeGame = () => {
   }, [timeLeft, timerEnabled, phase]);
 
   // ── Score & Speed Calculation ────────────────────────────────
+  const isAnswerCorrect = (choiceIdx, questionObj) => {
+    if (!questionObj || choiceIdx === null || choiceIdx === undefined || choiceIdx < 0) return false;
+    const ans = questionObj.answer;
+
+    // 1. Exact numeric or loose numeric match (0 === 0, 1 == "1")
+    if (ans === choiceIdx || Number(ans) === choiceIdx) return true;
+
+    // 2. Letter representation ("A" -> 0, "B" -> 1, "C" -> 2, "D" -> 3)
+    if (typeof ans === "string") {
+      const trimmed = ans.trim().toUpperCase();
+      if (trimmed.length === 1 && trimmed >= "A" && trimmed <= "Z") {
+        if (trimmed.charCodeAt(0) - 65 === choiceIdx) return true;
+      }
+      // 3. Option text matching ("Super Mario Bros." === choices[1])
+      if (Array.isArray(questionObj.choices) && questionObj.choices[choiceIdx]) {
+        if (questionObj.choices[choiceIdx].trim().toLowerCase() === ans.trim().toLowerCase()) return true;
+      }
+    }
+
+    return false;
+  };
+
   const calculateScore = (difficulty, remaining) => {
     const diffMultiplier = difficulty || 1;
     const baseScore = diffMultiplier * 100;
@@ -167,7 +189,7 @@ const TriviaChallengeGame = () => {
     stopTimer();
 
     const timeSpent = Math.max(0, timerSeconds - timeLeft);
-    const correct = choiceIndex === currentQ.answer;
+    const correct = isAnswerCorrect(choiceIndex, currentQ);
     const scoreDetails = correct ? calculateScore(currentQ.difficulty, timeLeft) : { total: 0, base: 0, speedBonus: 0 };
     const earned = scoreDetails.total;
 
@@ -359,7 +381,7 @@ const TriviaChallengeGame = () => {
             {currentQ.choices.map((choice, idx) => {
               let cls = "";
               if (selectedAnswer !== null) {
-                if (idx === currentQ.answer) {
+                if (isAnswerCorrect(idx, currentQ)) {
                   cls = selectedAnswer === idx ? "correct" : "reveal-correct";
                 } else if (idx === selectedAnswer) {
                   cls = "wrong";
