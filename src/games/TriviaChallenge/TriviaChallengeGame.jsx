@@ -30,6 +30,7 @@ const TriviaChallengeGame = () => {
   const gameQuestions = useMemo(() => {
     let allQuestionsList = [];
     const catKeys = Object.keys(questionsData);
+    const usedIndicesByCat = {};
 
     for (let r = 0; r < totalRounds; r++) {
       const assignedCat = roundCategories[r] || selectedCategory || "All";
@@ -43,7 +44,7 @@ const TriviaChallengeGame = () => {
         }
       }
 
-      if (roundPool.length < questionsPerRound) {
+      if (roundPool.length === 0) {
         catKeys.forEach((catKey) => {
           const catObj = questionsData[catKey];
           const qs = catObj.questions || catObj;
@@ -55,7 +56,18 @@ const TriviaChallengeGame = () => {
         });
       }
 
-      const selectedForRound = roundPool.slice(0, questionsPerRound);
+      const poolKey = assignedCat !== "All" ? assignedCat : "All";
+      const startIndex = usedIndicesByCat[poolKey] || 0;
+      let selectedForRound = roundPool.slice(startIndex, startIndex + questionsPerRound);
+
+      if (selectedForRound.length < questionsPerRound && roundPool.length > 0) {
+        const needed = questionsPerRound - selectedForRound.length;
+        selectedForRound = [...selectedForRound, ...roundPool.slice(0, needed)];
+        usedIndicesByCat[poolKey] = needed;
+      } else {
+        usedIndicesByCat[poolKey] = startIndex + questionsPerRound;
+      }
+
       allQuestionsList.push(...selectedForRound);
     }
 
@@ -73,12 +85,14 @@ const TriviaChallengeGame = () => {
   const tcSaved = currentPlayer?.triviaChallenge || {};
   const initialAnswered = tcSaved.questionsAnswered || 0;
   const initialScore = tcSaved.score || 0;
+  const initialCorrect = tcSaved.correctAnswers || 0;
   const initialTimeTaken = tcSaved.totalTimeTaken || 0;
   const initialRound = tcSaved.currentRound || 1;
   const isAlreadyCompleted = tcSaved.completed || (initialAnswered >= totalPossibleQuestions && totalPossibleQuestions > 0);
 
   const [phase, setPhase] = useState(isAlreadyCompleted ? "complete" : "question");
   const [totalScore, setTotalScore] = useState(initialScore);
+  const [totalCorrectAnswers, setTotalCorrectAnswers] = useState(initialCorrect);
   const [totalQuestionsAnswered, setTotalQuestionsAnswered] = useState(initialAnswered);
   const [totalTimeTaken, setTotalTimeTaken] = useState(initialTimeTaken);
   const [currentRound, setCurrentRound] = useState(initialRound);
@@ -150,18 +164,21 @@ const TriviaChallengeGame = () => {
     if (!questionObj || choiceIdx === null || choiceIdx === undefined || choiceIdx < 0) return false;
     const ans = questionObj.answer;
 
-    // 1. Exact numeric or loose numeric match (0 === 0, 1 == "1")
-    if (ans === choiceIdx || Number(ans) === choiceIdx) return true;
+    // 1. Exact numeric index match (0 === 0, 1 === 1, or string "0" === 0)
+    if (typeof ans === "number" && ans === choiceIdx) return true;
+    if (typeof ans === "string" && !isNaN(parseInt(ans, 10)) && parseInt(ans, 10) === choiceIdx) return true;
 
-    // 2. Letter representation ("A" -> 0, "B" -> 1, "C" -> 2, "D" -> 3)
+    // 2. Choice text matching ("Super Mario Bros." === choices[1])
+    if (Array.isArray(questionObj.choices) && questionObj.choices[choiceIdx] !== undefined) {
+      const choiceText = String(questionObj.choices[choiceIdx]).trim().toLowerCase();
+      if (typeof ans === "string" && choiceText === ans.trim().toLowerCase()) return true;
+    }
+
+    // 3. Letter representation ("A" -> 0, "B" -> 1, "C" -> 2, "D" -> 3)
     if (typeof ans === "string") {
       const trimmed = ans.trim().toUpperCase();
       if (trimmed.length === 1 && trimmed >= "A" && trimmed <= "Z") {
         if (trimmed.charCodeAt(0) - 65 === choiceIdx) return true;
-      }
-      // 3. Option text matching ("Super Mario Bros." === choices[1])
-      if (Array.isArray(questionObj.choices) && questionObj.choices[choiceIdx]) {
-        if (questionObj.choices[choiceIdx].trim().toLowerCase() === ans.trim().toLowerCase()) return true;
       }
     }
 
@@ -200,11 +217,13 @@ const TriviaChallengeGame = () => {
     setShowPopup(true);
 
     const newTotalScore = totalScore + earned;
+    const newTotalCorrect = totalCorrectAnswers + (correct ? 1 : 0);
     const newQAnswered = totalQuestionsAnswered + 1;
     const newTotalTime = Math.round((totalTimeTaken + timeSpent) * 100) / 100;
     const calculatedRound = Math.min(totalRounds, Math.floor(newQAnswered / questionsPerRound) + 1);
 
     setTotalScore(newTotalScore);
+    setTotalCorrectAnswers(newTotalCorrect);
     setTotalQuestionsAnswered(newQAnswered);
     setTotalTimeTaken(newTotalTime);
     setCurrentRound(calculatedRound);
@@ -229,6 +248,7 @@ const TriviaChallengeGame = () => {
         round: calculatedRound,
         category: currentQ.category,
         isCorrect: correct,
+        correctAnswers: newTotalCorrect,
         pointsEarned: earned,
         totalScore: newTotalScore,
         totalQuestionsAnswered: newQAnswered,
