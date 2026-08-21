@@ -747,12 +747,10 @@ const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
         if (!enabledCats.has(cat)) return;
         const editor = catEditors[cat];
         if (!editor) return;
-        if (editor.modified) {
-          questions[cat] = { icon: editor.icon, questions: editor.questions };
+        if (Array.isArray(editor.questions) && editor.questions.length > 0) {
+          questions[cat] = { icon: editor.icon || "❓", questions: editor.questions };
         } else if (DEFAULT_TRIVIA_QUESTIONS[cat]) {
           questions[cat] = DEFAULT_TRIVIA_QUESTIONS[cat];
-        } else if (editor.isCustomCat && editor.questions.length > 0) {
-          questions[cat] = { icon: editor.icon, questions: editor.questions };
         }
       });
     }
