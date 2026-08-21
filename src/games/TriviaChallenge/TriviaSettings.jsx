@@ -32,6 +32,113 @@ function buildEditorEntry(questions, modified = false, icon = "❓", isCustomCat
   };
 }
 
+const DEFAULT_TEXT_IMPORT_TEMPLATE = `1. Which game features the character Mario?
+A. Minecraft
+B. Super Mario Bros.
+C. Fortnite
+D. Roblox
+Answer: B
+
+2. Who directed Titanic?
+A. James Cameron
+B. Steven Spielberg
+C. Christopher Nolan
+D. Ridley Scott
+Answer: A`;
+
+function parseClientTextQuestions(rawText, defaultDifficulty = 1) {
+  if (!rawText || typeof rawText !== "string") return [];
+  const text = rawText.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+  if (!text) return [];
+
+  const lines = text.split("\n").map((l) => l.trim());
+  const blocks = [];
+  let currentBlock = [];
+
+  const questionStartRe = /^(?:\d+[\.\)]|Q\d+[:\.]?)\s*/i;
+
+  for (const line of lines) {
+    if (!line) {
+      if (currentBlock.length > 0) {
+        blocks.push(currentBlock);
+        currentBlock = [];
+      }
+      continue;
+    }
+
+    const hasAnswer = currentBlock.some((l) => /^(?:Answer|Ans|Correct)[:\s]/i.test(l));
+    if (questionStartRe.test(line) && currentBlock.length > 0 && (hasAnswer || currentBlock.length >= 3)) {
+      blocks.push(currentBlock);
+      currentBlock = [];
+    }
+
+    currentBlock.push(line);
+  }
+
+  if (currentBlock.length > 0) {
+    blocks.push(currentBlock);
+  }
+
+  const parsed = [];
+
+  for (const block of blocks) {
+    let qText = "";
+    const choices = [];
+    let answerStr = "";
+
+    const choiceRe = /^(?:[A-Da-d0-9][\.\)]|[A-Da-d0-9]\s*[-–—])\s*(.+)/;
+    const answerRe = /^(?:Answer|Ans|Correct)[:\s]*\s*(.+)/i;
+
+    for (const line of block) {
+      const ansMatch = line.match(answerRe);
+      if (ansMatch) {
+        answerStr = ansMatch[1].trim();
+        continue;
+      }
+
+      const choiceMatch = line.match(choiceRe);
+      if (choiceMatch) {
+        choices.push(choiceMatch[1].trim());
+        continue;
+      }
+
+      if (choices.length === 0 && !answerStr) {
+        const cleanLine = line.replace(questionStartRe, "").trim();
+        if (cleanLine) {
+          qText = qText ? qText + " " + cleanLine : cleanLine;
+        }
+      }
+    }
+
+    if (!qText || choices.length < 2) continue;
+
+    let answerIdx = 0;
+    if (answerStr) {
+      const upperAns = answerStr.toUpperCase();
+      if (upperAns.length === 1 && upperAns >= "A" && upperAns <= "Z") {
+        answerIdx = upperAns.charCodeAt(0) - 65;
+      } else if (!isNaN(parseInt(upperAns))) {
+        const num = parseInt(upperAns);
+        answerIdx = num >= 1 ? num - 1 : 0;
+      } else {
+        const foundIdx = choices.findIndex((c) => c.toLowerCase() === answerStr.toLowerCase());
+        if (foundIdx !== -1) answerIdx = foundIdx;
+      }
+    }
+
+    answerIdx = Math.max(0, Math.min(choices.length - 1, answerIdx));
+
+    parsed.push({
+      question: qText,
+      difficulty: Math.max(1, Math.min(5, parseInt(defaultDifficulty) || 1)),
+      choices,
+      answer: answerIdx,
+    });
+  }
+
+  return parsed;
+}
+
 const API_URL = import.meta.env.VITE_API_URL || "";
 
 const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
@@ -40,9 +147,33 @@ const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
   const [timerEnabled, setTimerEnabled] = useState(() => initialConfig?.timerEnabled !== undefined ? initialConfig.timerEnabled : true);
   const [timerSeconds, setTimerSeconds] = useState(() => initialConfig?.timerSeconds || 15);
   const [selectedCategory, setSelectedCategory] = useState(() => initialConfig?.selectedCategory || "All");
+
+  // Per-round categories array
+  const [roundCategories, setRoundCategories] = useState(() => {
+    if (Array.isArray(initialConfig?.roundCategories) && initialConfig.roundCategories.length > 0) {
+      return initialConfig.roundCategories;
+    }
+    const initRounds = initialConfig?.rounds || 3;
+    const defaultCat = initialConfig?.selectedCategory || "All";
+    return Array(initRounds).fill(defaultCat);
+  });
+
   const [loadingApi, setLoadingApi] = useState(false);
 
-  // "settings" | "questions" | "json"
+  // Loading overlay state
+  const [loadingOverlay, setLoadingOverlay] = useState({ active: false, title: "", message: "" });
+
+  // Track deleted question dbIds for MongoDB sync
+  const [deletedQIds, setDeletedQIds] = useState(new Set());
+
+  // Text Import state
+  const [importCat, setImportCat] = useState("Movies");
+  const [importDifficulty, setImportDifficulty] = useState(1);
+  const [importText, setImportText] = useState(DEFAULT_TEXT_IMPORT_TEMPLATE);
+  const [importError, setImportError] = useState("");
+  const [importSuccessMsg, setImportSuccessMsg] = useState("");
+
+  // "settings" | "questions" | "text" | "json"
   const [tab, setTab] = useState("settings");
 
   // Ordered list of all category names (default + custom)
@@ -354,10 +485,106 @@ const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
   };
 
   const removeQuestion = (cat, qIdx) => {
+    const targetQ = catEditors[cat]?.questions[qIdx];
+    if (targetQ && targetQ.dbId) {
+      setDeletedQIds((prev) => new Set([...prev, targetQ.dbId]));
+    }
     markDirty(cat, (editor) => ({
       ...editor,
       questions: editor.questions.filter((_, i) => i !== qIdx),
     }));
+  };
+
+  /* ── Plain Text Import Handler ── */
+  const handleImportTextSubmit = async () => {
+    setImportError("");
+    setImportSuccessMsg("");
+
+    const catName = importCat || catOrder[0] || "Movies";
+    const parsed = parseClientTextQuestions(importText, importDifficulty);
+
+    if (parsed.length === 0) {
+      setImportError("Could not parse any valid questions. Please ensure text matches the format:\n1. Question text\nA. Choice 1\nB. Choice 2\nAnswer: B");
+      return;
+    }
+
+    setLoadingOverlay({
+      active: true,
+      title: "Importing Questions",
+      message: `Translating ${parsed.length} question(s) and sending to backend database...`,
+    });
+
+    try {
+      const targetEditor = catEditors[catName];
+      const catId = targetEditor?.dbId;
+
+      const res = await fetch(`${API_URL}/api/trivia/import-text`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          categoryId: catId,
+          categoryName: catName,
+          text: importText,
+          difficulty: importDifficulty,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success && Array.isArray(data.questions)) {
+        setCatEditors((prev) => {
+          const existingQs = prev[catName]?.questions || [];
+          const newQs = data.questions.map((q) => ({
+            dbId: q.id,
+            question: q.question,
+            difficulty: q.difficulty,
+            choices: q.choices,
+            answer: q.answer,
+          }));
+          return {
+            ...prev,
+            [catName]: {
+              ...prev[catName],
+              dbId: data.categoryId || prev[catName]?.dbId,
+              questions: [...existingQs, ...newQs],
+              modified: true,
+              isDirty: false,
+            },
+          };
+        });
+        setImportSuccessMsg(`Successfully imported ${data.count} question(s) into category "${catName}"!`);
+      } else {
+        setCatEditors((prev) => {
+          const existingQs = prev[catName]?.questions || [];
+          return {
+            ...prev,
+            [catName]: {
+              ...prev[catName],
+              questions: [...existingQs, ...parsed],
+              modified: true,
+              isDirty: true,
+            },
+          };
+        });
+        setImportSuccessMsg(`Imported ${parsed.length} question(s) into category "${catName}" locally.`);
+      }
+    } catch (err) {
+      console.error("Text import error:", err);
+      setCatEditors((prev) => {
+        const existingQs = prev[catName]?.questions || [];
+        return {
+          ...prev,
+          [catName]: {
+            ...prev[catName],
+            questions: [...existingQs, ...parsed],
+            modified: true,
+            isDirty: true,
+          },
+        };
+      });
+      setImportSuccessMsg(`Imported ${parsed.length} question(s) into category "${catName}" locally.`);
+    } finally {
+      setLoadingOverlay({ active: false, title: "", message: "" });
+    }
   };
 
   /** Validate + mark a category as applied */
@@ -397,7 +624,6 @@ const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
 
   /** Discard edits and close modal */
   const discardAndCloseModal = (cat) => {
-    // Revert to last applied state
     setCatEditors((prev) => ({
       ...prev,
       [cat]: { ...prev[cat], isDirty: false },
@@ -421,6 +647,10 @@ const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
 
   /** Remove an admin-added custom category */
   const removeCustomCat = (cat) => {
+    const targetCatObj = catEditors[cat];
+    if (targetCatObj?.dbId) {
+      fetch(`${API_URL}/api/trivia/categories/${targetCatObj.dbId}`, { method: "DELETE" }).catch(() => {});
+    }
     if (editingCat === cat) setEditingCat(null);
     setCatOrder((prev) => prev.filter((c) => c !== cat));
     setEnabledCats((prev) => {
@@ -453,7 +683,6 @@ const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
     setNewCatIcon("❓");
     setNewCatError("");
     setShowAddCatForm(false);
-    // Immediately open the modal for the new category so user can add questions
     setEditingCat(name);
   };
 
@@ -500,34 +729,46 @@ const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
   };
 
   /* ══════════════════════════════════════
-     Save — FIX: always include ALL enabled categories
+     Save — FIX: include deleted questions sync & loading screen
   ══════════════════════════════════════ */
   const handleSave = async () => {
+    setLoadingOverlay({
+      active: true,
+      title: "Saving Settings & Database",
+      message: "Syncing categories, question updates, and deletions with MongoDB...",
+    });
+
     let questions;
     if (jsonCustom && jsonValid) {
-      // JSON editor override takes precedence
       questions = JSON.parse(jsonText);
     } else {
       questions = {};
       catOrder.forEach((cat) => {
-        if (!enabledCats.has(cat)) return; // skip disabled categories
+        if (!enabledCats.has(cat)) return;
         const editor = catEditors[cat];
         if (!editor) return;
         if (editor.modified) {
-          // Use admin-edited questions
           questions[cat] = { icon: editor.icon, questions: editor.questions };
         } else if (DEFAULT_TRIVIA_QUESTIONS[cat]) {
-          // Use default built-in questions
           questions[cat] = DEFAULT_TRIVIA_QUESTIONS[cat];
         } else if (editor.isCustomCat && editor.questions.length > 0) {
-          // Custom category with questions (not yet formally applied)
           questions[cat] = { icon: editor.icon, questions: editor.questions };
         }
       });
     }
 
-    // Persist any custom/modified category and question edits to backend DB
     try {
+      // 1. Delete queued removed questions from backend DB
+      for (const qId of deletedQIds) {
+        try {
+          await fetch(`${API_URL}/api/trivia/questions/${qId}`, { method: "DELETE" });
+        } catch (err) {
+          console.error(`Failed to delete question ${qId} from DB:`, err);
+        }
+      }
+      setDeletedQIds(new Set());
+
+      // 2. Persist any custom/modified category and question edits to backend DB
       for (const [catName, editor] of Object.entries(catEditors)) {
         if (!editor.modified && !editor.isCustomCat) continue;
         let catId = editor.dbId;
@@ -574,6 +815,8 @@ const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
       }
     } catch (e) {
       console.error("Failed to sync trivia edits to backend DB:", e);
+    } finally {
+      setLoadingOverlay({ active: false, title: "", message: "" });
     }
 
     onSave({
@@ -582,9 +825,14 @@ const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
       timerEnabled,
       timerSeconds: Math.max(5, Math.min(60, timerSeconds)),
       selectedCategory,
+      roundCategories: roundCategories.slice(0, Math.max(1, Math.min(10, rounds))),
       questions,
     });
   };
+
+  const parsedPreview = useMemo(() => {
+    return parseClientTextQuestions(importText, importDifficulty);
+  }, [importText, importDifficulty]);
 
   /* ══════════════════════════════════════
      Category Edit Modal
@@ -609,6 +857,17 @@ const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
   ══════════════════════════════════════ */
   return (
     <div className="ts-fs-wrap">
+
+      {/* ── Loading screen overlay ── */}
+      {loadingOverlay.active && (
+        <div className="ts-loading-overlay">
+          <div className="ts-loading-modal">
+            <div className="ts-spinner-ring" />
+            <h3 className="ts-loading-title">{loadingOverlay.title}</h3>
+            <p className="ts-loading-message">{loadingOverlay.message}</p>
+          </div>
+        </div>
+      )}
 
       {/* ── Unsaved changes guard dialog ── */}
       {guardDialog.open && (
@@ -858,6 +1117,12 @@ const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
             {hasUnappliedEdits && <span className="ts-tab-badge ts-tab-badge-warn">● Unsaved</span>}
           </button>
           <button
+            className={`ts-tab-btn ${tab === "text" ? "active" : ""}`}
+            onClick={() => requestTabChange("text")}
+          >
+            📋 Text Import
+          </button>
+          <button
             className={`ts-tab-btn ${tab === "json" ? "active" : ""}`}
             onClick={() => requestTabChange("json")}
           >
@@ -914,26 +1179,36 @@ const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
             </div>
 
             <div className="ts-section">
-              <div className="ts-section-title">🎯 Assigned Game Category (Admin Only)</div>
+              <div className="ts-section-title">🎯 Per-Round Category Assignment (Admin Only)</div>
               <p className="ts-hint" style={{ marginBottom: "10px" }}>
-                Players cannot choose categories during gameplay. Select the assigned category for this trivia game:
+                Select a specific category for each round (or "All Enabled Categories" for mixed questions):
               </p>
-              <div className="ts-row">
-                <span className="ts-label">Category for Game</span>
-                <select
-                  className="ts-input"
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  style={{ minWidth: "200px", padding: "6px 10px", borderRadius: "6px" }}
-                >
-                  <option value="All">🌟 All Enabled Categories (Mixed)</option>
-                  {catOrder.filter((cat) => enabledCats.has(cat)).map((cat) => (
-                    <option key={cat} value={cat}>
-                      {catEditors[cat]?.icon || DEFAULT_TRIVIA_QUESTIONS[cat]?.icon || "❓"} {cat}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {Array.from({ length: Math.max(1, Math.min(10, rounds)) }).map((_, rIdx) => (
+                <div key={rIdx} className="ts-row" style={{ marginBottom: "8px" }}>
+                  <span className="ts-label">Round {rIdx + 1} Category</span>
+                  <select
+                    className="ts-input"
+                    value={roundCategories[rIdx] || selectedCategory || "All"}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setRoundCategories((prev) => {
+                        const next = [...prev];
+                        next[rIdx] = val;
+                        return next;
+                      });
+                      if (rIdx === 0) setSelectedCategory(val);
+                    }}
+                    style={{ minWidth: "220px", padding: "6px 10px", borderRadius: "6px" }}
+                  >
+                    <option value="All">🌟 All Enabled Categories (Mixed)</option>
+                    {catOrder.filter((cat) => enabledCats.has(cat)).map((cat) => (
+                      <option key={cat} value={cat}>
+                        {catEditors[cat]?.icon || DEFAULT_TRIVIA_QUESTIONS[cat]?.icon || "❓"} {cat}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ))}
             </div>
 
             <div className="ts-section">
@@ -1101,6 +1376,114 @@ const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
                   </div>
                 </>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* ─── TEXT IMPORT TAB ─── */}
+        {tab === "text" && (
+          <div className="ts-text-import-panel">
+            <div className="ts-section">
+              <div className="ts-section-title">📋 Import Questions from Plain Text</div>
+              <p className="ts-hint" style={{ marginBottom: "12px" }}>
+                Paste questions in standard plain-text format. Questions will be translated to the backend database and fetched for play.
+              </p>
+
+              <div className="ts-text-import-controls">
+                <div className="ts-text-import-field">
+                  <label>Target Category</label>
+                  <select
+                    className="ts-input"
+                    value={importCat}
+                    onChange={(e) => setImportCat(e.target.value)}
+                  >
+                    {catOrder.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {catEditors[cat]?.icon || "❓"} {cat}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="ts-text-import-field">
+                  <label>Default Difficulty</label>
+                  <select
+                    className="ts-input"
+                    value={importDifficulty}
+                    onChange={(e) => setImportDifficulty(parseInt(e.target.value) || 1)}
+                  >
+                    <option value={1}>Easy (1★)</option>
+                    <option value={2}>Medium (2★)</option>
+                    <option value={3}>Hard (3★)</option>
+                    <option value={4}>Expert (4★)</option>
+                    <option value={5}>Master (5★)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="ts-text-area-wrap">
+              <textarea
+                className="ts-text-import-area"
+                value={importText}
+                onChange={(e) => {
+                  setImportText(e.target.value);
+                  setImportError("");
+                  setImportSuccessMsg("");
+                }}
+                placeholder={`1. Which game features the character Mario?\nA. Minecraft\nB. Super Mario Bros.\nC. Fortnite\nD. Roblox\nAnswer: B`}
+                rows={10}
+              />
+            </div>
+
+            {importError && <div className="ts-add-cat-error">⚠ {importError}</div>}
+            {importSuccessMsg && <div className="ts-json-ok">✅ {importSuccessMsg}</div>}
+
+            {/* Live Preview Box */}
+            <div className="ts-import-preview-box">
+              <div className="ts-import-preview-header">
+                <span className="ts-import-preview-title">🔍 Live Parser Preview</span>
+                <span className="ts-import-badge-count">
+                  {parsedPreview.length} Question{parsedPreview.length !== 1 ? "s" : ""} Detected
+                </span>
+              </div>
+
+              {parsedPreview.length === 0 ? (
+                <div className="ts-hint" style={{ padding: "0.5rem 0" }}>
+                  No valid questions detected yet. Ensure each question has question text, choices (A., B.), and an Answer line.
+                </div>
+              ) : (
+                <div className="ts-import-parsed-list">
+                  {parsedPreview.map((pq, idx) => (
+                    <div key={idx} className="ts-parsed-q-card">
+                      <div className="ts-parsed-q-title">
+                        {idx + 1}. {pq.question}
+                      </div>
+                      <div className="ts-parsed-choices">
+                        {pq.choices.map((ch, cIdx) => (
+                          <div
+                            key={cIdx}
+                            className={`ts-parsed-choice-item ${pq.answer === cIdx ? "correct" : ""}`}
+                          >
+                            {String.fromCharCode(65 + cIdx)}. {ch} {pq.answer === cIdx ? "✓" : ""}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div style={{ marginTop: "0.75rem", display: "flex", justifyContent: "flex-end" }}>
+                <button
+                  className="ts-cat-modal-apply-btn"
+                  onClick={handleImportTextSubmit}
+                  disabled={parsedPreview.length === 0}
+                  style={{ opacity: parsedPreview.length === 0 ? 0.5 : 1, cursor: parsedPreview.length === 0 ? "not-allowed" : "pointer" }}
+                >
+                  📥 Import &amp; Save to Database
+                </button>
+              </div>
             </div>
           </div>
         )}
