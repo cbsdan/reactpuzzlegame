@@ -102,7 +102,11 @@ const TriviaChallengeAdminDashboard = () => {
         </div>
         <div className="tc-config-item">
           <span className="tc-config-label">Assigned Category:</span>
-          <span className="tc-config-val">{selectedCategory}</span>
+          <span className="tc-config-val">
+            {Array.isArray(triviaConfig.roundCategories) && triviaConfig.roundCategories.length > 0
+              ? triviaConfig.roundCategories.map((rc, idx) => `R${idx + 1}: ${rc}`).join(" | ")
+              : selectedCategory}
+          </span>
         </div>
         {categoryNames.length > 0 && (
           <div className="tc-config-item">
