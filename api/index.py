@@ -146,11 +146,13 @@ def join_room():
         if not room:
             return jsonify({'success': False, 'error': 'Invalid room passkey'}), 404
         
-        # Check if game is already in progress
+        # Check if game is already in progress (allow trivia-challenge to be joined in progress)
         game_states = db['gamestate']
         game_state = game_states.find_one({'roomId': room['_id']})
         if game_state and game_state.get('status', 'idle') != 'idle':
-            return jsonify({'success': False, 'error': 'Game is already in progress. You cannot join right now.'}), 403
+            game_type = game_state.get('gameType')
+            if game_type != 'trivia-challenge':
+                return jsonify({'success': False, 'error': 'Game is already in progress. You cannot join right now.'}), 403
         
         # Add player to room
         new_player = {
