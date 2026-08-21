@@ -852,3 +852,183 @@ def submit_trivia_answer(room_id):
 
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ── Plain Text Question Importer API ────────────────────────────────
+import re
+
+def parse_plain_text_questions(raw_text, default_difficulty=1):
+    """
+    Parses plain text containing questions in the format:
+    1. Question text
+    A. Choice 1
+    B. Choice 2
+    C. Choice 3
+    D. Choice 4
+    Answer: B
+    """
+    if not raw_text or not isinstance(raw_text, str):
+        return []
+
+    text = raw_text.replace('\r\n', '\n').replace('\r', '\n').strip()
+    if not text:
+        return []
+
+    lines = [line.strip() for line in text.split('\n')]
+    blocks = []
+    current_block = []
+
+    question_start_re = re.compile(r'^(?:\d+[\.\)]|Q\d+[:\.]?)\s*', re.IGNORECASE)
+
+    for line in lines:
+        if not line:
+            if current_block:
+                blocks.append(current_block)
+                current_block = []
+            continue
+
+        has_answer = any(re.match(r'^(?:Answer|Ans|Correct)[:\s]', l, re.IGNORECASE) for l in current_block)
+        if question_start_re.match(line) and current_block and (has_answer or len(current_block) >= 3):
+            blocks.append(current_block)
+            current_block = []
+
+        current_block.append(line)
+
+    if current_block:
+        blocks.append(current_block)
+
+    parsed_questions = []
+
+    for block in blocks:
+        q_text = ""
+        choices = []
+        answer_str = ""
+
+        choice_re = re.compile(r'^(?:[A-Da-d0-9][\.\)]|[A-Da-d0-9]\s*[-–—])\s*(.+)')
+        answer_re = re.compile(r'^(?:Answer|Ans|Correct)[:\s]*\s*(.+)', re.IGNORECASE)
+
+        for line in block:
+            ans_match = answer_re.match(line)
+            if ans_match:
+                answer_str = ans_match.group(1).strip()
+                continue
+
+            choice_match = choice_re.match(line)
+            if choice_match:
+                choices.append(choice_match.group(1).strip())
+                continue
+
+            if not choices and not answer_str:
+                clean_line = question_start_re.sub('', line).strip()
+                if clean_line:
+                    if q_text:
+                        q_text += " " + clean_line
+                    else:
+                        q_text = clean_line
+
+        if not q_text or len(choices) < 2:
+            continue
+
+        answer_idx = 0
+        if answer_str:
+            upper_ans = answer_str.strip().upper()
+            if len(upper_ans) == 1 and 'A' <= upper_ans <= 'Z':
+                answer_idx = ord(upper_ans) - ord('A')
+            elif upper_ans.isdigit():
+                idx = int(upper_ans)
+                answer_idx = idx - 1 if idx >= 1 else 0
+            else:
+                found = False
+                for idx, c in enumerate(choices):
+                    if c.lower() == answer_str.lower():
+                        answer_idx = idx
+                        found = True
+                        break
+                if not found:
+                    answer_idx = 0
+
+        answer_idx = max(0, min(len(choices) - 1, answer_idx))
+
+        parsed_questions.append({
+            'question': q_text,
+            'difficulty': max(1, min(5, int(default_difficulty))),
+            'choices': choices,
+            'answer': answer_idx
+        })
+
+    return parsed_questions
+
+
+@trivia_challenge_bp.route('/api/trivia/import-text', methods=['POST'])
+def import_text():
+    db = get_database()
+    if db is None:
+        return jsonify({'success': False, 'error': 'Database not configured'}), 503
+
+    try:
+        data = request.get_json() or {}
+        cat_id = data.get('categoryId') or data.get('category_id')
+        cat_name = str(data.get('categoryName') or data.get('category_name') or '').strip()
+        raw_text = data.get('text', '')
+        difficulty = int(data.get('difficulty', 1))
+
+        if not raw_text:
+            return jsonify({'success': False, 'error': 'Question text content is required'}), 400
+
+        categories_coll = db['trivia_categories']
+        questions_coll = db['trivia_questions']
+
+        target_cat = None
+        if cat_id:
+            c_oid = parse_object_id(cat_id)
+            if c_oid:
+                target_cat = categories_coll.find_one({'_id': c_oid})
+
+        if not target_cat and cat_name:
+            target_cat = categories_coll.find_one({'name': {'$regex': f'^{cat_name}$', '$options': 'i'}})
+            if not target_cat:
+                now = datetime.now(timezone.utc)
+                doc = {'name': cat_name, 'icon': '❓', 'createdAt': now, 'updatedAt': now}
+                res = categories_coll.insert_one(doc)
+                doc['_id'] = res.inserted_id
+                target_cat = doc
+
+        if not target_cat:
+            first_cat = categories_coll.find_one()
+            if first_cat:
+                target_cat = first_cat
+            else:
+                return jsonify({'success': False, 'error': 'No valid category found or specified'}), 400
+
+        parsed = parse_plain_text_questions(raw_text, default_difficulty=difficulty)
+        if not parsed:
+            return jsonify({'success': False, 'error': 'Could not parse any valid questions from the text provided.'}), 400
+
+        now = datetime.now(timezone.utc)
+        inserted_questions = []
+
+        for q in parsed:
+            q_doc = {
+                'categoryId': target_cat['_id'],
+                'question': q['question'],
+                'difficulty': q['difficulty'],
+                'choices': q['choices'],
+                'answer': q['answer'],
+                'createdAt': now,
+                'updatedAt': now
+            }
+            res = questions_coll.insert_one(q_doc)
+            q_doc['_id'] = res.inserted_id
+            inserted_questions.append(serialize_question(q_doc))
+
+        return jsonify({
+            'success': True,
+            'count': len(inserted_questions),
+            'categoryId': str(target_cat['_id']),
+            'categoryName': target_cat.get('name', ''),
+            'questions': inserted_questions
+        }), 201
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
