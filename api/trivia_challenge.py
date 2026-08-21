@@ -819,7 +819,12 @@ def submit_trivia_answer(room_id):
             prev_correct = tc.get('correctAnswers', 0)
             prev_total_time = float(tc.get('totalTimeTaken', 0.0))
 
-        new_correct = prev_correct + (1 if is_correct else 0)
+        correct_answers_param = data.get('correctAnswers')
+        if correct_answers_param is not None:
+            new_correct = max(0, int(correct_answers_param))
+        else:
+            new_correct = prev_correct + (1 if is_correct else 0)
+
         new_total_time = total_time_taken if total_time_taken > 0 else (prev_total_time + time_taken)
 
         update_fields = {
