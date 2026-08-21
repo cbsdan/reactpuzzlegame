@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useGame } from "../../context/GameContext";
 import DEFAULT_TRIVIA_QUESTIONS from "./triviaQuestions";
 import "./TriviaChallengeGame.css";
@@ -25,8 +25,8 @@ const TriviaChallengeGame = () => {
   const timerSeconds = triviaConfig.timerSeconds || 15;
   const selectedCategory = triviaConfig.selectedCategory || "All";
 
-  // Build list of active questions for this session based on Admin configuration
-  const buildGameQuestions = () => {
+  // Build list of active questions for this session based on Admin configuration (memoized)
+  const gameQuestions = useMemo(() => {
     let list = [];
     const catKeys = Object.keys(questionsData);
 
@@ -57,9 +57,8 @@ const TriviaChallengeGame = () => {
     }
 
     return list.slice(0, totalNeeded);
-  };
+  }, [questionsData, selectedCategory, totalRounds, questionsPerRound]);
 
-  const gameQuestions = buildGameQuestions();
   const totalPossibleQuestions = Math.min(totalRounds * questionsPerRound, gameQuestions.length);
 
   // ── Local game state (initialized from player history for async play) ──
@@ -118,7 +117,7 @@ const TriviaChallengeGame = () => {
       startTimer();
     }
     return () => stopTimer();
-  }, [phase, totalQuestionsAnswered, startTimer, stopTimer, currentQ]);
+  }, [phase, totalQuestionsAnswered, startTimer, stopTimer]);
 
   // Auto-submit when timer runs out
   useEffect(() => {
