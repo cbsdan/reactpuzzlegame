@@ -38,8 +38,11 @@ const Admin = () => {
     if (action === 'start') {
       if (selectedGame === 'stickman-mystery' && stickmanConfig) {
         config = { stickmanConfig };
-      } else if (selectedGame === 'trivia-challenge' && triviaConfig) {
-        config = { triviaConfig };
+      } else if (selectedGame === 'trivia-challenge') {
+        const activeTriviaConfig = triviaConfig || gameState?.triviaConfig;
+        if (activeTriviaConfig) {
+          config = { triviaConfig: activeTriviaConfig };
+        }
       }
     }
     await adminAction(action, gameType, config);
@@ -196,6 +199,7 @@ const Admin = () => {
             <div className="stickman-settings-overlay">
               <div className="stickman-settings-modal">
                 <TriviaSettings
+                  initialConfig={triviaConfig || gameState?.triviaConfig}
                   onSave={async (cfg) => {
                     setTriviaConfig(cfg);
                     setShowTriviaSettings(false);
