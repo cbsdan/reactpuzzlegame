@@ -117,7 +117,7 @@ const TriviaChallengeGame = () => {
   const timerRef = useRef(null);
   const answeredRef = useRef(false);
 
-  const currentQ = gameQuestions[totalQuestionsAnswered] || null;
+  const [currentQ, setCurrentQ] = useState(gameQuestions[initialAnswered] || null);
 
   // ── Timer logic ──────────────────────────────────────────────
   const stopTimer = useCallback(() => {
@@ -276,6 +276,7 @@ const TriviaChallengeGame = () => {
         });
         setPhase("round_complete");
       } else {
+       setCurrentQ(gameQuestions[newQAnswered]); // ← load next question AFTER delay
         setSelectedAnswer(null);
         setIsCorrect(null);
         answeredRef.current = false;
