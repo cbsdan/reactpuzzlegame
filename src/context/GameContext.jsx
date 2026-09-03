@@ -28,6 +28,23 @@ export const GameProvider = ({ children }) => {
   const [userRole, setUserRole] = useState(null); // 'admin' or 'player'
   const [initialized, setInitialized] = useState(false);
   const [removedNotification, setRemovedNotification] = useState(false);
+  // Room ID detected from ?room= URL parameter (link-based join)
+  const [linkRoomId, setLinkRoomId] = useState(() => {
+    try {
+      const searchVal = new URLSearchParams(window.location.search).get('room');
+      if (searchVal) return searchVal.trim();
+      if (window.location.hash) {
+        const hashClean = window.location.hash.replace(/^#\/?\??/, '');
+        const hashVal = new URLSearchParams(hashClean).get('room');
+        if (hashVal) return hashVal.trim();
+      }
+      const match = window.location.href.match(/[?&]room=([a-f0-9]+)/i);
+      if (match) return match[1].trim();
+      return null;
+    } catch {
+      return null;
+    }
+  });
   const pollingRef = useRef(null);
 
   const API_URL = import.meta.env.VITE_API_URL || "";
@@ -277,6 +294,52 @@ export const GameProvider = ({ children }) => {
     }
   };
 
+  // Join a room by ID (link-based join — no passkey required)
+  const joinRoomById = async (roomId, playerName) => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_URL}/api/rooms/${roomId}/join-by-id`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerName }),
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.player) {
+        setCurrentRoom(data.room);
+        setCurrentPlayer(data.player);
+        setUserRole("player");
+        setGameState(data.room.gameState);
+        setCurrentVersion(data.room.gameState?.version || 0);
+        setPlayers(data.room.players || []);
+        setCurrentPlayersCount((data.room.players || []).length);
+        setRemovedNotification(false);
+        // Clear the ?room= param from the URL so it doesn't persist on reload
+        setLinkRoomId(null);
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('room');
+          window.history.replaceState({}, '', url.toString());
+        } catch {}
+        saveSession(
+          data.room,
+          "player",
+          data.player,
+          data.room.gameState?.version || 0,
+        );
+        return { success: true, player: data.player, room: data.room };
+      }
+
+      return { success: false, error: data.error || "Failed to join room" };
+    } catch (error) {
+      console.error("Failed to join room by ID:", error);
+      return { success: false, error: error.message };
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Add player (for players in a room)
   const addPlayer = async (name) => {
     if (!currentRoom) {
@@ -509,8 +572,10 @@ export const GameProvider = ({ children }) => {
     userRole,
     removedNotification,
     clearRemovedNotification,
+    linkRoomId,
     createRoom,
     joinRoom,
+    joinRoomById,
     addPlayer,
     removePlayer,
     exitGame,
