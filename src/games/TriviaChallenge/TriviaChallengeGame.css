@@ -233,6 +233,38 @@
   font-weight: 600;
 }
 
+.trivia-q-difficulty-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  transition: all 0.25s ease;
+}
+
+.trivia-diff-label {
+  font-weight: 700;
+}
+
+.trivia-diff-pts {
+  font-size: 0.75rem;
+  opacity: 0.88;
+  padding: 0.1rem 0.4rem;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.trivia-diff-dots {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
 .trivia-q-difficulty {
   display: flex;
   align-items: center;
@@ -240,11 +272,11 @@
 }
 
 .trivia-diff-dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: rgba(255,255,255,0.15);
-  transition: background 0.2s;
+  background: rgba(255,255,255,0.18);
+  transition: all 0.2s;
 }
 
 .trivia-diff-dot.active {

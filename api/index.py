@@ -436,13 +436,16 @@ def room_admin_action(room_id):
                     else:
                         additional_updates['stickmanConfig'] = None
                 elif game_type == 'trivia-challenge':
+                    import random
                     trivia_config = data.get('triviaConfig')
                     if trivia_config:
-                        additional_updates['triviaConfig'] = trivia_config
+                        trivia_config = dict(trivia_config)
                     elif existing_state and existing_state.get('triviaConfig'):
-                        additional_updates['triviaConfig'] = existing_state.get('triviaConfig')
+                        trivia_config = dict(existing_state.get('triviaConfig'))
                     else:
-                        additional_updates['triviaConfig'] = {}
+                        trivia_config = {}
+                    trivia_config['gameSeed'] = random.randint(100000, 999999)
+                    additional_updates['triviaConfig'] = trivia_config
             # Reset all player progress for the new game
             players_collection.update_many(
                 {'roomId': room_oid},
