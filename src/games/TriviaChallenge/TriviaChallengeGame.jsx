@@ -16,7 +16,7 @@ const LETTERS = ["A", "B", "C", "D"];
 const TriviaChallengeGame = () => {
   const { gameState, players, currentPlayer, submitTriviaAnswer } = useGame();
 
-  // ── Derive config from server gameState ──────────────────────
+  // ── Derive config from server gameState ───────────────────────────────────
   const triviaConfig = gameState?.triviaConfig || {};
   const questionsData = triviaConfig.questions || DEFAULT_TRIVIA_QUESTIONS;
   const totalRounds = triviaConfig.rounds || 3;
@@ -25,6 +25,10 @@ const TriviaChallengeGame = () => {
   const timerSeconds = triviaConfig.timerSeconds || 15;
   const selectedCategory = triviaConfig.selectedCategory || "All";
   const roundCategories = triviaConfig.roundCategories || [];
+  const allowPlayerCategoryChoice = triviaConfig.allowPlayerCategoryChoice || false;
+
+  // Player's locally chosen category (overrides admin assignment when allowPlayerCategoryChoice is on)
+  const [playerCategory, setPlayerCategory] = useState(null);
 
   // Build list of active questions for this session based on Admin per-round configuration (memoized)
   const gameQuestions = useMemo(() => {
@@ -33,7 +37,9 @@ const TriviaChallengeGame = () => {
     const usedIndicesByCat = {};
 
     for (let r = 0; r < totalRounds; r++) {
-      const assignedCat = roundCategories[r] || selectedCategory || "All";
+      // If player chose their own category, use it for every round
+      const assignedCat = playerCategory ||
+        roundCategories[r] || selectedCategory || "All";
       let roundPool = [];
 
       if (assignedCat !== "All" && questionsData[assignedCat]) {
@@ -77,7 +83,7 @@ const TriviaChallengeGame = () => {
     }
 
     return allQuestionsList.slice(0, totalRounds * questionsPerRound);
-  }, [questionsData, selectedCategory, roundCategories, totalRounds, questionsPerRound]);
+  }, [questionsData, selectedCategory, roundCategories, totalRounds, questionsPerRound, playerCategory]);
 
   const totalPossibleQuestions = Math.min(totalRounds * questionsPerRound, gameQuestions.length);
 
@@ -90,7 +96,13 @@ const TriviaChallengeGame = () => {
   const initialRound = tcSaved.currentRound || 1;
   const isAlreadyCompleted = tcSaved.completed || (initialAnswered >= totalPossibleQuestions && totalPossibleQuestions > 0);
 
-  const [phase, setPhase] = useState(isAlreadyCompleted ? "complete" : "question");
+  const [phase, setPhase] = useState(
+    isAlreadyCompleted
+      ? "complete"
+      : allowPlayerCategoryChoice && !playerCategory
+      ? "category_pick"
+      : "question"
+  );
   const [totalScore, setTotalScore] = useState(initialScore);
   const [totalCorrectAnswers, setTotalCorrectAnswers] = useState(initialCorrect);
   const [totalQuestionsAnswered, setTotalQuestionsAnswered] = useState(initialAnswered);
@@ -150,6 +162,14 @@ const TriviaChallengeGame = () => {
     }
     return () => stopTimer();
   }, [phase, totalQuestionsAnswered, startTimer, stopTimer]);
+
+  // Sync currentQ when playerCategory changes (gameQuestions gets rebuilt)
+  useEffect(() => {
+    if (playerCategory) {
+      setCurrentQ(gameQuestions[totalQuestionsAnswered] || null);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playerCategory]);
 
   // Auto-submit when timer runs out
   useEffect(() => {
@@ -290,12 +310,38 @@ const TriviaChallengeGame = () => {
   };
 
   const handleContinueNextRound = () => {
+    if (allowPlayerCategoryChoice) {
+      setPlayerCategory(null);
+      setPhase("category_pick");
+    } else {
+      setSelectedAnswer(null);
+      setIsCorrect(null);
+      answeredRef.current = false;
+      setPhase("question");
+      startTimer();
+    }
+  };
+
+  // Handler when player selects a category
+  const handleCategoryPick = (catName) => {
+    setPlayerCategory(catName);
     setSelectedAnswer(null);
     setIsCorrect(null);
     answeredRef.current = false;
     setPhase("question");
     startTimer();
   };
+
+  // Derived: list of available categories for the player to pick from
+  const availableCategories = Object.keys(questionsData).map((catName) => {
+    const catObj = questionsData[catName];
+    const qs = catObj.questions || catObj;
+    return {
+      name: catName,
+      icon: catObj.icon || "❓",
+      count: Array.isArray(qs) ? qs.length : 0,
+    };
+  }).filter((c) => c.count > 0);
 
   // ── Leaderboard data with Speed Tiebreaker ────────────────────
   const leaderboard = [...players]
@@ -335,6 +381,11 @@ const TriviaChallengeGame = () => {
         <div className="trivia-score-pill">
           ⭐ {totalScore} pts
         </div>
+        {playerCategory && (
+          <div className="trivia-cat-pill">
+            {questionsData[playerCategory]?.icon || "❓"} {playerCategory}
+          </div>
+        )}
         <div className="trivia-players-pill">
           👥 {players.length} player{players.length !== 1 ? "s" : ""}
         </div>
@@ -350,6 +401,34 @@ const TriviaChallengeGame = () => {
           <div className="trivia-progress-fill" style={{ width: `${progressPct}%` }} />
         </div>
       </div>
+
+      {/* ── Phase: Category Pick ────────────────── */}
+      {phase === "category_pick" && (
+        <div className="trivia-category-pick-phase">
+          <div className="trivia-cat-pick-header">
+            <div className="trivia-cat-pick-icon">🎯</div>
+            <h2 className="trivia-cat-pick-title">Choose Your Category</h2>
+            <p className="trivia-cat-pick-sub">
+              Pick the topic you want to answer questions about!
+            </p>
+          </div>
+          <div className="trivia-cat-pick-grid">
+            {availableCategories.map((cat) => (
+              <button
+                key={cat.name}
+                className="trivia-cat-pick-card"
+                onClick={() => handleCategoryPick(cat.name)}
+              >
+                <span className="trivia-cat-pick-card-icon">{cat.icon}</span>
+                <span className="trivia-cat-pick-card-name">{cat.name}</span>
+                <span className="trivia-cat-pick-card-count">
+                  {cat.count} question{cat.count !== 1 ? "s" : ""}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Phase: Question ────────────────── */}
       {phase === "question" && currentQ && (
