@@ -902,6 +902,9 @@
 }
 
 /* ── Stickman Settings overlay + modal (fullscreen) ─── */
+body.stickman-settings-open {
+  overflow: hidden;
+}
 .stickman-settings-overlay {
   position: fixed;
   inset: 0;

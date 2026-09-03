@@ -1196,7 +1196,7 @@ const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
                       });
                       if (rIdx === 0) setSelectedCategory(val);
                     }}
-                    style={{ minWidth: "220px", padding: "6px 10px", borderRadius: "6px" }}
+                    style={{ minWidth: "300px", padding: "6px 10px", borderRadius: "6px" }}
                   >
                     <option value="All">🌟 All Enabled Categories (Mixed)</option>
                     {catOrder.filter((cat) => enabledCats.has(cat)).map((cat) => (
@@ -1394,6 +1394,7 @@ const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
                     className="ts-input"
                     value={importCat}
                     onChange={(e) => setImportCat(e.target.value)}
+                    style = {{width: "150px", textAlign: "left"}}
                   >
                     {catOrder.map((cat) => (
                       <option key={cat} value={cat}>
@@ -1409,6 +1410,7 @@ const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
                     className="ts-input"
                     value={importDifficulty}
                     onChange={(e) => setImportDifficulty(parseInt(e.target.value) || 1)}
+                    style = {{width: "150px", textAlign: "left"}}
                   >
                     <option value={1}>Easy (1★)</option>
                     <option value={2}>Medium (2★)</option>

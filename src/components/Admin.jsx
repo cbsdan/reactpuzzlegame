@@ -28,6 +28,11 @@ const Admin = () => {
     prevStatusRef.current = next;
   }, [gameState?.status]);
 
+  useEffect(() => {
+    document.body.classList.toggle('stickman-settings-open', showTriviaSettings);
+    return () => document.body.classList.remove('stickman-settings-open');
+  }, [showTriviaSettings]);
+
   const handleAction = async (action) => {
     if (action === 'start' && !selectedGame) {
       alert('Please select a game first.');
@@ -184,7 +189,7 @@ const Admin = () => {
 
           {/* Stickman Settings Modal */}
           {showStickmanSettings && (
-            <div className="stickman-settings-overlay">
+            <div className="stickman-settings-overlay stickman-settings-open">
               <div className="stickman-settings-modal">
                 <StickmanSettings
                   onSave={(cfg) => { setStickmanConfig(cfg); setShowStickmanSettings(false); }}
@@ -196,7 +201,7 @@ const Admin = () => {
 
           {/* Trivia Settings Modal */}
           {showTriviaSettings && (
-            <div className="stickman-settings-overlay">
+            <div className="stickman-settings-overlay stickman-settings-open">
               <div className="stickman-settings-modal">
                 <TriviaSettings
                   initialConfig={triviaConfig || gameState?.triviaConfig}
