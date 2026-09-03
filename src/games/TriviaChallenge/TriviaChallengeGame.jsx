@@ -261,6 +261,7 @@ const TriviaChallengeGame = () => {
     const isRoundEnd = newQAnswered % questionsPerRound === 0;
     const isGameEnd = newQAnswered >= totalPossibleQuestions;
 
+    // Give the player time to read the correct answer before moving on
     setTimeout(() => {
       setShowPopup(false);
       if (isGameEnd) {
@@ -280,7 +281,7 @@ const TriviaChallengeGame = () => {
         answeredRef.current = false;
         startTimer();
       }
-    }, 1200);
+    }, 3500);
   };
 
   const handleTimeout = () => {
@@ -545,11 +546,30 @@ const TriviaChallengeGame = () => {
               {isCorrect ? "✅" : "❌"}
             </div>
             <div className={`trivia-popup-text ${isCorrect ? "correct-text" : "wrong-text"}`}>
-              {isCorrect ? "Correct!" : "Wrong!"}
+              {isCorrect ? "Correct!" : selectedAnswer === -1 ? "Time's Up!" : "Wrong!"}
             </div>
             <div className={`trivia-popup-points ${popupPoints === 0 ? "zero" : ""}`}>
               +{popupPoints} pts
             </div>
+            {!isCorrect && currentQ && (
+              <div className="trivia-popup-correct-answer">
+                <span className="trivia-popup-correct-label">✔ Correct Answer:</span>
+                <span className="trivia-popup-correct-text">
+                  {(() => {
+                    const ans = currentQ.answer;
+                    if (typeof ans === "number" && currentQ.choices?.[ans] !== undefined)
+                      return currentQ.choices[ans];
+                    if (typeof ans === "string" && !isNaN(parseInt(ans, 10)) && currentQ.choices?.[parseInt(ans, 10)] !== undefined)
+                      return currentQ.choices[parseInt(ans, 10)];
+                    if (typeof ans === "string" && ans.trim().length === 1) {
+                      const letterIdx = ans.trim().toUpperCase().charCodeAt(0) - 65;
+                      if (currentQ.choices?.[letterIdx] !== undefined) return currentQ.choices[letterIdx];
+                    }
+                    return String(ans);
+                  })()}
+                </span>
+              </div>
+            )}
             {isCorrect && timerEnabled && (
               <div className="trivia-popup-breakdown">
                 <span className="trivia-base-pts">Base: +{scoreBreakdown.base}</span>
