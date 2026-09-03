@@ -679,24 +679,9 @@ def events():
                 if not is_admin:
                     game_state.pop('targetNumber', None)  # only strip for non-admins
                     game_state.pop('mysteryAnswer', None)
-                    # Strip correct answers from trivia questions for players
-                    trivia_cfg = game_state.get('triviaConfig')
-                    if trivia_cfg and isinstance(trivia_cfg, dict):
-                        questions = trivia_cfg.get('questions')
-                        if questions and isinstance(questions, dict):
-                            stripped = {}
-                            for cat_name, cat_data in questions.items():
-                                if isinstance(cat_data, dict):
-                                    qs = cat_data.get('questions', [])
-                                    stripped[cat_name] = {
-                                        **cat_data,
-                                        'questions': [{k: v for k, v in q.items() if k != 'answer'} for q in qs]
-                                    }
-                                elif isinstance(cat_data, list):
-                                    stripped[cat_name] = [{k: v for k, v in q.items() if k != 'answer'} for q in cat_data]
-                                else:
-                                    stripped[cat_name] = cat_data
-                            trivia_cfg['questions'] = stripped
+                    # NOTE: trivia question 'answer' fields are intentionally NOT stripped here.
+                    # The frontend (TriviaChallengeGame) performs all correctness evaluation using
+                    # isAnswerCorrect(), which requires the 'answer' field to determine scoring.
             
             return jsonify({
                 'success': True,
