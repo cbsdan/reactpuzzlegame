@@ -147,6 +147,7 @@ const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
   const [timerEnabled, setTimerEnabled] = useState(() => initialConfig?.timerEnabled !== undefined ? initialConfig.timerEnabled : true);
   const [timerSeconds, setTimerSeconds] = useState(() => initialConfig?.timerSeconds || 15);
   const [selectedCategory, setSelectedCategory] = useState(() => initialConfig?.selectedCategory || "All");
+  const [allowPlayerCategoryChoice, setAllowPlayerCategoryChoice] = useState(() => initialConfig?.allowPlayerCategoryChoice || false);
 
   // Per-round categories array
   const [roundCategories, setRoundCategories] = useState(() => {
@@ -824,6 +825,7 @@ const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
       timerSeconds: Math.max(5, Math.min(60, timerSeconds)),
       selectedCategory,
       roundCategories: roundCategories.slice(0, Math.max(1, Math.min(10, rounds))),
+      allowPlayerCategoryChoice,
       questions,
     });
   };
@@ -1173,6 +1175,22 @@ const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
                     <span className="ts-hint">seconds per question</span>
                   </div>
                 )}
+              </div>
+              <div className="ts-row">
+                <span className="ts-label">Player Category Choice</span>
+                <label className="ts-toggle">
+                  <input
+                    type="checkbox"
+                    checked={allowPlayerCategoryChoice}
+                    onChange={(e) => setAllowPlayerCategoryChoice(e.target.checked)}
+                  />
+                  <span className="ts-toggle-slider" />
+                </label>
+                <span className="ts-hint">
+                  {allowPlayerCategoryChoice
+                    ? "✅ Players will pick their own category before playing"
+                    : "Players use the admin-assigned category per round"}
+                </span>
               </div>
             </div>
 
