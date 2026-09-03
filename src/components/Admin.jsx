@@ -14,7 +14,36 @@ const Admin = () => {
   const [showTriviaSettings, setShowTriviaSettings] = useState(false);
   const [triviaConfig, setTriviaConfig] = useState(null);
   const [viewingPlayer, setViewingPlayer] = useState(null);
+  const [copiedLink, setCopiedLink] = useState(false);
   const prevStatusRef = useRef(gameState?.status);
+
+  const getJoinLink = () => {
+    if (!currentRoom?._id) return '';
+    const origin = window.location.origin;
+    const pathname = window.location.pathname;
+    return `${origin}${pathname}?room=${currentRoom._id}`;
+  };
+
+  const handleCopyLink = async () => {
+    const link = getJoinLink();
+    if (!link) return;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(link);
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = link;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2500);
+    } catch (err) {
+      console.error('Failed to copy link', err);
+    }
+  };
 
   // Auto-fullscreen dashboard when a new game starts; collapse when idle
   useEffect(() => {
@@ -121,6 +150,13 @@ const Admin = () => {
               <span className="passkey-label">Room Code:</span>
               <span className="passkey-value">{currentRoom?.passkey}</span>
             </div>
+            <button
+              className={`share-link-btn ${copiedLink ? 'copied' : ''}`}
+              onClick={handleCopyLink}
+              title="Copy shareable link for players to join with just their name (no passkey needed)"
+            >
+              {copiedLink ? '✓ Link Copied!' : '🔗 Copy Join Link'}
+            </button>
             {gameState && getStatusBadge(gameState.status)}
           </div>
         </div>

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useGame } from "../../context/GameContext";
 import "./TriviaChallengeAdminDashboard.css";
 
@@ -10,7 +11,31 @@ import "./TriviaChallengeAdminDashboard.css";
  *   • Live leaderboard sorted by score
  */
 const TriviaChallengeAdminDashboard = () => {
-  const { players, gameState } = useGame();
+  const { players, gameState, currentRoom } = useGame();
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  const handleCopyLink = async () => {
+    if (!currentRoom?._id) return;
+    const origin = window.location.origin;
+    const pathname = window.location.pathname;
+    const link = `${origin}${pathname}?room=${currentRoom._id}`;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(link);
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = link;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textArea);
+      }
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2500);
+    } catch (err) {
+      console.error("Failed to copy link", err);
+    }
+  };
 
   const triviaConfig = gameState?.triviaConfig || {};
   const totalRounds = triviaConfig.rounds || 3;
@@ -81,6 +106,15 @@ const TriviaChallengeAdminDashboard = () => {
             <span className="tc-pill-val">{avgScore}</span>
             <span className="tc-pill-label">Avg Score</span>
           </div>
+          {currentRoom && (
+            <button
+              className={`tc-share-btn ${copiedLink ? "copied" : ""}`}
+              onClick={handleCopyLink}
+              title="Copy shareable link for players to join with just their name"
+            >
+              {copiedLink ? "✓ Copied!" : "🔗 Share Link"}
+            </button>
+          )}
         </div>
       </div>
 
