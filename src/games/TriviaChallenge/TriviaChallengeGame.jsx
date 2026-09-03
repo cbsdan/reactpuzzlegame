@@ -280,7 +280,7 @@ const TriviaChallengeGame = () => {
         answeredRef.current = false;
         startTimer();
       }
-    }, 1200);
+    }, 2000);
   };
 
   const handleTimeout = () => {
