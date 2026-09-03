@@ -280,6 +280,9 @@ const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
   // { open: bool, targetTab: str | null, targetAction: 'tab'|'cancel'|'close' }
   const [guardDialog, setGuardDialog] = useState({ open: false, targetTab: null, targetAction: null });
 
+  // Reset to defaults confirmation dialog
+  const [confirmResetAllOpen, setConfirmResetAllOpen] = useState(false);
+
   // JSON editor state
   const [jsonText, setJsonText] = useState("");
   const [jsonError, setJsonError] = useState("");
@@ -635,14 +638,24 @@ const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
   /** Reset a default category to built-in questions */
   const resetCategory = (cat) => {
     if (!DEFAULT_TRIVIA_QUESTIONS[cat]) return;
+    const oldEditor = catEditors[cat];
+    if (oldEditor && Array.isArray(oldEditor.questions)) {
+      const idsToDelete = oldEditor.questions.filter((q) => q.dbId).map((q) => q.dbId);
+      if (idsToDelete.length > 0) {
+        setDeletedQIds((prev) => new Set([...prev, ...idsToDelete]));
+      }
+    }
     setCatEditors((prev) => ({
       ...prev,
-      [cat]: buildEditorEntry(
-        DEFAULT_TRIVIA_QUESTIONS[cat].questions,
-        false,
-        DEFAULT_TRIVIA_QUESTIONS[cat].icon,
-        false
-      ),
+      [cat]: {
+        ...buildEditorEntry(
+          DEFAULT_TRIVIA_QUESTIONS[cat].questions,
+          true,
+          DEFAULT_TRIVIA_QUESTIONS[cat].icon,
+          false
+        ),
+        dbId: prev[cat]?.dbId,
+      },
     }));
   };
 
@@ -727,6 +740,92 @@ const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
   const handleResetJson = () => {
     setJsonText(JSON.stringify(DEFAULT_TRIVIA_QUESTIONS, null, 2));
     setJsonError(""); setJsonValid(false); setJsonCustom(false); setJsonDirty(false);
+  };
+
+  /** Reset all categories and questions to built-in defaults in local state and backend MongoDB */
+  const handleResetAllToDefaults = async () => {
+    setLoadingOverlay({
+      active: true,
+      title: "Resetting to Defaults",
+      message: "Restoring default categories and questions in the database...",
+    });
+
+    try {
+      const res = await fetch(`${API_URL}/api/trivia/reset`, { method: "POST" });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.categories) && data.categories.length > 0) {
+        const apiCatNames = data.categories.map((c) => c.name);
+        const editors = {};
+        const catIdMap = {};
+
+        data.categories.forEach((catObj) => {
+          catIdMap[catObj.id] = catObj.name;
+          editors[catObj.name] = {
+            dbId: catObj.id,
+            icon: catObj.icon || "❓",
+            questions: [],
+            modified: false,
+            isCustomCat: false,
+            isDirty: false,
+          };
+        });
+
+        if (Array.isArray(data.questions)) {
+          data.questions.forEach((qObj) => {
+            const catName = catIdMap[qObj.categoryId];
+            if (catName && editors[catName]) {
+              editors[catName].questions.push({
+                dbId: qObj.id,
+                question: qObj.question,
+                difficulty: qObj.difficulty,
+                choices: qObj.choices,
+                answer: qObj.answer,
+              });
+            }
+          });
+        }
+
+        setCatOrder(apiCatNames);
+        setEnabledCats(new Set(apiCatNames));
+        setCatEditors(editors);
+      } else {
+        const init = {};
+        DEFAULT_CATS.forEach((cat) => {
+          init[cat] = buildEditorEntry(
+            DEFAULT_TRIVIA_QUESTIONS[cat].questions,
+            false,
+            DEFAULT_TRIVIA_QUESTIONS[cat].icon,
+            false
+          );
+        });
+        setCatEditors(init);
+        setCatOrder(DEFAULT_CATS);
+        setEnabledCats(new Set(DEFAULT_CATS));
+      }
+    } catch (err) {
+      console.error("Failed to reset trivia to defaults via API:", err);
+      const init = {};
+      DEFAULT_CATS.forEach((cat) => {
+        init[cat] = buildEditorEntry(
+          DEFAULT_TRIVIA_QUESTIONS[cat].questions,
+          false,
+          DEFAULT_TRIVIA_QUESTIONS[cat].icon,
+          false
+        );
+      });
+      setCatEditors(init);
+      setCatOrder(DEFAULT_CATS);
+      setEnabledCats(new Set(DEFAULT_CATS));
+    } finally {
+      setDeletedQIds(new Set());
+      setJsonText(JSON.stringify(DEFAULT_TRIVIA_QUESTIONS, null, 2));
+      setJsonCustom(false);
+      setJsonValid(false);
+      setJsonDirty(false);
+      setEditingCat(null);
+      setConfirmResetAllOpen(false);
+      setLoadingOverlay({ active: false, title: "", message: "" });
+    }
   };
 
   /* ══════════════════════════════════════
@@ -904,6 +1003,39 @@ const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
                 onClick={() => setGuardDialog({ open: false, targetTab: null, targetAction: null })}
               >
                 Stay Here
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Reset to defaults confirmation dialog ── */}
+      {confirmResetAllOpen && (
+        <div className="ts-guard-overlay" onClick={() => setConfirmResetAllOpen(false)}>
+          <div className="ts-guard-dialog" onClick={(e) => e.stopPropagation()}>
+            <div className="ts-guard-icon">⚠️</div>
+            <h3 className="ts-guard-title">Reset All to Defaults?</h3>
+            <p className="ts-guard-body">
+              This will restore all default trivia categories and questions, reverting all edits and removing any newly added custom categories.
+            </p>
+            <div className="ts-guard-actions">
+              <button
+                className="ts-guard-discard-btn"
+                style={{
+                  background: "linear-gradient(135deg, #dc2626, #b91c1c)",
+                  color: "#ffffff",
+                  borderColor: "#ef4444",
+                  fontWeight: 700
+                }}
+                onClick={handleResetAllToDefaults}
+              >
+                ↺ Yes, Reset All to Defaults
+              </button>
+              <button
+                className="ts-guard-stay-btn"
+                onClick={() => setConfirmResetAllOpen(false)}
+              >
+                Cancel
               </button>
             </div>
           </div>
@@ -1131,8 +1263,8 @@ const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
             {jsonDirty && !jsonCustom && <span className="ts-tab-badge ts-tab-badge-warn">● Unsaved</span>}
           </button>
           <div className="ts-tab-spacer" />
-          {tab === "json" && (
-            <button className="ts-reset-btn" onClick={handleResetJson}>
+          {(tab === "questions" || tab === "json") && (
+            <button className="ts-reset-btn" onClick={() => setConfirmResetAllOpen(true)}>
               ↺ Reset to Defaults
             </button>
           )}
@@ -1318,13 +1450,22 @@ const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
             {/* ── Add New Category — toggle form ── */}
             <div className="ts-add-cat-section">
               {!showAddCatForm ? (
-                /* Collapsed state: just the button */
-                <button
-                  className="ts-add-cat-toggle-btn"
-                  onClick={() => setShowAddCatForm(true)}
-                >
-                  ➕ Add New Category
-                </button>
+                /* Collapsed state: add category and reset buttons */
+                <div className="ts-add-cat-actions-row">
+                  <button
+                    className="ts-add-cat-toggle-btn"
+                    onClick={() => setShowAddCatForm(true)}
+                  >
+                    ➕ Add New Category
+                  </button>
+                  <button
+                    className="ts-reset-all-cats-btn"
+                    onClick={() => setConfirmResetAllOpen(true)}
+                    title="Restore all default trivia questions and categories"
+                  >
+                    ↺ Reset to Defaults
+                  </button>
+                </div>
               ) : (
                 /* Expanded form */
                 <>
