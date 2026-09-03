@@ -179,6 +179,92 @@ def join_room():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/rooms/<room_id>/info', methods=['GET'])
+def get_room_info(room_id):
+    """Public room info for link-based join — does NOT expose the passkey."""
+    db = get_database()
+    if db is None:
+        return jsonify({'success': False, 'error': 'Database not configured'}), 503
+
+    try:
+        room_oid = ObjectId(room_id)
+        rooms = db['rooms']
+        room = rooms.find_one({'_id': room_oid, 'isActive': True})
+
+        if not room:
+            return jsonify({'success': False, 'error': 'Room not found or is no longer active'}), 404
+
+        game_states = db['gamestate']
+        game_state = game_states.find_one({'roomId': room_oid})
+
+        return jsonify({
+            'success': True,
+            'room': {
+                'id': str(room['_id']),
+                'isActive': room.get('isActive', True),
+                'status': game_state.get('status', 'idle') if game_state else 'idle',
+                'gameType': game_state.get('gameType') if game_state else None,
+            }
+        }), 200
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/rooms/<room_id>/join-by-id', methods=['POST'])
+def join_room_by_id(room_id):
+    """Join a room using its ID (from a share link) — only playerName is required, no passkey."""
+    db = get_database()
+    if db is None:
+        return jsonify({'success': False, 'error': 'Database not configured'}), 503
+
+    try:
+        data = request.get_json() or {}
+        player_name = data.get('playerName', '').strip()
+
+        if not player_name:
+            return jsonify({'success': False, 'error': 'Player name is required'}), 400
+
+        room_oid = ObjectId(room_id)
+        rooms = db['rooms']
+        players_collection = db['players']
+
+        room = rooms.find_one({'_id': room_oid, 'isActive': True})
+        if not room:
+            return jsonify({'success': False, 'error': 'Room not found or is no longer active'}), 404
+
+        # Same in-progress guard as the passkey join
+        game_states = db['gamestate']
+        game_state = game_states.find_one({'roomId': room_oid})
+        if game_state and game_state.get('status', 'idle') != 'idle':
+            game_type = game_state.get('gameType')
+            if game_type != 'trivia-challenge':
+                return jsonify({'success': False, 'error': 'Game is already in progress. You cannot join right now.'}), 403
+
+        new_player = {
+            'roomId': room_oid,
+            'name': player_name,
+            'score': 0,
+            'joinedAt': datetime.utcnow(),
+            'isActive': True
+        }
+
+        result = players_collection.insert_one(new_player)
+        new_player['_id'] = str(result.inserted_id)
+        new_player['roomId'] = str(new_player['roomId'])
+
+        full_room = get_room_by_id(db, str(room_oid))
+
+        return jsonify({
+            'success': True,
+            'player': new_player,
+            'room': full_room
+        }), 201
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/api/rooms/<room_id>/players', methods=['GET', 'POST'])
 def room_players(room_id):
     db = get_database()
