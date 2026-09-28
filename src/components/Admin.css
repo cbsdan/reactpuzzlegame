@@ -1043,3 +1043,132 @@ body.stickman-settings-open {
   background: linear-gradient(90deg, #2196f3, #00e676);
   transition: width 0.5s ease;
 }
+
+/* ── Pre-start Trivia Validation Dialog ─────────────────── */
+.admin-validation-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.admin-validation-dialog {
+  background: linear-gradient(145deg, #161b22, #0d1117);
+  border: 1px solid #30363d;
+  border-radius: 14px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255,255,255,0.04);
+  padding: 2rem 2.25rem;
+  max-width: 500px;
+  width: 100%;
+  text-align: center;
+}
+
+.admin-validation-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.admin-validation-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #f87171;
+  margin: 0 0 0.75rem;
+}
+
+.admin-validation-body {
+  font-size: 0.875rem;
+  color: #c9d1d9;
+  margin: 0 0 0.5rem;
+  line-height: 1.55;
+}
+
+.admin-validation-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.75rem;
+  text-align: left;
+  background: rgba(248, 113, 113, 0.06);
+  border: 1px solid rgba(248, 113, 113, 0.18);
+  border-radius: 7px;
+  padding: 0.55rem 1rem;
+}
+
+.admin-validation-list li {
+  font-size: 0.84rem;
+  color: #fca5a5;
+  padding: 0.2rem 0;
+  line-height: 1.6;
+}
+
+.admin-validation-suggestion {
+  font-size: 0.84rem;
+  color: #94a3b8;
+  margin: 0 0 1.25rem;
+  line-height: 1.55;
+  background: rgba(74, 222, 128, 0.05);
+  border: 1px solid rgba(74, 222, 128, 0.15);
+  border-radius: 7px;
+  padding: 0.5rem 0.85rem;
+  text-align: left;
+}
+
+.admin-validation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: center;
+}
+
+.admin-val-fix-btn {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.55rem 1.1rem;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.18s, transform 0.15s;
+}
+.admin-val-fix-btn:hover {
+  opacity: 0.88;
+  transform: translateY(-1px);
+}
+
+.admin-val-settings-btn {
+  background: linear-gradient(135deg, #1d4ed8, #1e40af);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.55rem 1rem;
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.18s, transform 0.15s;
+}
+.admin-val-settings-btn:hover {
+  opacity: 0.88;
+  transform: translateY(-1px);
+}
+
+.admin-val-cancel-btn {
+  background: transparent;
+  color: #8b949e;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 0.55rem 1rem;
+  font-size: 0.84rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s;
+}
+.admin-val-cancel-btn:hover {
+  background: rgba(255,255,255,0.06);
+  color: #c9d1d9;
+}
+

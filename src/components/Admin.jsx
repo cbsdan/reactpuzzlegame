@@ -16,6 +16,9 @@ const Admin = () => {
   const [viewingPlayer, setViewingPlayer] = useState(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const prevStatusRef = useRef(gameState?.status);
+  // Pre-start validation dialog for Trivia Challenge
+  const [startValidationDialog, setStartValidationDialog] = useState(null);
+  // null | { offenders: [{name, count}], suggestedMax: number, pendingConfig: object }
 
   const getJoinLink = () => {
     if (!currentRoom?._id) return '';
@@ -62,6 +65,24 @@ const Admin = () => {
     return () => document.body.classList.remove('stickman-settings-open');
   }, [showTriviaSettings]);
 
+  /**
+   * Validate that every active trivia category has at least questionsPerRound questions.
+   * Returns an array of { name, count } for categories that are short, or [] if all OK.
+   */
+  const validateTriviaBeforeStart = (cfg) => {
+    if (!cfg || !cfg.questions || typeof cfg.questions !== 'object') return [];
+    const qpr = Math.max(1, cfg.questionsPerRound || 5);
+    const offenders = [];
+    for (const [catName, catData] of Object.entries(cfg.questions)) {
+      const qs = Array.isArray(catData?.questions) ? catData.questions
+        : Array.isArray(catData) ? catData : [];
+      if (qs.length < qpr) {
+        offenders.push({ name: catName, count: qs.length });
+      }
+    }
+    return offenders;
+  };
+
   const handleAction = async (action) => {
     if (action === 'start' && !selectedGame) {
       alert('Please select a game first.');
@@ -76,6 +97,16 @@ const Admin = () => {
         const activeTriviaConfig = triviaConfig || gameState?.triviaConfig;
         if (activeTriviaConfig) {
           config = { triviaConfig: activeTriviaConfig };
+        }
+        // ── Double-validation: check question counts before starting ──
+        const cfgToCheck = activeTriviaConfig;
+        if (cfgToCheck) {
+          const offenders = validateTriviaBeforeStart(cfgToCheck);
+          if (offenders.length > 0) {
+            const suggestedMax = Math.min(...offenders.map((o) => o.count));
+            setStartValidationDialog({ offenders, suggestedMax, pendingConfig: cfgToCheck });
+            return; // block start
+          }
         }
       }
     }
@@ -142,6 +173,65 @@ const Admin = () => {
 
   return (
     <div className="admin-container">
+
+      {/* ── Trivia pre-start validation dialog ── */}
+      {startValidationDialog && (
+        <div className="admin-validation-overlay">
+          <div className="admin-validation-dialog">
+            <div className="admin-validation-icon">🚫</div>
+            <h3 className="admin-validation-title">Cannot Start — Not Enough Questions</h3>
+            <p className="admin-validation-body">
+              The following categories have <strong>fewer questions than the current
+              "Questions / Round" setting
+              ({startValidationDialog.pendingConfig?.questionsPerRound ?? '?'})</strong>:
+            </p>
+            <ul className="admin-validation-list">
+              {startValidationDialog.offenders.map(({ name, count }) => (
+                <li key={name}>
+                  <strong>{name}</strong>: only <strong>{count}</strong> question{count !== 1 ? 's' : ''}
+                </li>
+              ))}
+            </ul>
+            <p className="admin-validation-suggestion">
+              💡 <strong>Suggestion:</strong> Reduce <em>Questions / Round</em> to{' '}
+              <strong style={{ color: '#4ade80' }}>{startValidationDialog.suggestedMax}</strong>{' '}
+              or lower, or open ⚙️ Settings to add more questions.
+            </p>
+            <div className="admin-validation-actions">
+              <button
+                className="admin-val-fix-btn"
+                onClick={async () => {
+                  // Patch the config with the safe questionsPerRound and start
+                  const fixed = {
+                    ...startValidationDialog.pendingConfig,
+                    questionsPerRound: startValidationDialog.suggestedMax,
+                  };
+                  setTriviaConfig(fixed);
+                  setStartValidationDialog(null);
+                  await adminAction('start', 'trivia-challenge', { triviaConfig: fixed });
+                }}
+              >
+                ✅ Use {startValidationDialog.suggestedMax} Questions / Round &amp; Start
+              </button>
+              <button
+                className="admin-val-settings-btn"
+                onClick={() => {
+                  setStartValidationDialog(null);
+                  setShowTriviaSettings(true);
+                }}
+              >
+                ⚙️ Open Settings
+              </button>
+              <button
+                className="admin-val-cancel-btn"
+                onClick={() => setStartValidationDialog(null)}
+              >
+                ✕ Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="admin-header">
         <div className="header-content">
           <h1>🎮 Game Admin</h1>

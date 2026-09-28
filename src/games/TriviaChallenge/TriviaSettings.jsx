@@ -290,6 +290,11 @@ const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
   const [jsonCustom, setJsonCustom] = useState(false);
   // Track whether admin has manually typed into JSON editor
   const [jsonDirty, setJsonDirty] = useState(false);
+  // Categories that have fewer questions than questionsPerRound
+  // [ { name, count } ]
+  const [jsonQtyWarning, setJsonQtyWarning] = useState([]);
+  // Blocking dialog shown when admin tries to save with qty issues
+  const [saveBlockDialog, setSaveBlockDialog] = useState({ open: false, offenders: [], suggestedMax: 0 });
 
   /* ── Derived dirty state ── */
   const hasUnappliedEdits = useMemo(
@@ -766,6 +771,16 @@ const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
       const validCatSet = new Set(["All", ...newCatNames]);
       setRoundCategories((prev) => prev.map((rc) => (validCatSet.has(rc) ? rc : "All")));
       setSelectedCategory((prev) => (newCatNames.includes(prev) || prev === "All" ? prev : "All"));
+
+      // ── Quantity check: flag categories with fewer questions than questionsPerRound ──
+      const offenders = newCatNames
+        .map((catName) => {
+          const catData = parsed[catName];
+          const qs = Array.isArray(catData.questions) ? catData.questions : Array.isArray(catData) ? catData : [];
+          return { name: catName, count: qs.length };
+        })
+        .filter(({ count }) => count < questionsPerRound);
+      setJsonQtyWarning(offenders);
     } catch (e) {
       setJsonError("Invalid JSON: " + e.message);
     }
@@ -883,6 +898,13 @@ const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
      Save — FIX: include deleted questions sync & loading screen
   ══════════════════════════════════════ */
   const handleSave = async () => {
+    // Block save if any category has fewer questions than questionsPerRound
+    if (jsonQtyWarning.length > 0) {
+      const suggestedMax = Math.min(...jsonQtyWarning.map((o) => o.count));
+      setSaveBlockDialog({ open: true, offenders: jsonQtyWarning, suggestedMax });
+      return;
+    }
+
     setLoadingOverlay({
       active: true,
       title: "Saving Settings & Database",
@@ -1076,6 +1098,50 @@ const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
                 onClick={() => setGuardDialog({ open: false, targetTab: null, targetAction: null })}
               >
                 Stay Here
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Save-block dialog: not enough questions in some categories ── */}
+      {saveBlockDialog.open && (
+        <div className="ts-guard-overlay">
+          <div className="ts-guard-dialog" style={{ maxWidth: "520px" }}>
+            <div className="ts-guard-icon">🚫</div>
+            <h3 className="ts-guard-title">Cannot Save — Not Enough Questions</h3>
+            <p className="ts-guard-body">
+              The following categories have <strong>fewer questions than the current
+              "Questions / Round" setting ({questionsPerRound})</strong>:
+            </p>
+            <ul style={{ margin: "0.5rem 0 0.75rem 1.25rem", textAlign: "left", color: "#fca5a5", lineHeight: 1.7 }}>
+              {saveBlockDialog.offenders.map(({ name, count }) => (
+                <li key={name}>
+                  <strong>{name}</strong>: only <strong>{count}</strong> question{count !== 1 ? "s" : ""}
+                </li>
+              ))}
+            </ul>
+            <p className="ts-guard-body" style={{ marginBottom: "0.25rem" }}>
+              💡 <strong>Suggestion:</strong> Set <em>Questions / Round</em> to
+              <strong style={{ color: "#86efac" }}> {saveBlockDialog.suggestedMax} </strong>
+              or lower, OR add more questions to the categories above.
+            </p>
+            <div className="ts-guard-actions" style={{ flexWrap: "wrap", gap: "8px" }}>
+              <button
+                className="ts-guard-apply-btn"
+                onClick={() => {
+                  setQuestionsPerRound(saveBlockDialog.suggestedMax);
+                  setJsonQtyWarning([]);
+                  setSaveBlockDialog({ open: false, offenders: [], suggestedMax: 0 });
+                }}
+              >
+                ✅ Use {saveBlockDialog.suggestedMax} Questions / Round
+              </button>
+              <button
+                className="ts-guard-stay-btn"
+                onClick={() => setSaveBlockDialog({ open: false, offenders: [], suggestedMax: 0 })}
+              >
+                ✏️ Fix Manually
               </button>
             </div>
           </div>
@@ -1780,6 +1846,21 @@ const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
             {jsonValid && (
               <div className="ts-json-ok">
                 ✅ Valid — {Object.keys(JSON.parse(jsonText)).length} categories
+              </div>
+            )}
+            {jsonQtyWarning.length > 0 && (
+              <div className="ts-json-qty-warning">
+                <strong>⚠ Question count mismatch</strong> — the following categories have fewer questions than the current
+                "Questions / Round" setting (<strong>{questionsPerRound}</strong>):
+                <ul style={{ margin: "0.4rem 0 0.2rem 1.2rem", lineHeight: 1.65 }}>
+                  {jsonQtyWarning.map(({ name, count }) => (
+                    <li key={name}>
+                      <strong>{name}</strong>: {count} question{count !== 1 ? "s" : ""}
+                    </li>
+                  ))}
+                </ul>
+                Saving is blocked. Lower <em>Questions / Round</em> to{" "}
+                <strong>{Math.min(...jsonQtyWarning.map((o) => o.count))}</strong> or fewer, or add more questions.
               </div>
             )}
           </div>

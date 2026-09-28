@@ -454,6 +454,16 @@
   padding: 0.4rem 0.7rem;
 }
 
+.ts-json-qty-warning {
+  font-size: 0.77rem;
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 5px;
+  padding: 0.55rem 0.75rem;
+  line-height: 1.55;
+}
+
 .ts-json-schema-hint {
   font-size: 0.72rem;
   color: #6b7280;
