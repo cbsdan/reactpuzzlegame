@@ -965,21 +965,23 @@ const TriviaChallengeGame = () => {
         </div>
       )}
 
-      {/* ── Score popup overlay (Toast notification at top) ─────────────── */}
+      {/* ── Floating Centered Square Score Popup ─────────────── */}
       {showPopup && (
         <div className="trivia-score-popup">
-          <div className="trivia-score-popup-inner">
+          <div className={`trivia-score-popup-inner square-centered ${isCorrect ? "popup-correct" : "popup-wrong"}`}>
             <div className="trivia-popup-icon">
-              {isCorrect ? "✅" : "❌"}
-            </div>
-            <div className={`trivia-popup-text ${isCorrect ? "correct-text" : "wrong-text"}`}>
-              {isCorrect ? "Correct!" : selectedAnswer === -1 ? "Time's Up!" : "Wrong!"}
+              {isCorrect ? "⭐" : selectedAnswer === -1 ? "⏰" : "❌"}
             </div>
             <div className={`trivia-popup-points ${popupPoints === 0 ? "zero" : ""}`}>
-              +{popupPoints} pts
+              {isCorrect ? `+${popupPoints}` : "+0"}
             </div>
-            {isCorrect && timerEnabled && scoreBreakdown.speedBonus > 0 && (
+            <div className="trivia-popup-pts-label">PTS</div>
+            {isCorrect && timerEnabled && scoreBreakdown.speedBonus > 0 ? (
               <span className="trivia-popup-speed-badge">⚡ +{scoreBreakdown.speedBonus} speed</span>
+            ) : (
+              <span className={`trivia-popup-status-text ${isCorrect ? "correct" : "wrong"}`}>
+                {isCorrect ? "CORRECT" : selectedAnswer === -1 ? "TIME'S UP" : "INCORRECT"}
+              </span>
             )}
           </div>
         </div>

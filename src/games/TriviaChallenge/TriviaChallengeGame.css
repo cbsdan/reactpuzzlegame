@@ -498,83 +498,135 @@
   filter: grayscale(40%);
 }
 
-/* ── Score popup (non-blocking toast at top) ────────────────────── */
+/* ── Floating Centered Square Score Popup ────────────────────────── */
 .trivia-score-popup {
   position: fixed;
-  top: 1.25rem;
+  top: 50%;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
   z-index: 200;
-  text-align: center;
-  animation: scoreToastSlideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1);
   pointer-events: none;
-  max-width: 90vw;
-}
-
-.trivia-score-popup-inner {
   display: flex;
   align-items: center;
-  gap: 0.85rem;
-  background: rgba(15, 23, 42, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 999px;
-  padding: 0.6rem 1.6rem;
-  backdrop-filter: blur(16px);
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6), 0 0 15px rgba(0, 0, 0, 0.3);
+  justify-content: center;
+  animation: floatingScoreFloat 1.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.trivia-score-popup-inner.square-centered {
+  width: 170px;
+  height: 170px;
+  border-radius: 26px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1.1rem;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(20px);
+  text-align: center;
+  box-sizing: border-box;
+  transition: all 0.3s ease;
+}
+
+.trivia-score-popup-inner.popup-correct {
+  border: 2px solid rgba(16, 185, 129, 0.55);
+  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.7), 0 0 35px rgba(16, 185, 129, 0.4);
+}
+
+.trivia-score-popup-inner.popup-wrong {
+  border: 2px solid rgba(239, 68, 68, 0.55);
+  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.7), 0 0 35px rgba(239, 68, 68, 0.35);
 }
 
 .trivia-popup-icon {
-  font-size: 1.4rem;
+  font-size: 2rem;
   line-height: 1;
-}
-
-.trivia-popup-text {
-  font-size: 1.05rem;
-  font-weight: 700;
-}
-
-.trivia-popup-text.correct-text {
-  color: #34d399;
-}
-
-.trivia-popup-text.wrong-text {
-  color: #f87171;
+  margin-bottom: 0.15rem;
 }
 
 .trivia-popup-points {
-  font-size: 1.15rem;
+  font-size: 2.1rem;
   font-weight: 800;
-  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  line-height: 1.1;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b, #eab308);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  filter: drop-shadow(0 2px 8px rgba(245, 158, 11, 0.3));
 }
 
 .trivia-popup-points.zero {
-  background: linear-gradient(135deg, #94a3b8, #64748b);
+  background: linear-gradient(135deg, #f87171, #ef4444);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  filter: drop-shadow(0 2px 8px rgba(239, 68, 68, 0.3));
+}
+
+.trivia-popup-pts-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #fbbf24;
+  margin-top: -0.1rem;
+  margin-bottom: 0.25rem;
+}
+
+.trivia-score-popup-inner.popup-wrong .trivia-popup-pts-label {
+  color: #f87171;
+}
+
+.trivia-popup-status-text {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  text-transform: uppercase;
+}
+
+.trivia-popup-status-text.correct {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.trivia-popup-status-text.wrong {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.4);
 }
 
 .trivia-popup-speed-badge {
-  font-size: 0.85rem;
+  font-size: 0.72rem;
   font-weight: 700;
   color: #38bdf8;
-  padding: 0.2rem 0.5rem;
-  background: rgba(56, 189, 248, 0.15);
+  padding: 0.18rem 0.55rem;
+  background: rgba(56, 189, 248, 0.18);
   border-radius: 999px;
-  border: 1px solid rgba(56, 189, 248, 0.3);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  white-space: nowrap;
 }
 
-@keyframes scoreToastSlideDown {
-  from {
+@keyframes floatingScoreFloat {
+  0% {
     opacity: 0;
-    transform: translate(-50%, -20px) scale(0.95);
+    transform: translate(-50%, -35%) scale(0.65);
   }
-  to {
+  18% {
     opacity: 1;
-    transform: translate(-50%, 0) scale(1);
+    transform: translate(-50%, -50%) scale(1.05);
+  }
+  30% {
+    transform: translate(-50%, -52%) scale(1);
+  }
+  75% {
+    opacity: 1;
+    transform: translate(-50%, -58%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -70%) scale(0.92);
   }
 }
 
