@@ -193,6 +193,7 @@
   width: 72px;
   text-align: center;
   transition: border-color 0.2s;
+  appearance: textfield;
   -moz-appearance: textfield;
 }
 
@@ -1198,7 +1199,41 @@
   margin-top: 0.2rem;
 }
 
-/* Collapsed: just the toggle button */
+/* Collapsed: action buttons row */
+.ts-add-cat-actions-row {
+  display: flex;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.ts-add-cat-actions-row .ts-add-cat-toggle-btn {
+  flex: 1;
+}
+
+.ts-reset-all-cats-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: inherit;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.08);
+  color: #fca5a5;
+  cursor: pointer;
+  transition: all 0.2s;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.ts-reset-all-cats-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ffffff;
+  border-color: rgba(239, 68, 68, 0.6);
+}
+
 .ts-add-cat-toggle-btn {
   display: flex;
   align-items: center;

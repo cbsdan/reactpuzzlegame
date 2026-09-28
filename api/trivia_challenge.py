@@ -859,6 +859,40 @@ def submit_trivia_answer(room_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+# ── Reset Trivia to Defaults API ────────────────────────────────────
+@trivia_challenge_bp.route('/api/trivia/reset', methods=['POST'])
+def reset_trivia_to_defaults():
+    db = get_database()
+    if db is None:
+        return jsonify({'success': False, 'error': 'Database not configured'}), 503
+    try:
+        categories_coll = db['trivia_categories']
+        questions_coll = db['trivia_questions']
+
+        questions_coll.delete_many({})
+        categories_coll.delete_many({})
+
+        ensure_trivia_defaults(db)
+
+        categories = list(categories_coll.find().sort('name', 1))
+        serialized_cats = []
+        for cat in categories:
+            q_count = questions_coll.count_documents({'categoryId': cat['_id']})
+            serialized_cats.append(serialize_category(cat, q_count))
+
+        questions = list(questions_coll.find().sort([('categoryId', 1), ('difficulty', 1)]))
+        serialized_qs = [serialize_question(q) for q in questions]
+
+        return jsonify({
+            'success': True,
+            'message': 'Trivia categories and questions reset to defaults successfully',
+            'categories': serialized_cats,
+            'questions': serialized_qs
+        }), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 # ── Plain Text Question Importer API ────────────────────────────────
 import re
 
