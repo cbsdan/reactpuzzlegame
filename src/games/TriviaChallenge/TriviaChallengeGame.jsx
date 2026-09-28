@@ -379,23 +379,26 @@ const TriviaChallengeGame = () => {
 
   const timerRef = useRef(null);
   const answeredRef = useRef(false);
+  const revealTimeoutRef = useRef(null);
 
   const [currentQ, setCurrentQ] = useState(() => gameQuestions[initialAnswered] || null);
 
   // Keep currentQ in sync whenever questions or progress updates
+  // but strictly NEVER change currentQ while an answer is actively being reviewed
   useEffect(() => {
-    if (gameQuestions && gameQuestions.length > totalQuestionsAnswered) {
-      setCurrentQ(gameQuestions[totalQuestionsAnswered]);
+    if (gameQuestions && gameQuestions.length > 0 && !answeredRef.current) {
+      setCurrentQ(gameQuestions[totalQuestionsAnswered] || null);
     }
   }, [gameQuestions, totalQuestionsAnswered]);
 
-  // Keep currentQ in sync if the question list itself changes (e.g. initial load or category change)
-  // but only when not actively displaying the feedback popup for the current answer
+  // Cleanup timers on unmount
   useEffect(() => {
-    if (gameQuestions.length > 0 && !answeredRef.current) {
-      setCurrentQ(gameQuestions[totalQuestionsAnswered] || null);
-    }
-  }, [gameQuestions]);
+    return () => {
+      if (revealTimeoutRef.current) {
+        clearTimeout(revealTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // ── Timer logic ──────────────────────────────────────────────
   const stopTimer = useCallback(() => {
@@ -463,6 +466,28 @@ const TriviaChallengeGame = () => {
     return false;
   };
 
+  const getCorrectAnswerText = useCallback((questionObj) => {
+    if (!questionObj) return "";
+    const ans = questionObj.answer;
+    if (typeof ans === "number" && questionObj.choices?.[ans] !== undefined) {
+      return questionObj.choices[ans];
+    }
+    if (typeof ans === "string" && !isNaN(parseInt(ans, 10)) && questionObj.choices?.[parseInt(ans, 10)] !== undefined) {
+      return questionObj.choices[parseInt(ans, 10)];
+    }
+    if (typeof ans === "string" && ans.trim().length === 1) {
+      const letterIdx = ans.trim().toUpperCase().charCodeAt(0) - 65;
+      if (questionObj.choices?.[letterIdx] !== undefined) return questionObj.choices[letterIdx];
+    }
+    if (typeof ans === "string" && Array.isArray(questionObj.choices)) {
+      const matched = questionObj.choices.find(
+        (c) => String(c).trim().toLowerCase() === ans.trim().toLowerCase()
+      );
+      if (matched) return matched;
+    }
+    return String(ans ?? "");
+  }, []);
+
   const calculateScore = (difficulty, remaining) => {
     const diffMultiplier = difficulty || 1;
     const baseScore = diffMultiplier * 100;
@@ -500,11 +525,10 @@ const TriviaChallengeGame = () => {
     const newTotalTime = Math.round((totalTimeTaken + timeSpent) * 100) / 100;
     const calculatedRound = Math.min(totalRounds, Math.floor(newQAnswered / questionsPerRound) + 1);
 
+    // Update score and correct count immediately for responsive UI
     setTotalScore(newTotalScore);
     setTotalCorrectAnswers(newTotalCorrect);
-    setTotalQuestionsAnswered(newQAnswered);
     setTotalTimeTaken(newTotalTime);
-    setCurrentRound(calculatedRound);
 
     const activeRoundNum = Math.min(totalRounds, Math.floor(totalQuestionsAnswered / questionsPerRound) + 1);
     const updatedRoundStats = {
@@ -539,29 +563,48 @@ const TriviaChallengeGame = () => {
     const isRoundEnd = newQAnswered % questionsPerRound === 0;
     const isGameEnd = newQAnswered >= totalPossibleQuestions;
 
-      // Give the player time to read the correct answer before moving on
-      setTimeout(() => {
-        setShowPopup(false);
-        if (isGameEnd) {
-          setPhase("complete");
-        } else if (isRoundEnd) {
-          const completedR = Math.floor(newQAnswered / questionsPerRound);
-          setRoundStats({
-            completedRound: completedR,
-            roundQuestions: questionsPerRound,
-            roundCorrect: updatedRoundStats.correct,
-            roundScore: updatedRoundStats.score,
-          });
-          setPhase("round_complete");
-        } else {
-        setCurrentQ(gameQuestions[newQAnswered]); // ← load next question AFTER delay
-          setSelectedAnswer(null);
-          setIsCorrect(null);
-          answeredRef.current = false;
-          startTimer();
+    // When the user selects wrong (or time runs out), reveal the correct answer for 2 full seconds (2000ms).
+    // When correct, keep visible for 1500ms before transitioning.
+    const feedbackDuration = correct ? 1500 : 2000;
+
+    if (revealTimeoutRef.current) {
+      clearTimeout(revealTimeoutRef.current);
+    }
+
+    revealTimeoutRef.current = setTimeout(() => {
+      setShowPopup(false);
+      setTotalQuestionsAnswered(newQAnswered);
+      setCurrentRound(calculatedRound);
+
+      if (isGameEnd) {
+        answeredRef.current = false;
+        setSelectedAnswer(null);
+        setIsCorrect(null);
+        setPhase("complete");
+      } else if (isRoundEnd) {
+        const completedR = Math.floor(newQAnswered / questionsPerRound);
+        setRoundStats({
+          completedRound: completedR,
+          roundQuestions: questionsPerRound,
+          roundCorrect: updatedRoundStats.correct,
+          roundScore: updatedRoundStats.score,
+        });
+        answeredRef.current = false;
+        setSelectedAnswer(null);
+        setIsCorrect(null);
+        if (gameQuestions[newQAnswered]) {
+          setCurrentQ(gameQuestions[newQAnswered]);
         }
-      }, 1500);
-    };
+        setPhase("round_complete");
+      } else {
+        setCurrentQ(gameQuestions[newQAnswered]);
+        setSelectedAnswer(null);
+        setIsCorrect(null);
+        answeredRef.current = false;
+        startTimer();
+      }
+    }, feedbackDuration);
+  };
 
   const handleTimeout = () => {
     handleAnswer(-1); // -1 = timeout / no choice selected
@@ -760,19 +803,35 @@ const TriviaChallengeGame = () => {
           )}
 
           {/* Question card */}
-          <div className="trivia-question-card">
+          <div
+            className={`trivia-question-card ${
+              selectedAnswer !== null
+                ? isCorrect
+                  ? "card-correct"
+                  : "card-wrong"
+                : ""
+            }`}
+          >
             <div className="trivia-question-text">{currentQ.question}</div>
           </div>
 
           {/* Choices */}
           <div className="trivia-choices">
             {currentQ.choices.map((choice, idx) => {
+              const isSelected = selectedAnswer === idx;
+              const isCorrectChoice = isAnswerCorrect(idx, currentQ);
               let cls = "";
+              let badge = null;
+
               if (selectedAnswer !== null) {
-                if (isAnswerCorrect(idx, currentQ)) {
-                  cls = selectedAnswer === idx ? "correct" : "reveal-correct";
-                } else if (idx === selectedAnswer) {
+                if (isCorrectChoice) {
+                  cls = isSelected ? "correct" : "reveal-correct";
+                  badge = <span className="trivia-choice-tag correct-tag">✔ CORRECT ANSWER</span>;
+                } else if (isSelected) {
                   cls = "wrong";
+                  badge = <span className="trivia-choice-tag wrong-tag">✖ YOUR CHOICE</span>;
+                } else {
+                  cls = "dimmed";
                 }
               }
 
@@ -784,7 +843,8 @@ const TriviaChallengeGame = () => {
                   disabled={selectedAnswer !== null}
                 >
                   <span className="trivia-choice-letter">{LETTERS[idx]}</span>
-                  <span>{choice}</span>
+                  <span className="trivia-choice-text">{choice}</span>
+                  {badge}
                 </button>
               );
             })}
@@ -905,7 +965,7 @@ const TriviaChallengeGame = () => {
         </div>
       )}
 
-      {/* ── Score popup overlay ─────────────── */}
+      {/* ── Score popup overlay (Toast notification at top) ─────────────── */}
       {showPopup && (
         <div className="trivia-score-popup">
           <div className="trivia-score-popup-inner">
@@ -918,32 +978,8 @@ const TriviaChallengeGame = () => {
             <div className={`trivia-popup-points ${popupPoints === 0 ? "zero" : ""}`}>
               +{popupPoints} pts
             </div>
-            {!isCorrect && currentQ && (
-              <div className="trivia-popup-correct-answer">
-                <span className="trivia-popup-correct-label">✔ Correct Answer:</span>
-                <span className="trivia-popup-correct-text">
-                  {(() => {
-                    const ans = currentQ.answer;
-                    if (typeof ans === "number" && currentQ.choices?.[ans] !== undefined)
-                      return currentQ.choices[ans];
-                    if (typeof ans === "string" && !isNaN(parseInt(ans, 10)) && currentQ.choices?.[parseInt(ans, 10)] !== undefined)
-                      return currentQ.choices[parseInt(ans, 10)];
-                    if (typeof ans === "string" && ans.trim().length === 1) {
-                      const letterIdx = ans.trim().toUpperCase().charCodeAt(0) - 65;
-                      if (currentQ.choices?.[letterIdx] !== undefined) return currentQ.choices[letterIdx];
-                    }
-                    return String(ans);
-                  })()}
-                </span>
-              </div>
-            )}
-            {isCorrect && timerEnabled && (
-              <div className="trivia-popup-breakdown">
-                <span className="trivia-base-pts">Base: +{scoreBreakdown.base}</span>
-                {scoreBreakdown.speedBonus > 0 && (
-                  <span className="trivia-speed-pts">⚡ Speed: +{scoreBreakdown.speedBonus}</span>
-                )}
-              </div>
+            {isCorrect && timerEnabled && scoreBreakdown.speedBonus > 0 && (
+              <span className="trivia-popup-speed-badge">⚡ +{scoreBreakdown.speedBonus} speed</span>
             )}
           </div>
         </div>
