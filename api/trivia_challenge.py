@@ -1037,3 +1037,85 @@ def import_text():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+
+# ── JSON Category & Question Importer API ────────────────────────────
+@trivia_challenge_bp.route('/api/trivia/import-json', methods=['POST'])
+def import_json():
+    db = get_database()
+    if db is None:
+        return jsonify({'success': False, 'error': 'Database not configured'}), 503
+
+    try:
+        data = request.get_json() or {}
+        raw_categories = data.get('categories') or data
+        if not isinstance(raw_categories, dict) or not raw_categories:
+            return jsonify({'success': False, 'error': 'Categories JSON object required'}), 400
+
+        categories_coll = db['trivia_categories']
+        questions_coll = db['trivia_questions']
+        now = datetime.now(timezone.utc)
+
+        imported_cats = []
+        total_questions = 0
+
+        for cat_name, cat_data in raw_categories.items():
+            if not isinstance(cat_data, dict):
+                continue
+            cat_name = str(cat_name).strip()
+            if not cat_name or cat_name == 'categories':
+                continue
+
+            icon = str(cat_data.get('icon', '❓')).strip() or '❓'
+            raw_qs = cat_data.get('questions', [])
+            if not isinstance(raw_qs, list):
+                continue
+
+            existing_cat = categories_coll.find_one({'name': {'$regex': f'^{re.escape(cat_name)}$', '$options': 'i'}})
+            if existing_cat:
+                cat_id = existing_cat['_id']
+                categories_coll.update_one({'_id': cat_id}, {'$set': {'icon': icon, 'updatedAt': now}})
+                questions_coll.delete_many({'categoryId': cat_id})
+            else:
+                cat_doc = {'name': cat_name, 'icon': icon, 'createdAt': now, 'updatedAt': now}
+                res = categories_coll.insert_one(cat_doc)
+                cat_id = res.inserted_id
+
+            cat_q_count = 0
+            for q in raw_qs:
+                if not isinstance(q, dict):
+                    continue
+                q_text = str(q.get('question', '')).strip()
+                choices = [str(c).strip() for c in q.get('choices', []) if str(c).strip()]
+                if not q_text or len(choices) < 2:
+                    continue
+
+                ans = int(q.get('answer', 0))
+                ans = max(0, min(len(choices) - 1, ans))
+                diff = max(1, min(5, int(q.get('difficulty', 1))))
+
+                q_doc = {
+                    'categoryId': cat_id,
+                    'question': q_text,
+                    'difficulty': diff,
+                    'choices': choices,
+                    'answer': ans,
+                    'createdAt': now,
+                    'updatedAt': now
+                }
+                questions_coll.insert_one(q_doc)
+                cat_q_count += 1
+                total_questions += 1
+
+            imported_cats.append({'id': str(cat_id), 'name': cat_name, 'questionCount': cat_q_count})
+
+        return jsonify({
+            'success': True,
+            'message': f'Successfully imported {len(imported_cats)} categories and {total_questions} questions',
+            'categories': imported_cats,
+            'totalQuestions': total_questions
+        }), 200
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
