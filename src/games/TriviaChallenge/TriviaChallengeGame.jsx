@@ -6,6 +6,36 @@ import "./TriviaChallengeGame.css";
 const LETTERS = ["A", "B", "C", "D"];
 
 /**
+ * Mulberry32 seeded pseudo-random number generator.
+ * Produces deterministic pseudo-random numbers based on a string seed.
+ */
+function createPrng(seedStr) {
+  let h = 1779033703 ^ (seedStr ? seedStr.length : 0);
+  const str = String(seedStr || "seed");
+  for (let i = 0; i < str.length; i++) {
+    h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+    h = (h << 13) | (h >>> 19);
+  }
+  return function () {
+    h = Math.imul(h ^ (h >>> 16), 2246822507);
+    h = Math.imul(h ^ (h >>> 13), 3266489909);
+    return ((h ^= h >>> 16) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Fisher-Yates shuffle using provided RNG
+ */
+function shuffleArray(arr, rng = Math.random) {
+  const result = [...arr];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
+/**
  * TriviaChallengeGame – Player-facing trivia component.
  *
  * Requirements:
@@ -27,65 +57,149 @@ const TriviaChallengeGame = () => {
   const roundCategories = triviaConfig.roundCategories || [];
   const allowPlayerCategoryChoice = triviaConfig.allowPlayerCategoryChoice || false;
 
-  // Player's locally chosen category (overrides admin assignment when allowPlayerCategoryChoice is on)
+  // Track player chosen category per round and active player category
+  const [playerRoundCategories, setPlayerRoundCategories] = useState({});
   const [playerCategory, setPlayerCategory] = useState(null);
 
-  // Build list of active questions for this session based on Admin per-round configuration (memoized)
+  // Build list of active questions with strict category isolation & true randomization
   const gameQuestions = useMemo(() => {
-    let allQuestionsList = [];
-    const catKeys = Object.keys(questionsData);
-    const usedIndicesByCat = {};
+    const catKeys = Object.keys(questionsData).filter((k) => {
+      const catObj = questionsData[k];
+      const qs = catObj?.questions || catObj;
+      return Array.isArray(qs) && qs.length > 0;
+    });
+
+    if (catKeys.length === 0) {
+      const defaultCat = DEFAULT_TRIVIA_QUESTIONS["Movies"] || Object.values(DEFAULT_TRIVIA_QUESTIONS)[0];
+      return (defaultCat?.questions || []).map((q) => ({
+        ...q,
+        category: "Movies",
+        icon: defaultCat?.icon || "🎬",
+      }));
+    }
+
+    // Seeded generator so all players in the room get the exact same randomized questions
+    const seedBase = `${gameState?.roomId || "room"}-${gameState?.sessionNumber || 1}`;
+    const allQuestionsList = [];
+    const usedCountByCat = {};
 
     for (let r = 0; r < totalRounds; r++) {
-      // If player chose their own category, use it for every round
-      const assignedCat = playerCategory ||
-        roundCategories[r] || selectedCategory || "All";
-      let roundPool = [];
+      const roundNum = r + 1;
+      let assignedCat = "All";
 
-      if (assignedCat !== "All" && questionsData[assignedCat]) {
-        const catObj = questionsData[assignedCat];
-        const qs = catObj.questions || catObj;
-        if (Array.isArray(qs) && qs.length > 0) {
-          roundPool = qs.map((q) => ({ ...q, category: assignedCat, icon: catObj.icon || "❓" }));
+      if (allowPlayerCategoryChoice) {
+        assignedCat = playerRoundCategories[roundNum] || playerCategory || "All";
+      } else {
+        const rc = roundCategories[r];
+        if (rc && rc !== "All" && questionsData[rc]) {
+          assignedCat = rc;
+        } else if (selectedCategory && selectedCategory !== "All" && questionsData[selectedCategory]) {
+          assignedCat = selectedCategory;
+        } else if (rc && rc !== "All") {
+          // Stale category not present in questionsData: fall back to valid category, NEVER leak across all
+          assignedCat = (questionsData[selectedCategory] ? selectedCategory : catKeys[0]) || "All";
+        } else {
+          assignedCat = "All";
         }
       }
 
-      if (roundPool.length === 0) {
+      const roundRng = createPrng(`${seedBase}-round-${roundNum}-${assignedCat}`);
+      let selectedForRound = [];
+
+      if (assignedCat !== "All" && questionsData[assignedCat]) {
+        // ── STRICT CATEGORY ISOLATION: QUESTIONS MUST ONLY COME FROM THIS CATEGORY ──
+        const catObj = questionsData[assignedCat];
+        const rawQs = catObj.questions || catObj;
+        const mappedQs = rawQs.map((q, idx) => ({
+          ...q,
+          category: assignedCat,
+          icon: catObj.icon || "❓",
+          _poolIdx: idx,
+        }));
+
+        // Shuffle questions within this specific category
+        const shuffledCategory = shuffleArray(mappedQs, roundRng);
+
+        if (!usedCountByCat[assignedCat]) {
+          usedCountByCat[assignedCat] = 0;
+        }
+        const startIdx = usedCountByCat[assignedCat];
+
+        if (startIdx + questionsPerRound <= shuffledCategory.length) {
+          selectedForRound = shuffledCategory.slice(startIdx, startIdx + questionsPerRound);
+          usedCountByCat[assignedCat] = startIdx + questionsPerRound;
+        } else {
+          // Pool exhausted for this category: cycle back within the SAME category, never pull from other categories
+          const firstChunk = shuffledCategory.slice(startIdx);
+          const needed = questionsPerRound - firstChunk.length;
+          const reshuffled = shuffleArray(mappedQs, roundRng);
+          const secondChunk = reshuffled.slice(0, needed);
+          selectedForRound = [...firstChunk, ...secondChunk];
+          usedCountByCat[assignedCat] = needed;
+        }
+      } else {
+        // ── "All" (Mixed Categories Mode): Randomize fairly across all enabled categories ──
+        const mixedPool = [];
         catKeys.forEach((catKey) => {
           const catObj = questionsData[catKey];
           const qs = catObj.questions || catObj;
           if (Array.isArray(qs)) {
-            qs.forEach((q) => {
-              roundPool.push({ ...q, category: catKey, icon: catObj.icon || "❓" });
+            qs.forEach((q, idx) => {
+              mixedPool.push({
+                ...q,
+                category: catKey,
+                icon: catObj.icon || "❓",
+                _poolIdx: idx,
+              });
             });
           }
         });
-      }
 
-      const poolKey = assignedCat !== "All" ? assignedCat : "All";
-      const startIndex = usedIndicesByCat[poolKey] || 0;
-      let selectedForRound = roundPool.slice(startIndex, startIndex + questionsPerRound);
+        const shuffledMixed = shuffleArray(mixedPool, roundRng);
+        if (!usedCountByCat["__MIXED__"]) {
+          usedCountByCat["__MIXED__"] = 0;
+        }
+        const startIdx = usedCountByCat["__MIXED__"];
 
-      if (selectedForRound.length < questionsPerRound && roundPool.length > 0) {
-        const needed = questionsPerRound - selectedForRound.length;
-        selectedForRound = [...selectedForRound, ...roundPool.slice(0, needed)];
-        usedIndicesByCat[poolKey] = needed;
-      } else {
-        usedIndicesByCat[poolKey] = startIndex + questionsPerRound;
+        if (startIdx + questionsPerRound <= shuffledMixed.length) {
+          selectedForRound = shuffledMixed.slice(startIdx, startIdx + questionsPerRound);
+          usedCountByCat["__MIXED__"] = startIdx + questionsPerRound;
+        } else {
+          const firstChunk = shuffledMixed.slice(startIdx);
+          const needed = questionsPerRound - firstChunk.length;
+          const secondChunk = shuffleArray(mixedPool, roundRng).slice(0, needed);
+          selectedForRound = [...firstChunk, ...secondChunk];
+          usedCountByCat["__MIXED__"] = needed;
+        }
       }
 
       allQuestionsList.push(...selectedForRound);
     }
 
-    if (allQuestionsList.length === 0) {
-      const defaultCat = DEFAULT_TRIVIA_QUESTIONS["Movies"];
-      allQuestionsList = (defaultCat.questions || []).map((q) => ({ ...q, category: "Movies", icon: defaultCat.icon }));
-    }
-
-    return allQuestionsList.slice(0, totalRounds * questionsPerRound);
-  }, [questionsData, selectedCategory, roundCategories, totalRounds, questionsPerRound, playerCategory]);
+    return allQuestionsList;
+  }, [
+    questionsData,
+    selectedCategory,
+    roundCategories,
+    totalRounds,
+    questionsPerRound,
+    allowPlayerCategoryChoice,
+    playerRoundCategories,
+    playerCategory,
+    gameState?.roomId,
+    gameState?._id,
+    gameState?.sessionNumber,
+  ]);
 
   const totalPossibleQuestions = Math.min(totalRounds * questionsPerRound, gameQuestions.length);
+
+  // Derived: true category name for each round
+  const roundCategoryNames = useMemo(() => {
+    return Array.from({ length: totalRounds }).map((_, r) => {
+      const q = gameQuestions[r * questionsPerRound];
+      return q?.category || roundCategories[r] || selectedCategory || "All";
+    });
+  }, [gameQuestions, totalRounds, questionsPerRound, roundCategories, selectedCategory]);
 
   // ── Local game state (initialized from player history for async play) ──
   const tcSaved = currentPlayer?.triviaChallenge || {};
@@ -129,7 +243,14 @@ const TriviaChallengeGame = () => {
   const timerRef = useRef(null);
   const answeredRef = useRef(false);
 
-  const [currentQ, setCurrentQ] = useState(gameQuestions[initialAnswered] || null);
+  const [currentQ, setCurrentQ] = useState(() => gameQuestions[initialAnswered] || null);
+
+  // Keep currentQ in sync whenever questions or progress updates
+  useEffect(() => {
+    if (gameQuestions && gameQuestions.length > totalQuestionsAnswered) {
+      setCurrentQ(gameQuestions[totalQuestionsAnswered]);
+    }
+  }, [gameQuestions, totalQuestionsAnswered]);
 
   // ── Timer logic ──────────────────────────────────────────────
   const stopTimer = useCallback(() => {
@@ -162,14 +283,6 @@ const TriviaChallengeGame = () => {
     }
     return () => stopTimer();
   }, [phase, totalQuestionsAnswered, startTimer, stopTimer]);
-
-  // Sync currentQ when playerCategory changes (gameQuestions gets rebuilt)
-  useEffect(() => {
-    if (playerCategory) {
-      setCurrentQ(gameQuestions[totalQuestionsAnswered] || null);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playerCategory]);
 
   // Auto-submit when timer runs out
   useEffect(() => {
@@ -324,6 +437,10 @@ const TriviaChallengeGame = () => {
 
   // Handler when player selects a category
   const handleCategoryPick = (catName) => {
+    setPlayerRoundCategories((prev) => ({
+      ...prev,
+      [currentRound]: catName,
+    }));
     setPlayerCategory(catName);
     setSelectedAnswer(null);
     setIsCorrect(null);
@@ -511,9 +628,9 @@ const TriviaChallengeGame = () => {
           <div className="trivia-round-card">
             <div style={{ fontSize: "3rem" }}>🎉</div>
             <h2 className="trivia-round-title">Round {roundStats.completedRound} Complete!</h2>
-            {roundCategories[roundStats.completedRound - 1] && (
+            {roundCategoryNames[roundStats.completedRound - 1] && (
               <div className="trivia-round-cat-tag">
-                Category: {roundCategories[roundStats.completedRound - 1]}
+                Category: {roundCategoryNames[roundStats.completedRound - 1]}
               </div>
             )}
 
