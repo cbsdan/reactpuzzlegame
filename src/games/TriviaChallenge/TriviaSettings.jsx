@@ -700,25 +700,59 @@ const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
     try {
       const parsed = JSON.parse(text);
       if (typeof parsed !== "object" || Array.isArray(parsed)) {
-        setJsonError("Must be an object with category names as keys."); return;
+        setJsonError("Must be an object with category names as keys.");
+        return;
+      }
+      const newCatNames = Object.keys(parsed);
+      if (newCatNames.length === 0) {
+        setJsonError("JSON object cannot be empty. Please include at least one category.");
+        return;
       }
       for (const [catName, catData] of Object.entries(parsed)) {
         const questions = catData.questions || catData;
         if (!Array.isArray(questions)) {
-          setJsonError(`"${catName}" must have a "questions" array.`); return;
+          setJsonError(`"${catName}" must have a "questions" array.`);
+          return;
         }
         for (let i = 0; i < questions.length; i++) {
           const q = questions[i];
           if (!q.question || !Array.isArray(q.choices) || q.answer === undefined) {
-            setJsonError(`"${catName}" question #${i + 1} missing required fields (question, choices, answer).`); return;
+            setJsonError(`"${catName}" question #${i + 1} missing required fields (question, choices, answer).`);
+            return;
           }
           if (q.choices.length < 2) {
-            setJsonError(`"${catName}" question #${i + 1} needs at least 2 choices.`); return;
+            setJsonError(`"${catName}" question #${i + 1} needs at least 2 choices.`);
+            return;
           }
         }
       }
       setJsonCustom(true);
       setJsonValid(true);
+
+      // Synchronize category order and editors with the parsed JSON
+      const newEditors = {};
+      newCatNames.forEach((catName) => {
+        const catData = parsed[catName];
+        const qs = Array.isArray(catData.questions) ? catData.questions : Array.isArray(catData) ? catData : [];
+        newEditors[catName] = {
+          icon: catData.icon || "❓",
+          questions: qs.map((q) => ({
+            ...q,
+            choices: Array.isArray(q.choices) ? [...q.choices] : [],
+          })),
+          modified: true,
+          isCustomCat: true,
+          isDirty: false,
+        };
+      });
+
+      setCatOrder(newCatNames);
+      setEnabledCats(new Set(newCatNames));
+      setCatEditors(newEditors);
+
+      const validCatSet = new Set(["All", ...newCatNames]);
+      setRoundCategories((prev) => prev.map((rc) => (validCatSet.has(rc) ? rc : "All")));
+      setSelectedCategory((prev) => (newCatNames.includes(prev) || prev === "All" ? prev : "All"));
     } catch (e) {
       setJsonError("Invalid JSON: " + e.message);
     }
@@ -726,7 +760,24 @@ const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
 
   const handleResetJson = () => {
     setJsonText(JSON.stringify(DEFAULT_TRIVIA_QUESTIONS, null, 2));
-    setJsonError(""); setJsonValid(false); setJsonCustom(false); setJsonDirty(false);
+    setJsonError("");
+    setJsonValid(false);
+    setJsonCustom(false);
+    setJsonDirty(false);
+    setCatOrder(DEFAULT_CATS);
+    setEnabledCats(new Set(DEFAULT_CATS));
+    const init = {};
+    DEFAULT_CATS.forEach((cat) => {
+      init[cat] = buildEditorEntry(
+        DEFAULT_TRIVIA_QUESTIONS[cat].questions,
+        false,
+        DEFAULT_TRIVIA_QUESTIONS[cat].icon,
+        false
+      );
+    });
+    setCatEditors(init);
+    setRoundCategories(Array(rounds).fill("All"));
+    setSelectedCategory("All");
   };
 
   /* ══════════════════════════════════════
@@ -756,58 +807,80 @@ const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
       });
     }
 
-    try {
-      // 1. Delete queued removed questions from backend DB
-      for (const qId of deletedQIds) {
-        try {
-          await fetch(`${API_URL}/api/trivia/questions/${qId}`, { method: "DELETE" });
-        } catch (err) {
-          console.error(`Failed to delete question ${qId} from DB:`, err);
-        }
-      }
-      setDeletedQIds(new Set());
+    const activeCatKeys = Object.keys(questions);
+    const sanitizedRoundCategories = roundCategories
+      .slice(0, Math.max(1, Math.min(10, rounds)))
+      .map((rc) => (activeCatKeys.includes(rc) || rc === "All" ? rc : (activeCatKeys[0] || "All")));
 
-      // 2. Persist any custom/modified category and question edits to backend DB
-      for (const [catName, editor] of Object.entries(catEditors)) {
-        if (!editor.modified && !editor.isCustomCat) continue;
-        let catId = editor.dbId;
-        if (!catId) {
-          const catRes = await fetch(`${API_URL}/api/trivia/categories`, {
+    const sanitizedSelectedCategory =
+      activeCatKeys.includes(selectedCategory) || selectedCategory === "All"
+        ? selectedCategory
+        : (activeCatKeys[0] || "All");
+
+    try {
+      if (jsonCustom && jsonValid) {
+        try {
+          await fetch(`${API_URL}/api/trivia/import-json`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name: catName, icon: editor.icon }),
+            body: JSON.stringify({ categories: questions }),
           });
-          const catData = await catRes.json();
-          if (catData.success && catData.category) {
-            catId = catData.category.id;
+        } catch (err) {
+          console.error("Failed to sync JSON to MongoDB /api/trivia/import-json:", err);
+        }
+      } else {
+        // 1. Delete queued removed questions from backend DB
+        for (const qId of deletedQIds) {
+          try {
+            await fetch(`${API_URL}/api/trivia/questions/${qId}`, { method: "DELETE" });
+          } catch (err) {
+            console.error(`Failed to delete question ${qId} from DB:`, err);
           }
         }
-        if (catId && Array.isArray(editor.questions)) {
-          for (const q of editor.questions) {
-            if (!q.question?.trim()) continue;
-            if (q.dbId) {
-              await fetch(`${API_URL}/api/trivia/questions/${q.dbId}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  question: q.question,
-                  difficulty: q.difficulty,
-                  choices: q.choices,
-                  answer: q.answer,
-                }),
-              });
-            } else {
-              await fetch(`${API_URL}/api/trivia/questions`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  categoryId: catId,
-                  question: q.question,
-                  difficulty: q.difficulty,
-                  choices: q.choices,
-                  answer: q.answer,
-                }),
-              });
+        setDeletedQIds(new Set());
+
+        // 2. Persist any custom/modified category and question edits to backend DB
+        for (const [catName, editor] of Object.entries(catEditors)) {
+          if (!editor.modified && !editor.isCustomCat) continue;
+          let catId = editor.dbId;
+          if (!catId) {
+            const catRes = await fetch(`${API_URL}/api/trivia/categories`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ name: catName, icon: editor.icon }),
+            });
+            const catData = await catRes.json();
+            if (catData.success && catData.category) {
+              catId = catData.category.id;
+            }
+          }
+          if (catId && Array.isArray(editor.questions)) {
+            for (const q of editor.questions) {
+              if (!q.question?.trim()) continue;
+              if (q.dbId) {
+                await fetch(`${API_URL}/api/trivia/questions/${q.dbId}`, {
+                  method: "PUT",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    question: q.question,
+                    difficulty: q.difficulty,
+                    choices: q.choices,
+                    answer: q.answer,
+                  }),
+                });
+              } else {
+                await fetch(`${API_URL}/api/trivia/questions`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    categoryId: catId,
+                    question: q.question,
+                    difficulty: q.difficulty,
+                    choices: q.choices,
+                    answer: q.answer,
+                  }),
+                });
+              }
             }
           }
         }
@@ -823,8 +896,8 @@ const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
       questionsPerRound: Math.max(1, Math.min(20, questionsPerRound)),
       timerEnabled,
       timerSeconds: Math.max(5, Math.min(60, timerSeconds)),
-      selectedCategory,
-      roundCategories: roundCategories.slice(0, Math.max(1, Math.min(10, rounds))),
+      selectedCategory: sanitizedSelectedCategory,
+      roundCategories: sanitizedRoundCategories,
       allowPlayerCategoryChoice,
       questions,
     });
@@ -1195,10 +1268,31 @@ const TriviaSettings = ({ initialConfig, onSave, onCancel }) => {
             </div>
 
             <div className="ts-section">
-              <div className="ts-section-title">🎯 Per-Round Category Assignment (Admin Only)</div>
+              <div className="ts-section-title">🎯 Category Assignment (Admin Only)</div>
               <p className="ts-hint" style={{ marginBottom: "10px" }}>
-                Select a specific category for each round (or "All Enabled Categories" for mixed questions):
+                Select a category for all rounds or assign specific categories per round:
               </p>
+              <div className="ts-row" style={{ marginBottom: "12px", background: "rgba(255,255,255,0.04)", padding: "8px 12px", borderRadius: "8px" }}>
+                <span className="ts-label" style={{ fontWeight: 600 }}>Default for All Rounds</span>
+                <select
+                  className="ts-input"
+                  value={selectedCategory || "All"}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedCategory(val);
+                    setRoundCategories(Array(rounds).fill(val));
+                  }}
+                  style={{ minWidth: "260px", padding: "6px 10px", borderRadius: "6px" }}
+                >
+                  <option value="All">🌟 All Enabled Categories (Mixed)</option>
+                  {catOrder.filter((cat) => enabledCats.has(cat)).map((cat) => (
+                    <option key={cat} value={cat}>
+                      {catEditors[cat]?.icon || DEFAULT_TRIVIA_QUESTIONS[cat]?.icon || "❓"} {cat}
+                    </option>
+                  ))}
+                </select>
+                <span className="ts-hint">Quickly set all rounds to this category</span>
+              </div>
               {Array.from({ length: Math.max(1, Math.min(10, rounds)) }).map((_, rIdx) => (
                 <div key={rIdx} className="ts-row" style={{ marginBottom: "8px" }}>
                   <span className="ts-label">Round {rIdx + 1} Category</span>
