@@ -281,29 +281,29 @@ const TriviaChallengeGame = () => {
     const isRoundEnd = newQAnswered % questionsPerRound === 0;
     const isGameEnd = newQAnswered >= totalPossibleQuestions;
 
-    // Give the player time to read the correct answer before moving on
-    setTimeout(() => {
-      setShowPopup(false);
-      if (isGameEnd) {
-        setPhase("complete");
-      } else if (isRoundEnd) {
-        const completedR = Math.floor(newQAnswered / questionsPerRound);
-        setRoundStats({
-          completedRound: completedR,
-          roundQuestions: questionsPerRound,
-          roundCorrect: updatedRoundStats.correct,
-          roundScore: updatedRoundStats.score,
-        });
-        setPhase("round_complete");
-      } else {
-       setCurrentQ(gameQuestions[newQAnswered]); // ← load next question AFTER delay
-        setSelectedAnswer(null);
-        setIsCorrect(null);
-        answeredRef.current = false;
-        startTimer();
-      }
-    }, 1500);
-  };
+      // Give the player time to read the correct answer before moving on
+      setTimeout(() => {
+        setShowPopup(false);
+        if (isGameEnd) {
+          setPhase("complete");
+        } else if (isRoundEnd) {
+          const completedR = Math.floor(newQAnswered / questionsPerRound);
+          setRoundStats({
+            completedRound: completedR,
+            roundQuestions: questionsPerRound,
+            roundCorrect: updatedRoundStats.correct,
+            roundScore: updatedRoundStats.score,
+          });
+          setPhase("round_complete");
+        } else {
+        setCurrentQ(gameQuestions[newQAnswered]); // ← load next question AFTER delay
+          setSelectedAnswer(null);
+          setIsCorrect(null);
+          answeredRef.current = false;
+          startTimer();
+        }
+      }, 1500);
+    };
 
   const handleTimeout = () => {
     handleAnswer(-1); // -1 = timeout / no choice selected
